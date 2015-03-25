@@ -52,8 +52,11 @@ import org.apache.hadoop.hive.serde2.io.ByteWritable;
 import org.apache.hadoop.hive.serde2.io.DoubleWritable;
 import org.apache.hadoop.hive.serde2.io.ShortWritable;
 import org.apache.hadoop.hive.serde2.lazy.LazyUtils;
+import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.LongObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorUtils;
 import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.io.BooleanWritable;
 import org.apache.hadoop.io.FloatWritable;
@@ -115,7 +118,7 @@ public class HiveHBaseTableInputFormat extends TableInputFormatBase
     if (!readAllColumns) {
       for (int i : readColIDs) {
         ColumnMapping colMap = columnsMapping.get(i);
-        if (colMap.hbaseRowKey) {
+        if (colMap.hbaseRowKey || colMap.hbaseTimestampKey) {
           continue;
         }
 
@@ -141,7 +144,7 @@ public class HiveHBaseTableInputFormat extends TableInputFormatBase
     if (empty) {
       for (int i = 0; i < columnsMapping.size(); i++) {
         ColumnMapping colMap = columnsMapping.get(i);
-        if (colMap.hbaseRowKey) {
+        if (colMap.hbaseRowKey || colMap.hbaseTimestampKey) {
           continue;
         }
 
@@ -247,10 +250,12 @@ public class HiveHBaseTableInputFormat extends TableInputFormatBase
    * @param jobConf configuration for the scan
    *
    * @param iKey 0-based offset of key column within Hive table
+   * @param iTimestamp 0-based offset of timestamp column within Hive table
+   *
    *
    * @return converted table split if any
    */
-  private Scan createFilterScan(JobConf jobConf, int iKey, boolean isKeyBinary)
+  private Scan createFilterScan(JobConf jobConf, int iKey, int iTimestamp, boolean isKeyBinary)
       throws IOException {
 
     // TODO: assert iKey is HBaseSerDe#HBASE_KEY_COL
@@ -267,6 +272,12 @@ public class HiveHBaseTableInputFormat extends TableInputFormatBase
     String colType = jobConf.get(serdeConstants.LIST_COLUMN_TYPES).split(",")[iKey];
     IndexPredicateAnalyzer analyzer = newIndexPredicateAnalyzer(colName,colType, isKeyBinary);
 
+    String tsColName = null;
+    if (iTimestamp >= 0) {
+    	tsColName = jobConf.get(serdeConstants.LIST_COLUMNS).split(",")[iTimestamp];
+    	analyzer.allowColumnName(tsColName);
+    }
+
     List<IndexSearchCondition> searchConditions =
       new ArrayList<IndexSearchCondition>();
     ExprNodeDesc residualPredicate =
@@ -282,11 +293,15 @@ public class HiveHBaseTableInputFormat extends TableInputFormatBase
     if (residualPredicate != null) {
       LOG.debug("Ignoring residual predicate " + residualPredicate.getExprString());
     }
-
+    
     // Convert the search condition into a restriction on the HBase scan
     byte [] startRow = HConstants.EMPTY_START_ROW, stopRow = HConstants.EMPTY_END_ROW;
     for (IndexSearchCondition sc : searchConditions){
-
+    	  // Convert the search condition into a restriction on the HBase scan
+        if (sc.getColumnDesc().getColumn().equals(tsColName)) {
+            setupTimestampRange(scan, sc);
+            continue;
+           }
       ExprNodeConstantEvaluator eval = new ExprNodeConstantEvaluator(sc.getConstantDesc());
       PrimitiveObjectInspector objInspector;
       Object writable;
@@ -374,6 +389,49 @@ public class HiveHBaseTableInputFormat extends TableInputFormatBase
     System.arraycopy(current, 0, next, 0, current.length);
     return next;
   }
+  
+  
+  private void setupTimestampRange(Scan scan, 
+		  IndexSearchCondition sc) throws IOException { 
+		 long timestamp;
+		  try {
+			  	ExprNodeConstantEvaluator eval =
+				  	new ExprNodeConstantEvaluator(sc.getConstantDesc());
+		  		ObjectInspector inspector = eval.initialize(null);
+		  		Object value = eval.evaluate(null);
+		  		if (inspector instanceof LongObjectInspector) {
+		  			timestamp = ((LongObjectInspector)inspector).get(value);
+		  		} else {
+		  			PrimitiveObjectInspector primitive = (PrimitiveObjectInspector) inspector;
+		  			timestamp = PrimitiveObjectInspectorUtils.getTimestamp(value, primitive).getTime();
+		  		}
+		  } catch (HiveException e) {
+			  throw new IOException(e);
+		  }
+		  long start = 0;
+		  long end = Long.MAX_VALUE;
+		  String comparisonOp = sc.getComparisonOp();
+		  if("org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPEqual".equals(comparisonOp)){
+			  start = timestamp;
+			  end = timestamp + 1;
+		  } else if ("org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPLessThan".equals(comparisonOp)){
+			  end = timestamp; 
+		  } else if ("org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPEqualOrGreaterThan"
+		  .equals(comparisonOp)) {
+			  start = timestamp;
+		  } else if ("org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPGreaterThan"
+		  .equals(comparisonOp)){
+			  start = timestamp + 1;
+		  } else if ("org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPEqualOrLessThan"
+		  .equals(comparisonOp)){
+			  end = timestamp + 1;
+		  } else {
+			  throw new IOException(comparisonOp + " is not a supported comparison operator");
+		  }
+		  scan.setTimeRange(start, end); 
+		 }
+  
+  
   /**
    * Instantiates a new predicate analyzer suitable for
    * determining how to push a filter down into the HBase scan,
@@ -431,9 +489,10 @@ public class HiveHBaseTableInputFormat extends TableInputFormatBase
     }
 
     int iKey;
-
+    int iTimestamp = -1;
     try {
       iKey = HBaseSerDe.getRowKeyColumnOffset(columnsMapping);
+      iTimestamp = HBaseSerDe.getTimestampColumnOffset(columnsMapping);
     } catch (SerDeException e) {
       throw new IOException(e);
     }
@@ -444,7 +503,7 @@ public class HiveHBaseTableInputFormat extends TableInputFormatBase
     // split per region, the implementation actually takes the scan
     // definition into account and excludes regions which don't satisfy
     // the start/stop row conditions (HBASE-1829).
-    Scan scan = createFilterScan(jobConf, iKey,
+    Scan scan = createFilterScan(jobConf, iKey, iTimestamp, 
         getStorageFormatOfKey(columnsMapping.get(iKey).mappingSpec,
             jobConf.get(HBaseSerDe.HBASE_TABLE_DEFAULT_STORAGE_TYPE, "string")));
 
@@ -456,7 +515,7 @@ public class HiveHBaseTableInputFormat extends TableInputFormatBase
     // same as in getRecordReader?
     for (int i = 0; i <columnsMapping.size(); i++) {
       ColumnMapping colMap = columnsMapping.get(i);
-      if (colMap.hbaseRowKey) {
+      if (colMap.hbaseRowKey || colMap.hbaseTimestampKey) {
         continue;
       }
 

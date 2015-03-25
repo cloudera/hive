@@ -18,16 +18,22 @@
 
 package org.apache.hadoop.hive.hbase;
 
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hive.hbase.HBaseSerDe.ColumnMapping;
+import org.apache.hadoop.hive.serde2.io.TimestampWritable;
 import org.apache.hadoop.hive.serde2.lazy.ByteArrayRef;
 import org.apache.hadoop.hive.serde2.lazy.LazyFactory;
+import org.apache.hadoop.hive.serde2.lazy.LazyLong;
 import org.apache.hadoop.hive.serde2.lazy.LazyObject;
+import org.apache.hadoop.hive.serde2.lazy.LazyString;
 import org.apache.hadoop.hive.serde2.lazy.LazyStruct;
+import org.apache.hadoop.hive.serde2.lazy.LazyTimestamp;
 import org.apache.hadoop.hive.serde2.lazy.objectinspector.LazyMapObjectInspector;
 import org.apache.hadoop.hive.serde2.lazy.objectinspector.LazySimpleStructObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
@@ -93,7 +99,7 @@ public class LazyHBaseRow extends LazyStruct {
       for (int i = 0; i < fields.length; i++) {
         ColumnMapping colMap = columnsMapping.get(i);
 
-        if (colMap.qualifierName == null && !colMap.hbaseRowKey) {
+        if (colMap.qualifierName == null && !colMap.hbaseRowKey && !colMap.hbaseTimestampKey) {
           // a column family
           fields[i] = new LazyHBaseCellMap(
               (LazyMapObjectInspector) fieldRefs.get(i).getFieldObjectInspector());
@@ -159,6 +165,22 @@ public class LazyHBaseRow extends LazyStruct {
       if (colMap.hbaseRowKey) {
         ref = new ByteArrayRef();
         ref.setData(result.getRow());
+      } else if (colMap.hbaseTimestampKey) {
+    	  KeyValue[] kvs = result.raw();
+    	  if (kvs == null || kvs.length == 0) {
+    		  return null;
+    	  } else {
+    		  long timestamp = kvs[0].getTimestamp();
+    		  LazyObject lz = fields[fieldID];
+    		  if (lz instanceof LazyTimestamp) {
+    			  ((LazyTimestamp)lz).getWritableObject().set(new Timestamp(timestamp));
+    		  } else if (lz instanceof LazyString) {
+    			  	String stringfied = new TimestampWritable(new Timestamp(timestamp)).toString();
+    		  		((LazyString)lz).getWritableObject().set(stringfied);
+    		  } else {
+    		  		((LazyLong)lz).getWritableObject().set(timestamp);
+    	  	  }
+    	  }
       } else {
         if (colMap.qualifierName == null) {
           // it is a column family
