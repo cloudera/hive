@@ -40,10 +40,12 @@ import org.apache.hadoop.hive.ql.exec.OperatorFactory;
 import org.apache.hadoop.hive.ql.exec.ReduceSinkOperator;
 import org.apache.hadoop.hive.ql.exec.SMBMapJoinOperator;
 import org.apache.hadoop.hive.ql.exec.TableScanOperator;
+import org.apache.hadoop.hive.ql.exec.LimitOperator;
 import org.apache.hadoop.hive.ql.exec.Task;
 import org.apache.hadoop.hive.ql.exec.TaskFactory;
 import org.apache.hadoop.hive.ql.exec.UnionOperator;
 import org.apache.hadoop.hive.ql.exec.Utilities;
+import org.apache.hadoop.hive.ql.exec.RowSchema;
 import org.apache.hadoop.hive.ql.hooks.ReadEntity;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Partition;
@@ -793,6 +795,22 @@ public final class GenMapRedUtils {
     return op;
   }
 
+  /**
+   * return recursive lookup the parent operator schema util the parent operator is not LimitOperator
+   *
+   * @param parent
+   * @return
+     */
+  private static RowSchema getParentRowSchema(Operator<? extends Serializable> parent) {
+    Operator<? extends Serializable> pp = parent;
+    RowSchema ppSchema = pp.getSchema();
+    while (pp instanceof LimitOperator) {
+      pp = pp.getParentOperators().get(0);
+      ppSchema = pp.getSchema();
+    }
+    return ppSchema;
+  }
+
   @SuppressWarnings("nls")
   /**
    * Merge the tasks - by creating a temporary file between them.
@@ -825,8 +843,9 @@ public final class GenMapRedUtils {
     String taskTmpDir = baseCtx.getMRTmpFileURI();
 
     Operator<? extends Serializable> parent = op.getParentOperators().get(posn);
+    RowSchema ppSchema = getParentRowSchema(parent);
     TableDesc tt_desc = PlanUtils.getIntermediateFileTableDesc(PlanUtils
-        .getFieldSchemasFromRowSchema(parent.getSchema(), "temporarycol"));
+        .getFieldSchemasFromRowSchema(ppSchema, "temporarycol"));
 
     // Create a file sink operator for this file name
     boolean compressIntermediate = parseCtx.getConf().getBoolVar(
@@ -840,7 +859,7 @@ public final class GenMapRedUtils {
           HiveConf.ConfVars.COMPRESSINTERMEDIATETYPE));
     }
     Operator<? extends Serializable> fs_op = putOpInsertMap(OperatorFactory
-        .get(desc, parent.getSchema()), null, parseCtx);
+        .get(desc, ppSchema), null, parseCtx);
 
     // replace the reduce child with this operator
     List<Operator<? extends Serializable>> childOpList = parent
@@ -861,7 +880,7 @@ public final class GenMapRedUtils {
     // TableScanOperator is implicitly created here for each MapOperator
     RowResolver rowResolver = opProcCtx.getParseCtx().getOpParseCtx().get(parent).getRowResolver();
     Operator<? extends Serializable> ts_op = putOpInsertMap(OperatorFactory
-        .get(TableScanDesc.class, parent.getSchema()), rowResolver, parseCtx);
+        .get(TableScanDesc.class, ppSchema), rowResolver, parseCtx);
 
     childOpList = new ArrayList<Operator<? extends Serializable>>();
     childOpList.add(op);
