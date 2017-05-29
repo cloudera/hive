@@ -19,15 +19,19 @@
 package org.apache.hadoop.hive.ql.plan;
 
 import java.util.HashMap;
+import java.util.List;
 
 @Explain(displayName="privilege subject")
 public class PrivilegeObjectDesc {
 
-  private boolean table;
+  //default type is table
+  private boolean table = true;
 
   private String object;
 
   private HashMap<String, String> partSpec;
+
+  private List<String> columns;
 
   public PrivilegeObjectDesc(boolean isTable, String object,
       HashMap<String, String> partSpec) {
@@ -67,4 +71,11 @@ public class PrivilegeObjectDesc {
     this.partSpec = partSpec;
   }
 
+  public List<String> getColumns() {
+    return columns;
+  }
+
+  public void setColumns(List<String> columns) {
+    this.columns = columns;
+  }
 }

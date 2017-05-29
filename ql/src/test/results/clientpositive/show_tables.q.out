@@ -1,12 +1,18 @@
 PREHOOK: query: CREATE TABLE shtb_test1(KEY STRING, VALUE STRING) PARTITIONED BY(ds STRING) STORED AS TEXTFILE
 PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:default
+PREHOOK: Output: default@shtb_test1
 POSTHOOK: query: CREATE TABLE shtb_test1(KEY STRING, VALUE STRING) PARTITIONED BY(ds STRING) STORED AS TEXTFILE
 POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@shtb_test1
 PREHOOK: query: CREATE TABLE shtb_test2(KEY STRING, VALUE STRING) PARTITIONED BY(ds STRING) STORED AS TEXTFILE
 PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:default
+PREHOOK: Output: default@shtb_test2
 POSTHOOK: query: CREATE TABLE shtb_test2(KEY STRING, VALUE STRING) PARTITIONED BY(ds STRING) STORED AS TEXTFILE
 POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@shtb_test2
 PREHOOK: query: EXPLAIN
 SHOW TABLES 'shtb_*'
@@ -14,12 +20,9 @@ PREHOOK: type: SHOWTABLES
 POSTHOOK: query: EXPLAIN
 SHOW TABLES 'shtb_*'
 POSTHOOK: type: SHOWTABLES
-ABSTRACT SYNTAX TREE:
-  (TOK_SHOWTABLES 'shtb_*')
-
 STAGE DEPENDENCIES:
   Stage-0 is a root stage
-  Stage-1 is a root stage
+  Stage-1 depends on stages: Stage-0
 
 STAGE PLANS:
   Stage: Stage-0
@@ -31,7 +34,8 @@ STAGE PLANS:
   Stage: Stage-1
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: SHOW TABLES 'shtb_*'
 PREHOOK: type: SHOWTABLES
@@ -45,12 +49,9 @@ PREHOOK: type: SHOWTABLES
 POSTHOOK: query: EXPLAIN
 SHOW TABLES LIKE 'shtb_test1|shtb_test2'
 POSTHOOK: type: SHOWTABLES
-ABSTRACT SYNTAX TREE:
-  (TOK_SHOWTABLES 'shtb_test1|shtb_test2')
-
 STAGE DEPENDENCIES:
   Stage-0 is a root stage
-  Stage-1 is a root stage
+  Stage-1 depends on stages: Stage-0
 
 STAGE PLANS:
   Stage: Stage-0
@@ -62,7 +63,8 @@ STAGE PLANS:
   Stage: Stage-1
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: SHOW TABLES LIKE 'shtb_test1|shtb_test2'
 PREHOOK: type: SHOWTABLES
@@ -73,34 +75,49 @@ shtb_test2
 PREHOOK: query: -- SHOW TABLES FROM/IN database
 CREATE DATABASE test_db
 PREHOOK: type: CREATEDATABASE
+PREHOOK: Output: database:test_db
 POSTHOOK: query: -- SHOW TABLES FROM/IN database
 CREATE DATABASE test_db
 POSTHOOK: type: CREATEDATABASE
+POSTHOOK: Output: database:test_db
 PREHOOK: query: USE test_db
 PREHOOK: type: SWITCHDATABASE
+PREHOOK: Input: database:test_db
 POSTHOOK: query: USE test_db
 POSTHOOK: type: SWITCHDATABASE
+POSTHOOK: Input: database:test_db
 PREHOOK: query: CREATE TABLE foo(a INT)
 PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:test_db
+PREHOOK: Output: test_db@foo
 POSTHOOK: query: CREATE TABLE foo(a INT)
 POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:test_db
 POSTHOOK: Output: test_db@foo
 PREHOOK: query: CREATE TABLE bar(a INT)
 PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:test_db
+PREHOOK: Output: test_db@bar
 POSTHOOK: query: CREATE TABLE bar(a INT)
 POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:test_db
 POSTHOOK: Output: test_db@bar
 PREHOOK: query: CREATE TABLE baz(a INT)
 PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:test_db
+PREHOOK: Output: test_db@baz
 POSTHOOK: query: CREATE TABLE baz(a INT)
 POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:test_db
 POSTHOOK: Output: test_db@baz
 PREHOOK: query: -- SHOW TABLES basic syntax tests
 USE default
 PREHOOK: type: SWITCHDATABASE
+PREHOOK: Input: database:default
 POSTHOOK: query: -- SHOW TABLES basic syntax tests
 USE default
 POSTHOOK: type: SWITCHDATABASE
+POSTHOOK: Input: database:default
 PREHOOK: query: SHOW TABLES FROM test_db
 PREHOOK: type: SHOWTABLES
 POSTHOOK: query: SHOW TABLES FROM test_db
@@ -112,10 +129,17 @@ PREHOOK: query: SHOW TABLES FROM default
 PREHOOK: type: SHOWTABLES
 POSTHOOK: query: SHOW TABLES FROM default
 POSTHOOK: type: SHOWTABLES
+alltypesorc
+cbo_t1
+cbo_t2
+cbo_t3
+lineitem
+part
 shtb_test1
 shtb_test2
 src
 src1
+src_cbo
 src_json
 src_sequencefile
 src_thrift
@@ -133,10 +157,17 @@ PREHOOK: query: SHOW TABLES IN default
 PREHOOK: type: SHOWTABLES
 POSTHOOK: query: SHOW TABLES IN default
 POSTHOOK: type: SHOWTABLES
+alltypesorc
+cbo_t1
+cbo_t2
+cbo_t3
+lineitem
+part
 shtb_test1
 shtb_test2
 src
 src1
+src_cbo
 src_json
 src_sequencefile
 src_thrift
@@ -151,25 +182,194 @@ PREHOOK: query: SHOW TABLES IN test_db LIKE "nomatch"
 PREHOOK: type: SHOWTABLES
 POSTHOOK: query: SHOW TABLES IN test_db LIKE "nomatch"
 POSTHOOK: type: SHOWTABLES
+PREHOOK: query: -- SHOW TABLE EXTENDED basic syntax tests and wildcard
+SHOW TABLE EXTENDED IN test_db LIKE foo
+PREHOOK: type: SHOW_TABLESTATUS
+POSTHOOK: query: -- SHOW TABLE EXTENDED basic syntax tests and wildcard
+SHOW TABLE EXTENDED IN test_db LIKE foo
+POSTHOOK: type: SHOW_TABLESTATUS
+tableName:foo
+#### A masked pattern was here ####
+inputformat:org.apache.hadoop.mapred.TextInputFormat
+outputformat:org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+columns:struct columns { i32 a}
+partitioned:false
+partitionColumns:
+totalNumberFiles:0
+totalFileSize:0
+maxFileSize:0
+minFileSize:0
+#### A masked pattern was here ####
+
+PREHOOK: query: SHOW TABLE EXTENDED IN test_db LIKE "foo"
+PREHOOK: type: SHOW_TABLESTATUS
+POSTHOOK: query: SHOW TABLE EXTENDED IN test_db LIKE "foo"
+POSTHOOK: type: SHOW_TABLESTATUS
+tableName:foo
+#### A masked pattern was here ####
+inputformat:org.apache.hadoop.mapred.TextInputFormat
+outputformat:org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+columns:struct columns { i32 a}
+partitioned:false
+partitionColumns:
+totalNumberFiles:0
+totalFileSize:0
+maxFileSize:0
+minFileSize:0
+#### A masked pattern was here ####
+
+PREHOOK: query: SHOW TABLE EXTENDED IN test_db LIKE 'foo'
+PREHOOK: type: SHOW_TABLESTATUS
+POSTHOOK: query: SHOW TABLE EXTENDED IN test_db LIKE 'foo'
+POSTHOOK: type: SHOW_TABLESTATUS
+tableName:foo
+#### A masked pattern was here ####
+inputformat:org.apache.hadoop.mapred.TextInputFormat
+outputformat:org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+columns:struct columns { i32 a}
+partitioned:false
+partitionColumns:
+totalNumberFiles:0
+totalFileSize:0
+maxFileSize:0
+minFileSize:0
+#### A masked pattern was here ####
+
+PREHOOK: query: SHOW TABLE EXTENDED IN test_db LIKE `foo`
+PREHOOK: type: SHOW_TABLESTATUS
+POSTHOOK: query: SHOW TABLE EXTENDED IN test_db LIKE `foo`
+POSTHOOK: type: SHOW_TABLESTATUS
+tableName:foo
+#### A masked pattern was here ####
+inputformat:org.apache.hadoop.mapred.TextInputFormat
+outputformat:org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+columns:struct columns { i32 a}
+partitioned:false
+partitionColumns:
+totalNumberFiles:0
+totalFileSize:0
+maxFileSize:0
+minFileSize:0
+#### A masked pattern was here ####
+
+PREHOOK: query: SHOW TABLE EXTENDED IN test_db LIKE 'ba*'
+PREHOOK: type: SHOW_TABLESTATUS
+POSTHOOK: query: SHOW TABLE EXTENDED IN test_db LIKE 'ba*'
+POSTHOOK: type: SHOW_TABLESTATUS
+tableName:bar
+#### A masked pattern was here ####
+inputformat:org.apache.hadoop.mapred.TextInputFormat
+outputformat:org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+columns:struct columns { i32 a}
+partitioned:false
+partitionColumns:
+totalNumberFiles:0
+totalFileSize:0
+maxFileSize:0
+minFileSize:0
+#### A masked pattern was here ####
+
+tableName:baz
+#### A masked pattern was here ####
+inputformat:org.apache.hadoop.mapred.TextInputFormat
+outputformat:org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+columns:struct columns { i32 a}
+partitioned:false
+partitionColumns:
+totalNumberFiles:0
+totalFileSize:0
+maxFileSize:0
+minFileSize:0
+#### A masked pattern was here ####
+
+PREHOOK: query: SHOW TABLE EXTENDED IN test_db LIKE "ba*"
+PREHOOK: type: SHOW_TABLESTATUS
+POSTHOOK: query: SHOW TABLE EXTENDED IN test_db LIKE "ba*"
+POSTHOOK: type: SHOW_TABLESTATUS
+tableName:bar
+#### A masked pattern was here ####
+inputformat:org.apache.hadoop.mapred.TextInputFormat
+outputformat:org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+columns:struct columns { i32 a}
+partitioned:false
+partitionColumns:
+totalNumberFiles:0
+totalFileSize:0
+maxFileSize:0
+minFileSize:0
+#### A masked pattern was here ####
+
+tableName:baz
+#### A masked pattern was here ####
+inputformat:org.apache.hadoop.mapred.TextInputFormat
+outputformat:org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+columns:struct columns { i32 a}
+partitioned:false
+partitionColumns:
+totalNumberFiles:0
+totalFileSize:0
+maxFileSize:0
+minFileSize:0
+#### A masked pattern was here ####
+
+PREHOOK: query: SHOW TABLE EXTENDED IN test_db LIKE `ba*`
+PREHOOK: type: SHOW_TABLESTATUS
+POSTHOOK: query: SHOW TABLE EXTENDED IN test_db LIKE `ba*`
+POSTHOOK: type: SHOW_TABLESTATUS
+tableName:bar
+#### A masked pattern was here ####
+inputformat:org.apache.hadoop.mapred.TextInputFormat
+outputformat:org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+columns:struct columns { i32 a}
+partitioned:false
+partitionColumns:
+totalNumberFiles:0
+totalFileSize:0
+maxFileSize:0
+minFileSize:0
+#### A masked pattern was here ####
+
+tableName:baz
+#### A masked pattern was here ####
+inputformat:org.apache.hadoop.mapred.TextInputFormat
+outputformat:org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+columns:struct columns { i32 a}
+partitioned:false
+partitionColumns:
+totalNumberFiles:0
+totalFileSize:0
+maxFileSize:0
+minFileSize:0
+#### A masked pattern was here ####
+
 PREHOOK: query: -- SHOW TABLES from a database with a name that requires escaping
 CREATE DATABASE `database`
 PREHOOK: type: CREATEDATABASE
+PREHOOK: Output: database:database
 POSTHOOK: query: -- SHOW TABLES from a database with a name that requires escaping
 CREATE DATABASE `database`
 POSTHOOK: type: CREATEDATABASE
+POSTHOOK: Output: database:database
 PREHOOK: query: USE `database`
 PREHOOK: type: SWITCHDATABASE
+PREHOOK: Input: database:database
 POSTHOOK: query: USE `database`
 POSTHOOK: type: SWITCHDATABASE
+POSTHOOK: Input: database:database
 PREHOOK: query: CREATE TABLE foo(a INT)
 PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:database
+PREHOOK: Output: database@foo
 POSTHOOK: query: CREATE TABLE foo(a INT)
 POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:database
 POSTHOOK: Output: database@foo
 PREHOOK: query: USE default
 PREHOOK: type: SWITCHDATABASE
+PREHOOK: Input: database:default
 POSTHOOK: query: USE default
 POSTHOOK: type: SWITCHDATABASE
+POSTHOOK: Input: database:default
 PREHOOK: query: SHOW TABLES FROM `database` LIKE "foo"
 PREHOOK: type: SHOWTABLES
 POSTHOOK: query: SHOW TABLES FROM `database` LIKE "foo"

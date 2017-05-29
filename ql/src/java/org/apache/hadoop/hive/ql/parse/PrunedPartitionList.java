@@ -18,80 +18,65 @@
 
 package org.apache.hadoop.hive.ql.parse;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 
 import org.apache.hadoop.hive.ql.metadata.Partition;
+import org.apache.hadoop.hive.ql.metadata.Table;
 
 /**
  * The list of pruned partitions.
  */
 public class PrunedPartitionList {
-  // confirmed partitions - satisfy the partition criteria
-  private Set<Partition> confirmedPartns;
 
-  // unknown partitions - may/may not satisfy the partition criteria
-  private Set<Partition> unknownPartns;
+  /** Source table. */
+  private final Table source;
 
-  // denied partitions - do not satisfy the partition criteria
-  private final Set<Partition> deniedPartns;
+  /** Partitions that either satisfy the partition criteria, or may satisfy it. */
+  private Set<Partition> partitions;
 
-  /**
-   * @param confirmedPartns
-   *          confirmed paritions
-   * @param unknownPartns
-   *          unknown partitions
-   */
-  public PrunedPartitionList(Set<Partition> confirmedPartns,
-      Set<Partition> unknownPartns, Set<Partition> deniedPartns) {
-    this.confirmedPartns = confirmedPartns;
-    this.unknownPartns = unknownPartns;
-    this.deniedPartns = deniedPartns;
+  /** partition columns referred by pruner expr */
+  private List<String> referred;
+
+  /** Whether there are partitions in the list that may or may not satisfy the criteria. */
+  private boolean hasUnknowns;
+
+  public PrunedPartitionList(Table source, Set<Partition> partitions, List<String> referred,
+      boolean hasUnknowns) {
+    this.source = source;
+    this.referred = referred;
+    this.partitions = partitions;
+    this.hasUnknowns = hasUnknowns;
+  }
+
+  public Table getSourceTable() {
+    return source;
   }
 
   /**
-   * get confirmed partitions.
-   * 
-   * @return confirmedPartns confirmed paritions
+   * @return partitions
    */
-  public Set<Partition> getConfirmedPartns() {
-    return confirmedPartns;
+  public Set<Partition> getPartitions() {
+    return partitions;
+  }
+
+
+  /**
+   * @return all partitions.
+   */
+  public List<Partition> getNotDeniedPartns() {
+    return new ArrayList<Partition>(partitions);
   }
 
   /**
-   * get unknown partitions.
-   * 
-   * @return unknownPartns unknown paritions
+   * @return Whether there are unknown partitions in {@link #getPartitions()} result.
    */
-  public Set<Partition> getUnknownPartns() {
-    return unknownPartns;
+  public boolean hasUnknownPartitions() {
+    return hasUnknowns;
   }
 
-  /**
-   * get denied partitions.
-   * 
-   * @return deniedPartns denied paritions
-   */
-  public Set<Partition> getDeniedPartns() {
-    return deniedPartns;
-  }
-
-  /**
-   * set confirmed partitions.
-   * 
-   * @param confirmedPartns
-   *          confirmed paritions
-   */
-  public void setConfirmedPartns(Set<Partition> confirmedPartns) {
-    this.confirmedPartns = confirmedPartns;
-  }
-
-  /**
-   * set unknown partitions.
-   * 
-   * @param unknownPartns
-   *          unknown partitions
-   */
-  public void setUnknownPartns(Set<Partition> unknownPartns) {
-    this.unknownPartns = unknownPartns;
+  public List<String> getReferredPartCols() {
+    return referred;
   }
 }

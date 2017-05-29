@@ -27,8 +27,10 @@ import java.util.regex.Pattern;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hive.serde2.Deserializer;
+import org.apache.hadoop.hive.serde2.AbstractDeserializer;
 import org.apache.hadoop.hive.serde2.SerDeException;
+import org.apache.hadoop.hive.serde2.SerDeStats;
+import org.apache.hadoop.hive.serde2.SerDeUtils;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
 import org.apache.hadoop.hive.serde2.objectinspector.ReflectionStructObjectInspector;
@@ -41,7 +43,7 @@ import org.apache.hadoop.io.Writable;
  * S3LogDeserializer.
  *
  */
-public class S3LogDeserializer implements Deserializer {
+public class S3LogDeserializer extends AbstractDeserializer {
 
   public static final Log LOG = LogFactory.getLog(S3LogDeserializer.class
       .getName());
@@ -72,6 +74,7 @@ public class S3LogDeserializer implements Deserializer {
 
   S3LogStruct deserializeCache = new S3LogStruct();
 
+  @Override
   public void initialize(Configuration job, Properties tbl)
       throws SerDeException {
 
@@ -131,12 +134,13 @@ public class S3LogDeserializer implements Deserializer {
     return (c);
   }
 
+  @Override
   public Object deserialize(Writable field) throws SerDeException {
     String row = null;
     if (field instanceof BytesWritable) {
       BytesWritable b = (BytesWritable) field;
       try {
-        row = Text.decode(b.get(), 0, b.getSize());
+        row = Text.decode(b.getBytes(), 0, b.getLength());
       } catch (CharacterCodingException e) {
         throw new SerDeException(e);
       }
@@ -154,6 +158,7 @@ public class S3LogDeserializer implements Deserializer {
     }
   }
 
+  @Override
   public ObjectInspector getObjectInspector() throws SerDeException {
     return cachedObjectInspector;
   }
@@ -178,7 +183,7 @@ public class S3LogDeserializer implements Deserializer {
       // Text("04ff331638adc13885d6c42059584deabbdeabcd55bf0bee491172a79a87b196 static.zemanta.com [09/Apr/2009:23:12:39 +0000] 65.94.12.181 65a011a29cdf8ec533ec3d1ccaae921c EEE6FFE9B9F9EA29 REST.HEAD.OBJECT readside/loader.js%22+defer%3D%22defer \"HEAD /readside/loader.js\"+defer=\"defer HTTP/1.0\" 403 AccessDenied 231 - 7 - \"-\" \"Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.0)\"");
       Text sample = new Text(
           "04ff331638adc13885d6c42059584deabbdeabcd55bf0bee491172a79a87b196 img.zemanta.com [10/Apr/2009:05:34:01 +0000] 70.32.81.92 65a011a29cdf8ec533ec3d1ccaae921c F939A7D698D27C63 REST.GET.OBJECT reblog_b.png \"GET /reblog_b.png?x-id=79ca9376-6326-41b7-9257-eea43d112eb2 HTTP/1.0\" 200 - 1250 1250 160 159 \"-\" \"Firefox 0.8 (Linux)\" useragent=\"Mozilla/5.0 (X11; U; Linux i686; en-US; rv:1.6) Gecko/20040614 Firefox/0.8\"");
-      serDe.initialize(conf, tbl);
+      SerDeUtils.initializeSerDe(serDe, conf, tbl, null);
       Object row = serDe.deserialize(sample);
       System.err.println(serDe.getObjectInspector().getClass().toString());
       ReflectionStructObjectInspector oi = (ReflectionStructObjectInspector) serDe
@@ -199,6 +204,12 @@ public class S3LogDeserializer implements Deserializer {
       e.printStackTrace();
     }
 
+  }
+
+  @Override
+  public SerDeStats getSerDeStats() {
+    // no support for statistics
+    return null;
   }
 
 }

@@ -5,6 +5,8 @@ STORED AS
   INPUTFORMAT 'org.apache.hadoop.hive.ql.io.RCFileInputFormat'
   OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.RCFileOutputFormat'
 PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:default
+PREHOOK: Output: default@input_columnarserde
 POSTHOOK: query: CREATE TABLE input_columnarserde(a array<int>, b array<string>, c map<string,string>, d int, e string)
 ROW FORMAT SERDE
   'org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe'
@@ -12,6 +14,7 @@ STORED AS
   INPUTFORMAT 'org.apache.hadoop.hive.ql.io.RCFileInputFormat'
   OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.RCFileOutputFormat'
 POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@input_columnarserde
 PREHOOK: query: EXPLAIN
 FROM src_thrift
@@ -21,9 +24,6 @@ POSTHOOK: query: EXPLAIN
 FROM src_thrift
 INSERT OVERWRITE TABLE input_columnarserde SELECT src_thrift.lint, src_thrift.lstring, src_thrift.mstringstring, src_thrift.aint, src_thrift.astring DISTRIBUTE BY 1
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF src_thrift)) (TOK_INSERT (TOK_DESTINATION (TOK_TAB input_columnarserde)) (TOK_SELECT (TOK_SELEXPR (. (TOK_TABLE_OR_COL src_thrift) lint)) (TOK_SELEXPR (. (TOK_TABLE_OR_COL src_thrift) lstring)) (TOK_SELEXPR (. (TOK_TABLE_OR_COL src_thrift) mstringstring)) (TOK_SELEXPR (. (TOK_TABLE_OR_COL src_thrift) aint)) (TOK_SELEXPR (. (TOK_TABLE_OR_COL src_thrift) astring))) (TOK_DISTRIBUTEBY 1)))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
   Stage-0 depends on stages: Stage-1
@@ -32,50 +32,32 @@ STAGE DEPENDENCIES:
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        src_thrift 
+      Map Operator Tree:
           TableScan
             alias: src_thrift
+            Statistics: Num rows: 11 Data size: 3070 Basic stats: COMPLETE Column stats: NONE
             Select Operator
-              expressions:
-                    expr: lint
-                    type: array<int>
-                    expr: lstring
-                    type: array<string>
-                    expr: mstringstring
-                    type: map<string,string>
-                    expr: aint
-                    type: int
-                    expr: astring
-                    type: string
+              expressions: lint (type: array<int>), lstring (type: array<string>), mstringstring (type: map<string,string>), aint (type: int), astring (type: string)
               outputColumnNames: _col0, _col1, _col2, _col3, _col4
+              Statistics: Num rows: 11 Data size: 3070 Basic stats: COMPLETE Column stats: NONE
               Reduce Output Operator
                 sort order: 
-                Map-reduce partition columns:
-                      expr: 1
-                      type: int
-                tag: -1
-                value expressions:
-                      expr: _col0
-                      type: array<int>
-                      expr: _col1
-                      type: array<string>
-                      expr: _col2
-                      type: map<string,string>
-                      expr: _col3
-                      type: int
-                      expr: _col4
-                      type: string
+                Map-reduce partition columns: 1 (type: int)
+                Statistics: Num rows: 11 Data size: 3070 Basic stats: COMPLETE Column stats: NONE
+                value expressions: _col0 (type: array<int>), _col1 (type: array<string>), _col2 (type: map<string,string>), _col3 (type: int), _col4 (type: string)
       Reduce Operator Tree:
-        Extract
+        Select Operator
+          expressions: VALUE._col0 (type: array<int>), VALUE._col1 (type: array<string>), VALUE._col2 (type: map<string,string>), VALUE._col3 (type: int), VALUE._col4 (type: string)
+          outputColumnNames: _col0, _col1, _col2, _col3, _col4
+          Statistics: Num rows: 11 Data size: 3070 Basic stats: COMPLETE Column stats: NONE
           File Output Operator
             compressed: false
-            GlobalTableId: 1
+            Statistics: Num rows: 11 Data size: 3070 Basic stats: COMPLETE Column stats: NONE
             table:
                 input format: org.apache.hadoop.hive.ql.io.RCFileInputFormat
                 output format: org.apache.hadoop.hive.ql.io.RCFileOutputFormat
                 serde: org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe
-                name: input_columnarserde
+                name: default.input_columnarserde
 
   Stage: Stage-0
     Move Operator
@@ -85,11 +67,10 @@ STAGE PLANS:
               input format: org.apache.hadoop.hive.ql.io.RCFileInputFormat
               output format: org.apache.hadoop.hive.ql.io.RCFileOutputFormat
               serde: org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe
-              name: input_columnarserde
+              name: default.input_columnarserde
 
   Stage: Stage-2
     Stats-Aggr Operator
-
 
 PREHOOK: query: FROM src_thrift
 INSERT OVERWRITE TABLE input_columnarserde SELECT src_thrift.lint, src_thrift.lstring, src_thrift.mstringstring, src_thrift.aint, src_thrift.astring DISTRIBUTE BY 1
@@ -109,16 +90,11 @@ POSTHOOK: Lineage: input_columnarserde.e SIMPLE [(src_thrift)src_thrift.FieldSch
 PREHOOK: query: SELECT input_columnarserde.* FROM input_columnarserde DISTRIBUTE BY 1
 PREHOOK: type: QUERY
 PREHOOK: Input: default@input_columnarserde
-PREHOOK: Output: file:/tmp/nzhang/hive_2010-09-14_16-32-58_757_857951464814038304/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: SELECT input_columnarserde.* FROM input_columnarserde DISTRIBUTE BY 1
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@input_columnarserde
-POSTHOOK: Output: file:/tmp/nzhang/hive_2010-09-14_16-32-58_757_857951464814038304/-mr-10000
-POSTHOOK: Lineage: input_columnarserde.a SIMPLE [(src_thrift)src_thrift.FieldSchema(name:lint, type:array<int>, comment:from deserializer), ]
-POSTHOOK: Lineage: input_columnarserde.b SIMPLE [(src_thrift)src_thrift.FieldSchema(name:lstring, type:array<string>, comment:from deserializer), ]
-POSTHOOK: Lineage: input_columnarserde.c SIMPLE [(src_thrift)src_thrift.FieldSchema(name:mstringstring, type:map<string,string>, comment:from deserializer), ]
-POSTHOOK: Lineage: input_columnarserde.d SIMPLE [(src_thrift)src_thrift.FieldSchema(name:aint, type:int, comment:from deserializer), ]
-POSTHOOK: Lineage: input_columnarserde.e SIMPLE [(src_thrift)src_thrift.FieldSchema(name:astring, type:string, comment:from deserializer), ]
+#### A masked pattern was here ####
 [0,0,0]	["0","0","0"]	{"key_0":"value_0"}	1712634731	record_0
 [1,2,3]	["10","100","1000"]	{"key_1":"value_1"}	465985200	record_1
 [2,4,6]	["20","200","2000"]	{"key_2":"value_2"}	-751827638	record_2
@@ -129,20 +105,15 @@ POSTHOOK: Lineage: input_columnarserde.e SIMPLE [(src_thrift)src_thrift.FieldSch
 [7,14,21]	["70","700","7000"]	{"key_7":"value_7"}	-1461153973	record_7
 [8,16,24]	["80","800","8000"]	{"key_8":"value_8"}	1638581578	record_8
 [9,18,27]	["90","900","9000"]	{"key_9":"value_9"}	336964413	record_9
-null	null	null	0	NULL
+NULL	NULL	NULL	0	NULL
 PREHOOK: query: SELECT input_columnarserde.a[0], input_columnarserde.b[0], input_columnarserde.c['key2'], input_columnarserde.d, input_columnarserde.e FROM input_columnarserde DISTRIBUTE BY 1
 PREHOOK: type: QUERY
 PREHOOK: Input: default@input_columnarserde
-PREHOOK: Output: file:/tmp/nzhang/hive_2010-09-14_16-33-02_404_3492935474356171782/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: SELECT input_columnarserde.a[0], input_columnarserde.b[0], input_columnarserde.c['key2'], input_columnarserde.d, input_columnarserde.e FROM input_columnarserde DISTRIBUTE BY 1
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@input_columnarserde
-POSTHOOK: Output: file:/tmp/nzhang/hive_2010-09-14_16-33-02_404_3492935474356171782/-mr-10000
-POSTHOOK: Lineage: input_columnarserde.a SIMPLE [(src_thrift)src_thrift.FieldSchema(name:lint, type:array<int>, comment:from deserializer), ]
-POSTHOOK: Lineage: input_columnarserde.b SIMPLE [(src_thrift)src_thrift.FieldSchema(name:lstring, type:array<string>, comment:from deserializer), ]
-POSTHOOK: Lineage: input_columnarserde.c SIMPLE [(src_thrift)src_thrift.FieldSchema(name:mstringstring, type:map<string,string>, comment:from deserializer), ]
-POSTHOOK: Lineage: input_columnarserde.d SIMPLE [(src_thrift)src_thrift.FieldSchema(name:aint, type:int, comment:from deserializer), ]
-POSTHOOK: Lineage: input_columnarserde.e SIMPLE [(src_thrift)src_thrift.FieldSchema(name:astring, type:string, comment:from deserializer), ]
+#### A masked pattern was here ####
 0	0	NULL	1712634731	record_0
 1	10	NULL	465985200	record_1
 2	20	NULL	-751827638	record_2

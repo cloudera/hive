@@ -1,7 +1,14 @@
-PREHOOK: query: create table authorization_part_fail (key int, value string) partitioned by (ds string)
+PREHOOK: query: -- SORT_BEFORE_DIFF
+
+create table authorization_part_fail (key int, value string) partitioned by (ds string)
 PREHOOK: type: CREATETABLE
-POSTHOOK: query: create table authorization_part_fail (key int, value string) partitioned by (ds string)
+PREHOOK: Output: database:default
+PREHOOK: Output: default@authorization_part_fail
+POSTHOOK: query: -- SORT_BEFORE_DIFF
+
+create table authorization_part_fail (key int, value string) partitioned by (ds string)
 POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@authorization_part_fail
 PREHOOK: query: ALTER TABLE authorization_part_fail SET TBLPROPERTIES ("PARTITION_LEVEL_PRIVILEGE"="TRUE")
 PREHOOK: type: ALTERTABLE_PROPERTIES
@@ -11,97 +18,91 @@ POSTHOOK: query: ALTER TABLE authorization_part_fail SET TBLPROPERTIES ("PARTITI
 POSTHOOK: type: ALTERTABLE_PROPERTIES
 POSTHOOK: Input: default@authorization_part_fail
 POSTHOOK: Output: default@authorization_part_fail
-PREHOOK: query: grant `Create` on table authorization_part_fail to user hive_test_user
+PREHOOK: query: create table src_auth as select * from src
+PREHOOK: type: CREATETABLE_AS_SELECT
+PREHOOK: Input: default@src
+PREHOOK: Output: database:default
+PREHOOK: Output: default@src_auth
+POSTHOOK: query: create table src_auth as select * from src
+POSTHOOK: type: CREATETABLE_AS_SELECT
+POSTHOOK: Input: default@src
+POSTHOOK: Output: database:default
+POSTHOOK: Output: default@src_auth
+PREHOOK: query: grant Create on table authorization_part_fail to user hive_test_user
 PREHOOK: type: GRANT_PRIVILEGE
-POSTHOOK: query: grant `Create` on table authorization_part_fail to user hive_test_user
+PREHOOK: Output: default@authorization_part_fail
+POSTHOOK: query: grant Create on table authorization_part_fail to user hive_test_user
 POSTHOOK: type: GRANT_PRIVILEGE
-PREHOOK: query: grant `Update` on table authorization_part_fail to user hive_test_user
+POSTHOOK: Output: default@authorization_part_fail
+PREHOOK: query: grant Update on table authorization_part_fail to user hive_test_user
 PREHOOK: type: GRANT_PRIVILEGE
-POSTHOOK: query: grant `Update` on table authorization_part_fail to user hive_test_user
+PREHOOK: Output: default@authorization_part_fail
+POSTHOOK: query: grant Update on table authorization_part_fail to user hive_test_user
 POSTHOOK: type: GRANT_PRIVILEGE
-PREHOOK: query: grant `Drop` on table authorization_part_fail to user hive_test_user
+POSTHOOK: Output: default@authorization_part_fail
+PREHOOK: query: grant Drop on table authorization_part_fail to user hive_test_user
 PREHOOK: type: GRANT_PRIVILEGE
-POSTHOOK: query: grant `Drop` on table authorization_part_fail to user hive_test_user
+PREHOOK: Output: default@authorization_part_fail
+POSTHOOK: query: grant Drop on table authorization_part_fail to user hive_test_user
 POSTHOOK: type: GRANT_PRIVILEGE
-PREHOOK: query: grant `select` on table src to user hive_test_user
+POSTHOOK: Output: default@authorization_part_fail
+PREHOOK: query: grant select on table src_auth to user hive_test_user
 PREHOOK: type: GRANT_PRIVILEGE
-POSTHOOK: query: grant `select` on table src to user hive_test_user
+PREHOOK: Output: default@src_auth
+POSTHOOK: query: grant select on table src_auth to user hive_test_user
 POSTHOOK: type: GRANT_PRIVILEGE
+POSTHOOK: Output: default@src_auth
 PREHOOK: query: -- column grant to group
 
-grant `select`(key) on table authorization_part_fail to group hive_test_group1
+grant select(key) on table authorization_part_fail to group hive_test_group1
 PREHOOK: type: GRANT_PRIVILEGE
+PREHOOK: Output: default@authorization_part_fail
 POSTHOOK: query: -- column grant to group
 
-grant `select`(key) on table authorization_part_fail to group hive_test_group1
+grant select(key) on table authorization_part_fail to group hive_test_group1
 POSTHOOK: type: GRANT_PRIVILEGE
-PREHOOK: query: grant `select` on table authorization_part_fail to group hive_test_group1
+POSTHOOK: Output: default@authorization_part_fail
+PREHOOK: query: grant select on table authorization_part_fail to group hive_test_group1
 PREHOOK: type: GRANT_PRIVILEGE
-POSTHOOK: query: grant `select` on table authorization_part_fail to group hive_test_group1
+PREHOOK: Output: default@authorization_part_fail
+POSTHOOK: query: grant select on table authorization_part_fail to group hive_test_group1
 POSTHOOK: type: GRANT_PRIVILEGE
+POSTHOOK: Output: default@authorization_part_fail
 PREHOOK: query: show grant group hive_test_group1 on table authorization_part_fail
 PREHOOK: type: SHOW_GRANT
 POSTHOOK: query: show grant group hive_test_group1 on table authorization_part_fail
 POSTHOOK: type: SHOW_GRANT
-
-database	default	
-table	authorization_part_fail	
-principalName	hive_test_group1	
-principalType	GROUP	
-privilege	Select	
-grantTime	1296259813	
-grantor	hive_test_user	
-PREHOOK: query: insert overwrite table authorization_part_fail partition (ds='2010') select key, value from src
+default	authorization_part_fail			hive_test_group1	GROUP	SELECT	false	-1	hive_test_user
+PREHOOK: query: insert overwrite table authorization_part_fail partition (ds='2010') select key, value from src_auth
 PREHOOK: type: QUERY
-PREHOOK: Input: default@src
+PREHOOK: Input: default@src_auth
 PREHOOK: Output: default@authorization_part_fail@ds=2010
-POSTHOOK: query: insert overwrite table authorization_part_fail partition (ds='2010') select key, value from src
+POSTHOOK: query: insert overwrite table authorization_part_fail partition (ds='2010') select key, value from src_auth
 POSTHOOK: type: QUERY
-POSTHOOK: Input: default@src
+POSTHOOK: Input: default@src_auth
 POSTHOOK: Output: default@authorization_part_fail@ds=2010
-POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2010).key EXPRESSION [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2010).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
+POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2010).key EXPRESSION [(src_auth)src_auth.FieldSchema(name:key, type:string, comment:null), ]
+POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2010).value SIMPLE [(src_auth)src_auth.FieldSchema(name:value, type:string, comment:null), ]
 PREHOOK: query: show grant group hive_test_group1 on table authorization_part_fail(key) partition (ds='2010')
 PREHOOK: type: SHOW_GRANT
 POSTHOOK: query: show grant group hive_test_group1 on table authorization_part_fail(key) partition (ds='2010')
 POSTHOOK: type: SHOW_GRANT
-POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2010).key EXPRESSION [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2010).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-
-database	default	
-table	authorization_part_fail	
-partition	ds=2010	
-columnName	key	
-principalName	hive_test_group1	
-principalType	GROUP	
-privilege	Select	
-grantTime	1296259822	
-grantor	hive_test_user	
+default	authorization_part_fail	[2010]	[key]	hive_test_group1	GROUP	SELECT	false	-1	hive_test_user
 PREHOOK: query: show grant group hive_test_group1 on table authorization_part_fail partition (ds='2010')
 PREHOOK: type: SHOW_GRANT
 POSTHOOK: query: show grant group hive_test_group1 on table authorization_part_fail partition (ds='2010')
 POSTHOOK: type: SHOW_GRANT
-POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2010).key EXPRESSION [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2010).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-
-database	default	
-table	authorization_part_fail	
-partition	ds=2010	
-principalName	hive_test_group1	
-principalType	GROUP	
-privilege	Select	
-grantTime	1296259822	
-grantor	hive_test_user	
+default	authorization_part_fail	[2010]		hive_test_group1	GROUP	SELECT	false	-1	hive_test_user
 PREHOOK: query: select key, value from authorization_part_fail where ds='2010' order by key limit 20
 PREHOOK: type: QUERY
+PREHOOK: Input: default@authorization_part_fail
 PREHOOK: Input: default@authorization_part_fail@ds=2010
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2011-01-28_16-10-22_949_2212884189255830110/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select key, value from authorization_part_fail where ds='2010' order by key limit 20
 POSTHOOK: type: QUERY
+POSTHOOK: Input: default@authorization_part_fail
 POSTHOOK: Input: default@authorization_part_fail@ds=2010
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2011-01-28_16-10-22_949_2212884189255830110/-mr-10000
-POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2010).key EXPRESSION [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2010).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
+#### A masked pattern was here ####
 0	val_0
 0	val_0
 0	val_0
@@ -122,65 +123,36 @@ POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2010).value SIMPLE [(src
 18	val_18
 18	val_18
 19	val_19
-PREHOOK: query: insert overwrite table authorization_part_fail partition (ds='2011') select key, value from src
+PREHOOK: query: insert overwrite table authorization_part_fail partition (ds='2011') select key, value from src_auth
 PREHOOK: type: QUERY
-PREHOOK: Input: default@src
+PREHOOK: Input: default@src_auth
 PREHOOK: Output: default@authorization_part_fail@ds=2011
-POSTHOOK: query: insert overwrite table authorization_part_fail partition (ds='2011') select key, value from src
+POSTHOOK: query: insert overwrite table authorization_part_fail partition (ds='2011') select key, value from src_auth
 POSTHOOK: type: QUERY
-POSTHOOK: Input: default@src
+POSTHOOK: Input: default@src_auth
 POSTHOOK: Output: default@authorization_part_fail@ds=2011
-POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2010).key EXPRESSION [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2010).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2011).key EXPRESSION [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2011).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
+POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2011).key EXPRESSION [(src_auth)src_auth.FieldSchema(name:key, type:string, comment:null), ]
+POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2011).value SIMPLE [(src_auth)src_auth.FieldSchema(name:value, type:string, comment:null), ]
 PREHOOK: query: show grant group hive_test_group1 on table authorization_part_fail(key) partition (ds='2011')
 PREHOOK: type: SHOW_GRANT
 POSTHOOK: query: show grant group hive_test_group1 on table authorization_part_fail(key) partition (ds='2011')
 POSTHOOK: type: SHOW_GRANT
-POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2010).key EXPRESSION [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2010).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2011).key EXPRESSION [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2011).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-
-database	default	
-table	authorization_part_fail	
-partition	ds=2011	
-columnName	key	
-principalName	hive_test_group1	
-principalType	GROUP	
-privilege	Select	
-grantTime	1296259838	
-grantor	hive_test_user	
+default	authorization_part_fail	[2011]	[key]	hive_test_group1	GROUP	SELECT	false	-1	hive_test_user
 PREHOOK: query: show grant group hive_test_group1 on table authorization_part_fail partition (ds='2011')
 PREHOOK: type: SHOW_GRANT
 POSTHOOK: query: show grant group hive_test_group1 on table authorization_part_fail partition (ds='2011')
 POSTHOOK: type: SHOW_GRANT
-POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2010).key EXPRESSION [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2010).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2011).key EXPRESSION [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2011).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-
-database	default	
-table	authorization_part_fail	
-partition	ds=2011	
-principalName	hive_test_group1	
-principalType	GROUP	
-privilege	Select	
-grantTime	1296259838	
-grantor	hive_test_user	
+default	authorization_part_fail	[2011]		hive_test_group1	GROUP	SELECT	false	-1	hive_test_user
 PREHOOK: query: select key, value from authorization_part_fail where ds='2011' order by key limit 20
 PREHOOK: type: QUERY
+PREHOOK: Input: default@authorization_part_fail
 PREHOOK: Input: default@authorization_part_fail@ds=2011
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2011-01-28_16-10-38_699_6026645486493533704/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select key, value from authorization_part_fail where ds='2011' order by key limit 20
 POSTHOOK: type: QUERY
+POSTHOOK: Input: default@authorization_part_fail
 POSTHOOK: Input: default@authorization_part_fail@ds=2011
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2011-01-28_16-10-38_699_6026645486493533704/-mr-10000
-POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2010).key EXPRESSION [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2010).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2011).key EXPRESSION [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2011).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
+#### A masked pattern was here ####
 0	val_0
 0	val_0
 0	val_0
@@ -203,18 +175,16 @@ POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2011).value SIMPLE [(src
 19	val_19
 PREHOOK: query: select key,value, ds from authorization_part_fail where ds>='2010' order by key, ds limit 20
 PREHOOK: type: QUERY
+PREHOOK: Input: default@authorization_part_fail
 PREHOOK: Input: default@authorization_part_fail@ds=2010
 PREHOOK: Input: default@authorization_part_fail@ds=2011
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2011-01-28_16-10-45_161_786348139842725610/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select key,value, ds from authorization_part_fail where ds>='2010' order by key, ds limit 20
 POSTHOOK: type: QUERY
+POSTHOOK: Input: default@authorization_part_fail
 POSTHOOK: Input: default@authorization_part_fail@ds=2010
 POSTHOOK: Input: default@authorization_part_fail@ds=2011
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2011-01-28_16-10-45_161_786348139842725610/-mr-10000
-POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2010).key EXPRESSION [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2010).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2011).key EXPRESSION [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2011).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
+#### A masked pattern was here ####
 0	val_0	2010
 0	val_0	2010
 0	val_0	2010
@@ -235,12 +205,10 @@ POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2011).value SIMPLE [(src
 8	val_8	2011
 9	val_9	2010
 9	val_9	2011
-PREHOOK: query: revoke `select` on table authorization_part_fail partition (ds='2010') from group hive_test_group1
+PREHOOK: query: revoke select on table authorization_part_fail partition (ds='2010') from group hive_test_group1
 PREHOOK: type: REVOKE_PRIVILEGE
-POSTHOOK: query: revoke `select` on table authorization_part_fail partition (ds='2010') from group hive_test_group1
+PREHOOK: Output: default@authorization_part_fail@ds=2010
+POSTHOOK: query: revoke select on table authorization_part_fail partition (ds='2010') from group hive_test_group1
 POSTHOOK: type: REVOKE_PRIVILEGE
-POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2010).key EXPRESSION [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2010).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2011).key EXPRESSION [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: authorization_part_fail PARTITION(ds=2011).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-Authorization failed:No privilege 'Select' found for inputs { database:default, table:authorization_part_fail, partitionName:ds=2010, columnName:value}. Use show grant to get more details.
+POSTHOOK: Output: default@authorization_part_fail@ds=2010
+Authorization failed:No privilege 'Select' found for inputs { database:default, table:authorization_part_fail, partitionName:ds=2010, columnName:value}. Use SHOW GRANT to get more details.

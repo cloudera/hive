@@ -15,22 +15,37 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package org.apache.hadoop.hive.serde2.lazy;
 
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
+import java.util.Arrays;
+import java.util.Map;
 
+import org.apache.commons.codec.binary.Base64;
+import org.apache.hadoop.hive.serde2.SerDeException;
+import org.apache.hadoop.hive.serde2.io.HiveCharWritable;
+import org.apache.hadoop.hive.serde2.io.HiveVarcharWritable;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.BinaryObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.BooleanObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.ByteObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.DateObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.DoubleObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.FloatObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.HiveCharObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.HiveDecimalObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.HiveVarcharObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.IntObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.LongObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.ShortObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.StringObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.TimestampObjectInspector;
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.Text;
 
 /**
@@ -41,7 +56,7 @@ public final class LazyUtils {
 
   /**
    * Returns the digit represented by character b.
-   * 
+   *
    * @param b
    *          The ascii code of the character
    * @param radix
@@ -95,7 +110,7 @@ public final class LazyUtils {
 
   /**
    * Convert a UTF-8 byte array to String.
-   * 
+   *
    * @param bytes
    *          The byte[] containing the UTF-8 String.
    * @param start
@@ -112,27 +127,27 @@ public final class LazyUtils {
     }
   }
 
-  private static byte[] trueBytes = {(byte) 't', 'r', 'u', 'e'};
-  private static byte[] falseBytes = {(byte) 'f', 'a', 'l', 's', 'e'};
+  public static byte[] trueBytes = {(byte) 't', 'r', 'u', 'e'};
+  public static byte[] falseBytes = {(byte) 'f', 'a', 'l', 's', 'e'};
 
   /**
    * Write the bytes with special characters escaped.
-   * 
+   *
    * @param escaped
    *          Whether the data should be written out in an escaped way.
    * @param escapeChar
-   *          if escaped, the char for prefixing special characters.
+   *          If escaped, the char for prefixing special characters.
    * @param needsEscape
-   *          if escaped, whether a specific character needs escaping. This
-   *          array should have size of 128.
+   *          If escaped, whether a specific character needs escaping. This
+   *          array should have size of 256.
    */
-  private static void writeEscaped(OutputStream out, byte[] bytes, int start,
+  public static void writeEscaped(OutputStream out, byte[] bytes, int start,
       int len, boolean escaped, byte escapeChar, boolean[] needsEscape)
       throws IOException {
     if (escaped) {
       int end = start + len;
       for (int i = start; i <= end; i++) {
-        if (i == end || (bytes[i] >= 0 && needsEscape[bytes[i]])) {
+        if (i == end || needsEscape[bytes[i] & 0xFF]) {  // Converts negative byte to positive index
           if (i > start) {
             out.write(bytes, start, i - start);
           }
@@ -151,14 +166,13 @@ public final class LazyUtils {
   /**
    * Write out the text representation of a Primitive Object to a UTF8 byte
    * stream.
-   * 
+   *
    * @param out
    *          The UTF8 byte OutputStream
    * @param o
    *          The primitive Object
    * @param needsEscape
-   *          Whether a character needs escaping. This array should have size of
-   *          128.
+   *          Whether a character needs escaping. 
    */
   public static void writePrimitiveUTF8(OutputStream out, Object o,
       PrimitiveObjectInspector oi, boolean escaped, byte escapeChar,
@@ -208,9 +222,109 @@ public final class LazyUtils {
           needsEscape);
       break;
     }
+    case CHAR: {
+      HiveCharWritable hc = ((HiveCharObjectInspector) oi).getPrimitiveWritableObject(o);
+      Text t = hc.getPaddedValue();
+      writeEscaped(out, t.getBytes(), 0, t.getLength(), escaped, escapeChar,
+          needsEscape);
+      break;
+    }
+    case VARCHAR: {
+      HiveVarcharWritable hc = ((HiveVarcharObjectInspector)oi).getPrimitiveWritableObject(o);
+      Text t = hc.getTextValue();
+      writeEscaped(out, t.getBytes(), 0, t.getLength(), escaped, escapeChar,
+          needsEscape);
+      break;
+    }
+    case BINARY: {
+      BytesWritable bw = ((BinaryObjectInspector) oi).getPrimitiveWritableObject(o);
+      byte[] toEncode = new byte[bw.getLength()];
+      System.arraycopy(bw.getBytes(), 0,toEncode, 0, bw.getLength());
+      byte[] toWrite = Base64.encodeBase64(toEncode);
+      out.write(toWrite, 0, toWrite.length);
+      break;
+    }
+    case DATE: {
+      LazyDate.writeUTF8(out,
+          ((DateObjectInspector) oi).getPrimitiveWritableObject(o));
+      break;
+    }
+    case TIMESTAMP: {
+      LazyTimestamp.writeUTF8(out,
+          ((TimestampObjectInspector) oi).getPrimitiveWritableObject(o));
+      break;
+    }
+    case DECIMAL: {
+      LazyHiveDecimal.writeUTF8(out,
+        ((HiveDecimalObjectInspector) oi).getPrimitiveJavaObject(o));
+      break;
+    }
     default: {
       throw new RuntimeException("Hive internal error.");
     }
+    }
+  }
+
+  /**
+   * Write out a binary representation of a PrimitiveObject to a byte stream.
+   *
+   * @param out ByteStream.Output, an unsynchronized version of ByteArrayOutputStream, used as a
+   *            backing buffer for the the DataOutputStream
+   * @param o the PrimitiveObject
+   * @param oi the PrimitiveObjectInspector
+   * @throws IOException on error during the write operation
+   */
+  public static void writePrimitive(
+      OutputStream out,
+      Object o,
+      PrimitiveObjectInspector oi) throws IOException {
+
+    DataOutputStream dos = new DataOutputStream(out);
+
+    try {
+      switch (oi.getPrimitiveCategory()) {
+      case BOOLEAN:
+        boolean b = ((BooleanObjectInspector) oi).get(o);
+        dos.writeBoolean(b);
+        break;
+
+      case BYTE:
+        byte bt = ((ByteObjectInspector) oi).get(o);
+        dos.writeByte(bt);
+        break;
+
+      case SHORT:
+        short s = ((ShortObjectInspector) oi).get(o);
+        dos.writeShort(s);
+        break;
+
+      case INT:
+        int i = ((IntObjectInspector) oi).get(o);
+        dos.writeInt(i);
+        break;
+
+      case LONG:
+        long l = ((LongObjectInspector) oi).get(o);
+        dos.writeLong(l);
+        break;
+
+      case FLOAT:
+        float f = ((FloatObjectInspector) oi).get(o);
+        dos.writeFloat(f);
+        break;
+
+      case DOUBLE:
+        double d = ((DoubleObjectInspector) oi).get(o);
+        dos.writeDouble(d);
+        break;
+
+      default:
+        throw new RuntimeException("Hive internal error.");
+      }
+    } finally {
+      // closing the underlying ByteStream should have no effect, the data should still be
+      // accessible
+      dos.close();
     }
   }
 
@@ -222,8 +336,106 @@ public final class LazyUtils {
     return hash;
   }
 
+
+
+  /**
+   * gets a byte[] with copy of data from source BytesWritable
+   * @param sourceBw - source BytesWritable
+   */
+  public static byte[] createByteArray(BytesWritable sourceBw){
+    //TODO should replace with BytesWritable.copyData() once Hive
+    //removes support for the Hadoop 0.20 series.
+    return Arrays.copyOf(sourceBw.getBytes(), sourceBw.getLength());
+  }
+
+  /**
+   * Utility function to get separator for current level used in serialization.
+   * Used to get a better log message when out of bound lookup happens
+   * @param separators - array of separators byte, byte at index x indicates
+   *  separator used at that level
+   * @param level - nesting level
+   * @return separator at given level
+   * @throws SerDeException
+   */
+  static byte getSeparator(byte[] separators, int level) throws SerDeException {
+    try{
+      return separators[level];
+    }catch(ArrayIndexOutOfBoundsException e){
+      String msg = "Number of levels of nesting supported for " +
+          "LazySimpleSerde is " + (separators.length - 1) +
+          " Unable to work with level " + level;
+      
+      String txt = ". Use %s serde property for tables using LazySimpleSerde.";
+      
+      if(separators.length < 9){
+        msg += String.format(txt, LazySerDeParameters.SERIALIZATION_EXTEND_NESTING_LEVELS);
+      } else if (separators.length < 25) {
+      	msg += String.format(txt, LazySerDeParameters.SERIALIZATION_EXTEND_ADDITIONAL_NESTING_LEVELS);
+      }
+      
+      throw new SerDeException(msg, e);
+    }
+  }
+
+  public static void copyAndEscapeStringDataToText(byte[] inputBytes, int start, int length,
+      byte escapeChar, Text data) {
+
+    // First calculate the length of the output string
+    int outputLength = 0;
+    for (int i = 0; i < length; i++) {
+      if (inputBytes[start + i] != escapeChar) {
+        outputLength++;
+      } else {
+        outputLength++;
+        i++;
+      }
+    }
+
+    // Copy the data over, so that the internal state of Text will be set to
+    // the required outputLength.
+    data.set(inputBytes, start, outputLength);
+
+    // We need to copy the data byte by byte only in case the
+    // "outputLength < length" (which means there is at least one escaped
+    // byte.
+    if (outputLength < length) {
+      int k = 0;
+      byte[] outputBytes = data.getBytes();
+      for (int i = 0; i < length; i++) {
+        byte b = inputBytes[start + i];
+        if (b != escapeChar || i == length - 1) {
+          outputBytes[k++] = b;
+        } else {
+          // get the next byte
+          i++;
+          outputBytes[k++] = inputBytes[start + i];
+        }
+      }
+      assert (k == outputLength);
+    }
+  }
+
+  /**
+   * Return the byte value of the number string.
+   *
+   * @param altValue
+   *          The string containing a number.
+   * @param defaultVal
+   *          If the altValue does not represent a number, return the
+   *          defaultVal.
+   */
+  public static byte getByte(String altValue, byte defaultVal) {
+    if (altValue != null && altValue.length() > 0) {
+      try {
+        return Byte.valueOf(altValue).byteValue();
+      } catch (NumberFormatException e) {
+        return (byte) altValue.charAt(0);
+      }
+    }
+    return defaultVal;
+  }
+  
   private LazyUtils() {
     // prevent instantiation
   }
-
 }

@@ -18,24 +18,28 @@
 
 package org.apache.hadoop.hive.ql.exec.persistence;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.io.Serializable;
-import java.lang.management.ManagementFactory;
-import java.lang.management.MemoryMXBean;
-import java.text.NumberFormat;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.hive.ql.exec.Utilities;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.ql.exec.ExprNodeEvaluator;
+import org.apache.hadoop.hive.ql.exec.vector.VectorHashKeyWrapper;
+import org.apache.hadoop.hive.ql.exec.vector.VectorHashKeyWrapperBatch;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.VectorExpressionWriter;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
-import org.apache.hadoop.hive.ql.session.SessionState.LogHelper;
+import org.apache.hadoop.hive.serde2.SerDeException;
+import org.apache.hadoop.hive.serde2.ByteStream.Output;
+import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
+import org.apache.hadoop.io.BytesWritable;
+import org.apache.hadoop.io.Writable;
 
 
 /**
@@ -45,192 +49,178 @@ import org.apache.hadoop.hive.ql.session.SessionState.LogHelper;
  * hash table.
  */
 
-public class HashMapWrapper<K, V> implements Serializable {
-
+public class HashMapWrapper extends AbstractMapJoinTableContainer implements Serializable {
   private static final long serialVersionUID = 1L;
-  protected Log LOG = LogFactory.getLog(this.getClass().getName());
+  protected static final Log LOG = LogFactory.getLog(HashMapWrapper.class);
 
   // default threshold for using main memory based HashMap
-
   private static final int THRESHOLD = 1000000;
   private static final float LOADFACTOR = 0.75f;
-  private static final float MEMORYUSAGE = 1;
+  private final HashMap<MapJoinKey, MapJoinRowContainer> mHash; // main memory HashMap
+  private MapJoinKey lastKey = null;
+  private Output output = new Output(0); // Reusable output for serialization
 
-  private float maxMemoryUsage;
-  private HashMap<K, V> mHash; // main memory HashMap
-  protected transient LogHelper console;
-
-  private File dumpFile;
-  public static MemoryMXBean memoryMXBean;
-  private long maxMemory;
-  private long currentMemory;
-  private NumberFormat num;
-
-  /**
-   * Constructor.
-   *
-   * @param threshold
-   *          User specified threshold to store new values into persistent storage.
-   */
-  public HashMapWrapper(int threshold, float loadFactor, float memoryUsage) {
-    maxMemoryUsage = memoryUsage;
-    mHash = new HashMap<K, V>(threshold, loadFactor);
-    memoryMXBean = ManagementFactory.getMemoryMXBean();
-    maxMemory = memoryMXBean.getHeapMemoryUsage().getMax();
-    LOG.info("maximum memory: " + maxMemory);
-    num = NumberFormat.getInstance();
-    num.setMinimumFractionDigits(2);
-  }
-
-  public HashMapWrapper(int threshold) {
-    this(threshold, LOADFACTOR, MEMORYUSAGE);
+  public HashMapWrapper(Map<String, String> metaData) {
+    super(metaData);
+    int threshold = Integer.parseInt(metaData.get(THESHOLD_NAME));
+    float loadFactor = Float.parseFloat(metaData.get(LOAD_NAME));
+    mHash = new HashMap<MapJoinKey, MapJoinRowContainer>(threshold, loadFactor);
   }
 
   public HashMapWrapper() {
-    this(THRESHOLD, LOADFACTOR, MEMORYUSAGE);
+    this(HiveConf.ConfVars.HIVEHASHTABLEKEYCOUNTADJUSTMENT.defaultFloatVal,
+        HiveConf.ConfVars.HIVEHASHTABLETHRESHOLD.defaultIntVal,
+        HiveConf.ConfVars.HIVEHASHTABLELOADFACTOR.defaultFloatVal, -1);
   }
 
-  public V get(K key) {
+  public HashMapWrapper(Configuration hconf, long keyCount) {
+    this(HiveConf.getFloatVar(hconf, HiveConf.ConfVars.HIVEHASHTABLEKEYCOUNTADJUSTMENT),
+        HiveConf.getIntVar(hconf, HiveConf.ConfVars.HIVEHASHTABLETHRESHOLD),
+        HiveConf.getFloatVar(hconf, HiveConf.ConfVars.HIVEHASHTABLELOADFACTOR), keyCount);
+  }
+
+  private HashMapWrapper(float keyCountAdj, int threshold, float loadFactor, long keyCount) {
+    super(createConstructorMetaData(threshold, loadFactor));
+    threshold = calculateTableSize(keyCountAdj, threshold, loadFactor, keyCount);
+    mHash = new HashMap<MapJoinKey, MapJoinRowContainer>(threshold, loadFactor);
+  }
+
+  public static int calculateTableSize(
+      float keyCountAdj, int threshold, float loadFactor, long keyCount) {
+    if (keyCount >= 0 && keyCountAdj != 0) {
+      // We have statistics for the table. Size appropriately.
+      threshold = (int)Math.ceil(keyCount / (keyCountAdj * loadFactor));
+    }
+    LOG.info("Key count from statistics is " + keyCount + "; setting map size to " + threshold);
+    return threshold;
+  }
+
+
+  @Override
+  public MapJoinRowContainer get(MapJoinKey key) {
     return mHash.get(key);
   }
 
-  public boolean put(K key, V value) throws HiveException {
-    // isAbort();
+  @Override
+  public void put(MapJoinKey key, MapJoinRowContainer value) {
     mHash.put(key, value);
-    return false;
   }
 
-
-  public void remove(K key) {
-    mHash.remove(key);
-  }
-
-  /**
-   * Flush the main memory hash table into the persistent cache file
-   *
-   * @return persistent cache file
-   */
-  public long flushMemoryCacheToPersistent(File file) throws IOException {
-    ObjectOutputStream outputStream = null;
-    outputStream = new ObjectOutputStream(new FileOutputStream(file));
-    outputStream.writeObject(mHash);
-    outputStream.flush();
-    outputStream.close();
-
-    return file.length();
-  }
-
-  public void initilizePersistentHash(String fileName) throws IOException, ClassNotFoundException {
-    ObjectInputStream inputStream = null;
-    inputStream = new ObjectInputStream(new FileInputStream(fileName));
-    HashMap<K, V> hashtable = (HashMap<K, V>) inputStream.readObject();
-    this.setMHash(hashtable);
-
-    inputStream.close();
-  }
-
+  @Override
   public int size() {
     return mHash.size();
   }
-
-  public Set<K> keySet() {
-    return mHash.keySet();
+  @Override
+  public Set<Entry<MapJoinKey, MapJoinRowContainer>> entrySet() {
+    return mHash.entrySet();
   }
-
-
-  /**
-   * Close the persistent hash table and clean it up.
-   *
-   * @throws HiveException
-   */
-  public void close() throws HiveException {
+  @Override
+  public void clear() {
     mHash.clear();
   }
 
-  public void clear() throws HiveException {
-    mHash.clear();
-  }
-
-  public int getKeySize() {
-    return mHash.size();
-  }
-
-  public boolean isAbort(long numRows,LogHelper console) {
-    System.gc();
-    System.gc();
-    int size = mHash.size();
-    long usedMemory = memoryMXBean.getHeapMemoryUsage().getUsed();
-    double rate = (double) usedMemory / (double) maxMemory;
-    console.printInfo(Utilities.now() + "\tProcessing rows:\t" + numRows + "\tHashtable size:\t"
-        + size + "\tMemory usage:\t" + usedMemory + "\trate:\t" + num.format(rate));
-    if (rate > (double) maxMemoryUsage) {
-      return true;
+  @Override
+  public MapJoinKey putRow(MapJoinObjectSerDeContext keyContext, Writable currentKey,
+      MapJoinObjectSerDeContext valueContext, Writable currentValue)
+          throws SerDeException, HiveException {
+    MapJoinKey key = MapJoinKey.read(output, keyContext, currentKey);
+    FlatRowContainer values = (FlatRowContainer)get(key);
+    if (values == null) {
+      values = new FlatRowContainer();
+      put(key, values);
     }
-    return false;
+    values.add(valueContext, (BytesWritable)currentValue);
+    return key;
   }
 
-  public void setLOG(Log log) {
-    LOG = log;
+  @Override
+  public ReusableGetAdaptor createGetter(MapJoinKey keyTypeFromLoader) {
+    return new GetAdaptor(keyTypeFromLoader);
   }
 
-  public HashMap<K, V> getMHash() {
-    return mHash;
+  private class GetAdaptor implements ReusableGetAdaptor {
+
+    private Object[] currentKey;
+    private List<ObjectInspector> vectorKeyOIs;
+
+    private MapJoinKey key;
+    private MapJoinRowContainer currentValue;
+    private final Output output = new Output();
+    private boolean isFirstKey = true;
+
+    public GetAdaptor(MapJoinKey key) {
+      this.key = key;
+    }
+
+    @Override
+    public void setFromVector(VectorHashKeyWrapper kw, VectorExpressionWriter[] keyOutputWriters,
+        VectorHashKeyWrapperBatch keyWrapperBatch) throws HiveException {
+      if (currentKey == null) {
+        currentKey = new Object[keyOutputWriters.length];
+        vectorKeyOIs = new ArrayList<ObjectInspector>();
+        for (int i = 0; i < keyOutputWriters.length; i++) {
+          vectorKeyOIs.add(keyOutputWriters[i].getObjectInspector());
+        }
+      }
+      for (int i = 0; i < keyOutputWriters.length; i++) {
+        currentKey[i] = keyWrapperBatch.getWritableKeyValue(kw, i, keyOutputWriters[i]);
+      }
+      key =  MapJoinKey.readFromVector(output, key, currentKey, vectorKeyOIs, !isFirstKey);
+      isFirstKey = false;
+      this.currentValue = mHash.get(key);
+    }
+
+    @Override
+    public void setFromRow(Object row, List<ExprNodeEvaluator> fields,
+        List<ObjectInspector> ois) throws HiveException {
+      if (currentKey == null) {
+        currentKey = new Object[fields.size()];
+      }
+      for (int keyIndex = 0; keyIndex < fields.size(); ++keyIndex) {
+        currentKey[keyIndex] = fields.get(keyIndex).evaluate(row);
+      }
+      key = MapJoinKey.readFromRow(output, key, currentKey, ois, !isFirstKey);
+      isFirstKey = false;
+      this.currentValue = mHash.get(key);
+    }
+
+    @Override
+    public void setFromOther(ReusableGetAdaptor other) {
+      assert other instanceof GetAdaptor;
+      GetAdaptor other2 = (GetAdaptor)other;
+      this.key = other2.key;
+      this.isFirstKey = other2.isFirstKey;
+      this.currentValue = mHash.get(key);
+    }
+
+    @Override
+    public boolean hasAnyNulls(int fieldCount, boolean[] nullsafes) {
+      return key.hasAnyNulls(fieldCount, nullsafes);
+    }
+
+    @Override
+    public MapJoinRowContainer getCurrentRows() {
+      return currentValue;
+    }
+
+    @Override
+    public Object[] getCurrentKey() {
+      return currentKey;
+    }
   }
 
-  public void setMHash(HashMap<K, V> hash) {
-    mHash = hash;
+  @Override
+  public void seal() {
+    // Nothing to do.
   }
 
-  public LogHelper getConsole() {
-    return console;
+  @Override
+  public MapJoinKey getAnyKey() {
+    return mHash.isEmpty() ? null : mHash.keySet().iterator().next();
   }
 
-  public void setConsole(LogHelper console) {
-    this.console = console;
+  @Override
+  public void dumpMetrics() {
+    // Nothing to do.
   }
-
-  public File getDumpFile() {
-    return dumpFile;
-  }
-
-  public void setDumpFile(File dumpFile) {
-    this.dumpFile = dumpFile;
-  }
-
-  public static MemoryMXBean getMemoryMXBean() {
-    return memoryMXBean;
-  }
-
-  public static void setMemoryMXBean(MemoryMXBean memoryMXBean) {
-    HashMapWrapper.memoryMXBean = memoryMXBean;
-  }
-
-  public long getMaxMemory() {
-    return maxMemory;
-  }
-
-  public void setMaxMemory(long maxMemory) {
-    this.maxMemory = maxMemory;
-  }
-
-  public long getCurrentMemory() {
-    return currentMemory;
-  }
-
-  public void setCurrentMemory(long currentMemory) {
-    this.currentMemory = currentMemory;
-  }
-
-  public NumberFormat getNum() {
-    return num;
-  }
-
-  public void setNum(NumberFormat num) {
-    this.num = num;
-  }
-
-  public static int getTHRESHOLD() {
-    return THRESHOLD;
-  }
-
 }

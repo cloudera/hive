@@ -18,10 +18,10 @@
 
 package org.apache.hadoop.hive.ql.optimizer;
 
-import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -29,9 +29,12 @@ import java.util.Stack;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.hive.ql.exec.FunctionRegistry;
+import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.exec.GroupByOperator;
 import org.apache.hadoop.hive.ql.exec.Operator;
+import org.apache.hadoop.hive.ql.exec.ReduceSinkOperator;
+import org.apache.hadoop.hive.ql.exec.SelectOperator;
 import org.apache.hadoop.hive.ql.exec.TableScanOperator;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.lib.DefaultGraphWalker;
@@ -43,24 +46,25 @@ import org.apache.hadoop.hive.ql.lib.NodeProcessor;
 import org.apache.hadoop.hive.ql.lib.NodeProcessorCtx;
 import org.apache.hadoop.hive.ql.lib.Rule;
 import org.apache.hadoop.hive.ql.lib.RuleRegExp;
-import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.metadata.Partition;
 import org.apache.hadoop.hive.ql.metadata.Table;
-import org.apache.hadoop.hive.ql.optimizer.ppr.PartitionPruner;
 import org.apache.hadoop.hive.ql.parse.ParseContext;
 import org.apache.hadoop.hive.ql.parse.PrunedPartitionList;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
+import org.apache.hadoop.hive.ql.plan.AggregationDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
-import org.apache.hadoop.hive.ql.plan.ExprNodeFieldDesc;
-import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeNullDesc;
 import org.apache.hadoop.hive.ql.plan.GroupByDesc;
-import org.apache.hadoop.hive.ql.udf.generic.GenericUDF;
+import org.apache.hadoop.hive.ql.plan.OperatorDesc;
+import org.apache.hadoop.hive.ql.plan.SelectDesc;
+import org.apache.hadoop.hive.ql.udf.generic.GenericUDAFEvaluator.Mode;
 
 /**
- *this transformation does bucket group by optimization.
+ * This transformation does group by optimization. If the grouping key is a superset
+ * of the bucketing and sorting keys of the underlying table in the same order, the
+ * group by can be be performed on the map-side completely.
  */
 public class GroupByOptimizer implements Transform {
 
@@ -74,20 +78,35 @@ public class GroupByOptimizer implements Transform {
   public ParseContext transform(ParseContext pctx) throws SemanticException {
 
     Map<Rule, NodeProcessor> opRules = new LinkedHashMap<Rule, NodeProcessor>();
-    GroupByOptProcCtx groupByOptimizeCtx = new GroupByOptProcCtx();
+    HiveConf conf = pctx.getConf();
 
-    // process group-by pattern
-    opRules.put(new RuleRegExp("R1", "GBY%RS%GBY%"),
-        getMapAggreSortedGroupbyProc(pctx));
+    if (!HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVEGROUPBYSKEW)) {
+      // process group-by pattern
+      opRules.put(new RuleRegExp("R1",
+          GroupByOperator.getOperatorName() + "%" +
+              ReduceSinkOperator.getOperatorName() + "%" +
+              GroupByOperator.getOperatorName() + "%"),
+          getMapSortedGroupbyProc(pctx));
+    } else {
+      // If hive.groupby.skewindata is set to true, the operator tree is as below
+      opRules.put(new RuleRegExp("R2",
+          GroupByOperator.getOperatorName() + "%" +
+              ReduceSinkOperator.getOperatorName() + "%" +
+              GroupByOperator.getOperatorName() + "%" +
+              ReduceSinkOperator.getOperatorName() + "%" +
+              GroupByOperator.getOperatorName() + "%"),
+          getMapSortedGroupbySkewProc(pctx));
+    }
 
     // The dispatcher fires the processor corresponding to the closest matching
     // rule and passes the context along
-    Dispatcher disp = new DefaultRuleDispatcher(getDefaultProc(), opRules,
-        groupByOptimizeCtx);
+    Dispatcher disp =
+        new DefaultRuleDispatcher(getDefaultProc(), opRules,
+            new GroupByOptimizerContext(conf));
     GraphWalker ogw = new DefaultGraphWalker(disp);
 
     // Create a list of topop nodes
-    ArrayList<Node> topNodes = new ArrayList<Node>();
+    List<Node> topNodes = new ArrayList<Node>();
     topNodes.addAll(pctx.getTopOps().values());
     ogw.startWalking(topNodes, null);
 
@@ -104,146 +123,336 @@ public class GroupByOptimizer implements Transform {
     };
   }
 
-  private NodeProcessor getMapAggreSortedGroupbyProc(ParseContext pctx) {
-    return new BucketGroupByProcessor(pctx);
+  private NodeProcessor getMapSortedGroupbyProc(ParseContext pctx) {
+    return new SortGroupByProcessor(pctx);
   }
 
+  private NodeProcessor getMapSortedGroupbySkewProc(ParseContext pctx) {
+    return new SortGroupBySkewProcessor(pctx);
+  }
+
+  public enum GroupByOptimizerSortMatch {
+    NO_MATCH, PARTIAL_MATCH, COMPLETE_MATCH
+  };
+
+  private enum ColumnOrderMatch {
+    NO_MATCH, PREFIX_COL1_MATCH, PREFIX_COL2_MATCH, COMPLETE_MATCH
+  };
+
   /**
-   * BucketGroupByProcessor.
+   * SortGroupByProcessor.
    *
    */
-  public class BucketGroupByProcessor implements NodeProcessor {
+  public class SortGroupByProcessor implements NodeProcessor {
 
     protected ParseContext pGraphContext;
 
-    public BucketGroupByProcessor(ParseContext pGraphContext) {
+    public SortGroupByProcessor(ParseContext pGraphContext) {
       this.pGraphContext = pGraphContext;
+    }
+
+    // Check if the group by operator has already been processed
+    protected boolean checkGroupByOperatorProcessed(
+        GroupByOptimizerContext groupBySortOptimizerContext,
+        GroupByOperator groupByOp) {
+
+      // The group by operator has already been processed
+      if (groupBySortOptimizerContext.getListGroupByOperatorsProcessed().contains(groupByOp)) {
+        return true;
+      }
+
+      groupBySortOptimizerContext.getListGroupByOperatorsProcessed().add(groupByOp);
+      return false;
+    }
+
+    protected void processGroupBy(GroupByOptimizerContext ctx,
+        Stack<Node> stack,
+        GroupByOperator groupByOp,
+        int depth) throws SemanticException {
+      HiveConf hiveConf = ctx.getConf();
+      GroupByOptimizerSortMatch match = checkSortGroupBy(stack, groupByOp);
+      boolean useMapperSort =
+          HiveConf.getBoolVar(hiveConf, HiveConf.ConfVars.HIVE_MAP_GROUPBY_SORT);
+      GroupByDesc groupByOpDesc = groupByOp.getConf();
+
+      boolean removeReduceSink = false;
+      boolean optimizeDistincts = false;
+      boolean setBucketGroup = false;
+
+      // Dont remove the operator for distincts
+      if (useMapperSort &&
+          (match == GroupByOptimizerSortMatch.COMPLETE_MATCH)) {
+        if (!groupByOpDesc.isDistinct()) {
+          removeReduceSink = true;
+        }
+        else if (!HiveConf.getBoolVar(hiveConf, HiveConf.ConfVars.HIVEGROUPBYSKEW)) {
+          // Optimize the query: select count(distinct keys) from T, where
+          // T is bucketized and sorted by T
+          // Partial aggregation can be done by the mappers in this scenario
+
+          List<ExprNodeDesc> keys =
+              ((GroupByOperator)
+              (groupByOp.getChildOperators().get(0).getChildOperators().get(0)))
+                  .getConf().getKeys();
+          if ((keys == null) || (keys.isEmpty())) {
+            optimizeDistincts = true;
+          }
+        }
+      }
+
+      if ((match == GroupByOptimizerSortMatch.PARTIAL_MATCH) ||
+          (match == GroupByOptimizerSortMatch.COMPLETE_MATCH)) {
+        setBucketGroup = true;
+      }
+
+      if (removeReduceSink) {
+        convertGroupByMapSideSortedGroupBy(hiveConf, groupByOp, depth);
+      }
+      else if (optimizeDistincts && !HiveConf.getBoolVar(hiveConf, HiveConf.ConfVars.HIVE_VECTORIZATION_ENABLED)) {
+        // In test mode, dont change the query plan. However, setup a query property
+        pGraphContext.getQueryProperties().setHasMapGroupBy(true);
+        if (HiveConf.getBoolVar(hiveConf, HiveConf.ConfVars.HIVE_MAP_GROUPBY_SORT_TESTMODE)) {
+          return;
+        }
+        ReduceSinkOperator reduceSinkOp =
+            (ReduceSinkOperator)groupByOp.getChildOperators().get(0);
+        GroupByDesc childGroupByDesc =
+            ((GroupByOperator)
+            (reduceSinkOp.getChildOperators().get(0))).getConf();
+
+        for (int pos = 0; pos < childGroupByDesc.getAggregators().size(); pos++) {
+          AggregationDesc aggr = childGroupByDesc.getAggregators().get(pos);
+          // Partial aggregation is not done for distincts on the mapper
+          // However, if the data is bucketed/sorted on the distinct key, partial aggregation
+          // can be performed on the mapper.
+          if (aggr.getDistinct()) {
+            ArrayList<ExprNodeDesc> parameters = new ArrayList<ExprNodeDesc>();
+            ExprNodeDesc param = aggr.getParameters().get(0);
+            assert param instanceof ExprNodeColumnDesc;
+            ExprNodeColumnDesc paramC = (ExprNodeColumnDesc) param;
+            paramC.setIsPartitionColOrVirtualCol(false);
+            paramC.setColumn("VALUE._col" + pos);
+            parameters.add(paramC);
+            aggr.setParameters(parameters);
+            aggr.setDistinct(false);
+            aggr.setMode(Mode.FINAL);
+          }
+        }
+        // Partial aggregation is performed on the mapper, no distinct processing at the reducer
+        childGroupByDesc.setDistinct(false);
+        groupByOpDesc.setDontResetAggrsDistinct(true);
+        groupByOpDesc.setBucketGroup(true);
+        groupByOp.setUseBucketizedHiveInputFormat(true);
+        // no distinct processing at the reducer
+        // A query like 'select count(distinct key) from T' is transformed into
+        // 'select count(key) from T' as far as the reducer is concerned.
+        reduceSinkOp.getConf().setDistinctColumnIndices(new ArrayList<List<Integer>>());
+      }
+      else if (setBucketGroup) {
+        groupByOpDesc.setBucketGroup(true);
+      }
     }
 
     @Override
     public Object process(Node nd, Stack<Node> stack, NodeProcessorCtx procCtx,
         Object... nodeOutputs) throws SemanticException {
       // GBY,RS,GBY... (top to bottom)
-      GroupByOperator op = (GroupByOperator) stack.get(stack.size() - 3);
-      checkBucketGroupBy(op);
+      GroupByOperator groupByOp = (GroupByOperator) stack.get(stack.size() - 3);
+
+      GroupByOptimizerContext ctx = (GroupByOptimizerContext) procCtx;
+
+      if (!checkGroupByOperatorProcessed(ctx, groupByOp)) {
+        processGroupBy(ctx, stack, groupByOp, 2);
+      }
       return null;
     }
 
-    private void checkBucketGroupBy(GroupByOperator curr)
+    // Should this group by be converted to a map-side group by, because the grouping keys for
+    // the base table for the group by matches the skewed keys
+    protected GroupByOptimizerSortMatch checkSortGroupBy(Stack<Node> stack,
+        GroupByOperator groupByOp)
         throws SemanticException {
 
       // if this is not a HASH groupby, return
-      if (curr.getConf().getMode() != GroupByDesc.Mode.HASH) {
-        return;
+      if (groupByOp.getConf().getMode() != GroupByDesc.Mode.HASH) {
+        return GroupByOptimizerSortMatch.NO_MATCH;
       }
 
-      Set<String> tblNames = pGraphContext.getGroupOpToInputTables().get(curr);
-      if (tblNames == null || tblNames.size() == 0) {
-        return;
+      // Check all the operators in the stack. Currently, only SELECTs and FILTERs
+      // are allowed. A interface 'supportMapSideGroupBy has been added for the same
+      Operator<? extends OperatorDesc> currOp = groupByOp;
+      currOp = currOp.getParentOperators().get(0);
+
+      while (true) {
+        if ((currOp.getParentOperators() == null) || (currOp.getParentOperators().isEmpty())) {
+          break;
+        }
+
+        if ((currOp.getParentOperators().size() > 1) ||
+            (!currOp.columnNamesRowResolvedCanBeObtained())) {
+          return GroupByOptimizerSortMatch.NO_MATCH;
+        }
+
+        currOp = currOp.getParentOperators().get(0);
       }
 
-      boolean bucketGroupBy = true;
-      GroupByDesc desc = curr.getConf();
-      List<ExprNodeDesc> groupByKeys = new LinkedList<ExprNodeDesc>();
-      groupByKeys.addAll(desc.getKeys());
+      // currOp now points to the top-most tablescan operator
+      TableScanOperator tableScanOp = (TableScanOperator) currOp;
+      int stackPos = 0;
+      assert stack.get(0) == tableScanOp;
+
+      // Create a mapping from the group by columns to the table columns
+      Map<String, String> tableColsMapping = new HashMap<String, String>();
+      Set<String> constantCols = new HashSet<String>();
+      Table table = tableScanOp.getConf().getTableMetadata();
+      for (FieldSchema col : table.getAllCols()) {
+        tableColsMapping.put(col.getName(), col.getName());
+      }
+
+      while (currOp != groupByOp) {
+        Operator<? extends OperatorDesc> processOp = currOp;
+        Set<String> newConstantCols = new HashSet<String>();
+        currOp = (Operator<? extends OperatorDesc>) (stack.get(++stackPos));
+
+        // Filters don't change the column names - so, no need to do anything for them
+        if (processOp instanceof SelectOperator) {
+          SelectOperator selectOp = (SelectOperator) processOp;
+          SelectDesc selectDesc = selectOp.getConf();
+
+          if (selectDesc.isSelStarNoCompute()) {
+            continue;
+          }
+
+          // Only columns and constants can be selected
+          for (int pos = 0; pos < selectDesc.getColList().size(); pos++) {
+            String outputColumnName = selectDesc.getOutputColumnNames().get(pos);
+            if (constantCols.contains(outputColumnName)) {
+              tableColsMapping.remove(outputColumnName);
+              newConstantCols.add(outputColumnName);
+              continue;
+            }
+
+            ExprNodeDesc selectCol = selectDesc.getColList().get(pos);
+            if (selectCol instanceof ExprNodeColumnDesc) {
+              String newValue =
+                  tableColsMapping.get(((ExprNodeColumnDesc) selectCol).getColumn());
+              tableColsMapping.put(outputColumnName, newValue);
+            }
+            else {
+              tableColsMapping.remove(outputColumnName);
+              if (selectCol instanceof ExprNodeNullDesc) {
+                newConstantCols.add(outputColumnName);
+              }
+              if (selectCol instanceof ExprNodeConstantDesc) {
+                // Lets see if this constant was folded because of optimization.
+                String origCol = ((ExprNodeConstantDesc) selectCol).getFoldedFromCol();
+                if (origCol != null) {
+                  tableColsMapping.put(outputColumnName, origCol);
+                } else {
+                  newConstantCols.add(outputColumnName);
+                }
+              }
+            }
+          }
+
+          constantCols = newConstantCols;
+        }
+      }
+
       // compute groupby columns from groupby keys
       List<String> groupByCols = new ArrayList<String>();
-      while (groupByKeys.size() > 0) {
-        ExprNodeDesc node = groupByKeys.remove(0);
-        if (node instanceof ExprNodeColumnDesc) {
-          groupByCols.addAll(node.getCols());
-        } else if ((node instanceof ExprNodeConstantDesc)
-            || (node instanceof ExprNodeNullDesc)) {
-          // nothing
-        } else if (node instanceof ExprNodeFieldDesc) {
-          groupByKeys.add(0, ((ExprNodeFieldDesc) node).getDesc());
+      // If the group by expression is anything other than a list of columns,
+      // the sorting property is not obeyed
+      for (ExprNodeDesc expr : groupByOp.getConf().getKeys()) {
+        if (expr instanceof ExprNodeColumnDesc) {
+          String groupByKeyColumn = ((ExprNodeColumnDesc) expr).getColumn();
+          // ignore if it is a constant
+          if (constantCols.contains(groupByKeyColumn)) {
+            continue;
+          }
+          else {
+            if (tableColsMapping.containsKey(groupByKeyColumn)) {
+              groupByCols.add(tableColsMapping.get(groupByKeyColumn));
+            }
+            else {
+              return GroupByOptimizerSortMatch.NO_MATCH;
+            }
+          }
+        }
+        // Constants and nulls are OK
+        else if ((expr instanceof ExprNodeConstantDesc) ||
+            (expr instanceof ExprNodeNullDesc)) {
           continue;
-        } else if (node instanceof ExprNodeGenericFuncDesc) {
-          ExprNodeGenericFuncDesc udfNode = ((ExprNodeGenericFuncDesc) node);
-          GenericUDF udf = udfNode.getGenericUDF();
-          if (!FunctionRegistry.isDeterministic(udf)) {
-            return;
-          }
-          groupByKeys.addAll(0, udfNode.getChildExprs());
         } else {
-          return;
+          return GroupByOptimizerSortMatch.NO_MATCH;
         }
       }
 
-      if (groupByCols.size() == 0) {
-        return;
+      if (!table.isPartitioned()) {
+        List<String> sortCols = Utilities.getColumnNamesFromSortCols(table.getSortCols());
+        List<String> bucketCols = table.getBucketCols();
+        return matchBucketSortCols(groupByCols, bucketCols, sortCols);
+      } else {
+        PrunedPartitionList partsList =
+            pGraphContext.getPrunedPartitions(table.getTableName(), tableScanOp);
+
+        List<Partition> notDeniedPartns = partsList.getNotDeniedPartns();
+
+        GroupByOptimizerSortMatch currentMatch =
+            notDeniedPartns.isEmpty() ? GroupByOptimizerSortMatch.NO_MATCH :
+                notDeniedPartns.size() > 1 ? GroupByOptimizerSortMatch.PARTIAL_MATCH :
+                    GroupByOptimizerSortMatch.COMPLETE_MATCH;
+        for (Partition part : notDeniedPartns) {
+          List<String> sortCols = part.getSortColNames();
+          List<String> bucketCols = part.getBucketCols();
+          GroupByOptimizerSortMatch match = matchBucketSortCols(groupByCols, bucketCols, sortCols);
+          if (match == GroupByOptimizerSortMatch.NO_MATCH) {
+            return match;
+          }
+
+          if (match == GroupByOptimizerSortMatch.PARTIAL_MATCH) {
+            currentMatch = match;
+          }
+        }
+        return currentMatch;
+      }
+    }
+
+    /*
+     * Return how the list of columns passed in match.
+     * Return NO_MATCH if either of the list is empty or null, or if there is a mismatch.
+     * For eg: ([], []), ([], ["a"]), (["a"],["b"]) and (["a", "b"], ["a","c"]) return NO_MATCH
+     *
+     * Return COMPLETE_MATCH if both the lists are non-empty and are same
+     * Return PREFIX_COL1_MATCH if list1 is a strict subset of list2 and
+     * return PREFIX_COL2_MATCH if list2 is a strict subset of list1
+     *
+     * For eg: (["a"], ["a"]), (["a"], ["a", "b"]) and (["a", "b"], ["a"]) return
+     * COMPLETE_MATCH, PREFIX_COL1_MATCH and PREFIX_COL2_MATCH respectively.
+     */
+    private ColumnOrderMatch matchColumnOrder(List<String> cols1, List<String> cols2) {
+      int numCols1 = cols1 == null ? 0 : cols1.size();
+      int numCols2 = cols2 == null ? 0 : cols2.size();
+
+      if (numCols1 == 0 || numCols2 == 0) {
+        return ColumnOrderMatch.NO_MATCH;
       }
 
-      for (String table : tblNames) {
-        Operator<? extends Serializable> topOp = pGraphContext.getTopOps().get(
-            table);
-        if (topOp == null || (!(topOp instanceof TableScanOperator))) {
-          // this is in a sub-query.
-          // In future, we need to infer subq's columns propery. For example
-          // "select key, count(1)
-          // from (from clustergroupbyselect key, value where ds='210') group by key, 3;",
-          // even though the group by op is in a subquery, it can be changed to
-          // bucket groupby.
-          return;
-        }
-        TableScanOperator ts = (TableScanOperator) topOp;
-        Table destTable = pGraphContext.getTopToTable().get(ts);
-        if (destTable == null) {
-          return;
-        }
-        if (!destTable.isPartitioned()) {
-          List<String> bucketCols = destTable.getBucketCols();
-          List<String> sortCols = Utilities
-              .getColumnNamesFromSortCols(destTable.getSortCols());
-          bucketGroupBy = matchBucketOrSortedColumns(groupByCols, bucketCols,
-              sortCols);
-          if (!bucketGroupBy) {
-            return;
-          }
-        } else {
-          PrunedPartitionList partsList = null;
-          try {
-            partsList = pGraphContext.getOpToPartList().get(ts);
-            if (partsList == null) {
-              partsList = PartitionPruner.prune(destTable, pGraphContext
-                .getOpToPartPruner().get(ts), pGraphContext.getConf(), table,
-                pGraphContext.getPrunedPartitions());
-              pGraphContext.getOpToPartList().put(ts, partsList);
-            }
-          } catch (HiveException e) {
-            // Has to use full name to make sure it does not conflict with
-            // org.apache.commons.lang.StringUtils
-            LOG.error(org.apache.hadoop.util.StringUtils.stringifyException(e));
-            throw new SemanticException(e.getMessage(), e);
-          }
-          List<Partition> parts = new ArrayList<Partition>();
-          parts.addAll(partsList.getConfirmedPartns());
-          parts.addAll(partsList.getUnknownPartns());
-          for (Partition part : parts) {
-            List<String> bucketCols = part.getBucketCols();
-            List<String> sortCols = part.getSortColNames();
-            bucketGroupBy = matchBucketOrSortedColumns(groupByCols, bucketCols,
-                sortCols);
-            if (!bucketGroupBy) {
-              return;
-            }
-          }
+      for (int pos = 0; pos < Math.min(numCols1, numCols2); pos++) {
+        if (!cols1.get(pos).equals(cols2.get(pos))) {
+          return ColumnOrderMatch.NO_MATCH;
         }
       }
 
-      curr.getConf().setBucketGroup(bucketGroupBy);
+      return (numCols1 == numCols2) ?
+          ColumnOrderMatch.COMPLETE_MATCH :
+          ((numCols1 < numCols2) ? ColumnOrderMatch.PREFIX_COL1_MATCH :
+              ColumnOrderMatch.PREFIX_COL2_MATCH);
     }
 
     /**
-     * Given the group by keys, bucket columns, sort column, this method
+     * Given the group by keys, bucket columns and sort columns, this method
      * determines if we can use sorted group by or not.
-     *
-     * We use bucket columns only when the sorted column set is empty and if all
-     * group by columns are contained in bucket columns.
-     *
-     * If we can can not determine by looking at bucketed columns and the table
-     * has sort columns, we resort to sort columns. We can use bucket group by
-     * if the groupby column set is an exact prefix match of sort columns.
      *
      * @param groupByCols
      * @param bucketCols
@@ -251,59 +460,126 @@ public class GroupByOptimizer implements Transform {
      * @return
      * @throws SemanticException
      */
-    private boolean matchBucketOrSortedColumns(List<String> groupByCols,
-        List<String> bucketCols, List<String> sortCols) throws SemanticException {
-      boolean ret = false;
+    private GroupByOptimizerSortMatch matchBucketSortCols(
+        List<String> groupByCols,
+        List<String> bucketCols,
+        List<String> sortCols) throws SemanticException {
 
-      if (sortCols == null || sortCols.size() == 0) {
-        ret = matchBucketColumns(groupByCols, bucketCols);
+      /*
+       * >> Super set of
+       * If the grouping columns are a,b,c and the sorting columns are a,b
+       * grouping columns >> sorting columns
+       * (or grouping columns are a superset of sorting columns)
+       *
+       * Similarly << means subset of
+       *
+       * No intersection between Sort Columns and BucketCols:
+       *
+       * 1. Sort Cols = Group By Cols ---> Partial Match
+       * 2. Group By Cols >> Sort By Cols --> No Match
+       * 3. Group By Cols << Sort By Cols --> Partial Match
+       *
+       * BucketCols <= SortCols (bucket columns is either same or a prefix of sort columns)
+       *
+       * 1. Sort Cols = Group By Cols ---> Complete Match
+       * 2. Group By Cols >> Sort By Cols --> No Match
+       * 3. Group By Cols << Sort By Cols --> Complete Match if Group By Cols >= BucketCols
+       * --> Partial Match otherwise
+       *
+       * BucketCols >> SortCols (bucket columns is a superset of sorting columns)
+       *
+       * 1. group by cols <= sort cols --> partial match
+       * 2. group by cols >> sort cols --> no match
+       *
+       * One exception to this rule is:
+       * If GroupByCols == SortCols and all bucketing columns are part of sorting columns
+       * (in any order), it is a complete match
+       */
+      ColumnOrderMatch bucketSortColsMatch = matchColumnOrder(bucketCols, sortCols);
+      ColumnOrderMatch sortGroupByColsMatch = matchColumnOrder(sortCols, groupByCols);
+      switch (sortGroupByColsMatch) {
+      case NO_MATCH:
+        return GroupByOptimizerSortMatch.NO_MATCH;
+      case COMPLETE_MATCH:
+        return ((bucketCols != null) && !bucketCols.isEmpty() &&
+            sortCols.containsAll(bucketCols)) ?
+            GroupByOptimizerSortMatch.COMPLETE_MATCH : GroupByOptimizerSortMatch.PARTIAL_MATCH;
+      case PREFIX_COL1_MATCH:
+        return GroupByOptimizerSortMatch.NO_MATCH;
+      case PREFIX_COL2_MATCH:
+        return ((bucketSortColsMatch == ColumnOrderMatch.NO_MATCH) ||
+            (bucketCols.size() > groupByCols.size())) ?
+            GroupByOptimizerSortMatch.PARTIAL_MATCH :
+            GroupByOptimizerSortMatch.COMPLETE_MATCH;
       }
-
-      if (!ret && sortCols != null && sortCols.size() >= groupByCols.size()) {
-        // check sort columns, if groupByCols is a prefix subset of sort
-        // columns, we will use sorted group by. For example, if data is sorted
-        // by column a, b, c, and a query wants to group by b,a, we will use
-        // sorted group by. But if the query wants to groupby b,c, then sorted
-        // group by can not be used.
-        int num = groupByCols.size();
-        for (int i = 0; i < num; i++) {
-          if (sortCols.indexOf(groupByCols.get(i)) > (num - 1)) {
-            return false;
-          }
-        }
-        return true;
-      }
-
-      return ret;
+      return GroupByOptimizerSortMatch.NO_MATCH;
     }
 
-    /*
-     * All group by columns should be contained in the bucket column set. And
-     * the number of group by columns should be equal to number of bucket
-     * columns.
-     */
-    private boolean matchBucketColumns(List<String> grpCols,
-        List<String> tblBucketCols) throws SemanticException {
-
-      if (tblBucketCols == null || tblBucketCols.size() == 0
-          || grpCols.size() == 0 || grpCols.size() != tblBucketCols.size()) {
-        return false;
+    // Convert the group by to a map-side group by
+    // The operators specified by depth and removed from the tree.
+    protected void convertGroupByMapSideSortedGroupBy(
+        HiveConf conf, GroupByOperator groupByOp, int depth) {
+      // In test mode, dont change the query plan. However, setup a query property
+      pGraphContext.getQueryProperties().setHasMapGroupBy(true);
+      if (HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVE_MAP_GROUPBY_SORT_TESTMODE)) {
+        return;
       }
 
-      for (int i = 0; i < grpCols.size(); i++) {
-        String tblCol = grpCols.get(i);
-        if (!tblBucketCols.contains(tblCol)) {
-          return false;
-        }
+      if (groupByOp.removeChildren(depth)) {
+        // Use bucketized hive input format - that makes sure that one mapper reads the entire file
+        groupByOp.setUseBucketizedHiveInputFormat(true);
+        groupByOp.getConf().setMode(GroupByDesc.Mode.FINAL);
       }
-      return true;
     }
   }
 
   /**
-   * GroupByOptProcCtx.
+   * SortGroupByProcessor.
    *
    */
-  public class GroupByOptProcCtx implements NodeProcessorCtx {
+  public class SortGroupBySkewProcessor extends SortGroupByProcessor {
+    public SortGroupBySkewProcessor(ParseContext pGraphContext) {
+      super(pGraphContext);
+    }
+
+    @Override
+    public Object process(Node nd, Stack<Node> stack, NodeProcessorCtx procCtx,
+        Object... nodeOutputs) throws SemanticException {
+      // GBY,RS,GBY,RS,GBY... (top to bottom)
+      GroupByOperator groupByOp = (GroupByOperator) stack.get(stack.size() - 5);
+      GroupByOptimizerContext ctx = (GroupByOptimizerContext) procCtx;
+
+      if (!checkGroupByOperatorProcessed(ctx, groupByOp)) {
+        processGroupBy(ctx, stack, groupByOp, 4);
+      }
+      return null;
+    }
+  }
+
+  public class GroupByOptimizerContext implements NodeProcessorCtx {
+    List<GroupByOperator> listGroupByOperatorsProcessed;
+    HiveConf conf;
+
+    public GroupByOptimizerContext(HiveConf conf) {
+      this.conf = conf;
+      listGroupByOperatorsProcessed = new ArrayList<GroupByOperator>();
+    }
+
+    public List<GroupByOperator> getListGroupByOperatorsProcessed() {
+      return listGroupByOperatorsProcessed;
+    }
+
+    public void setListGroupByOperatorsProcessed(
+        List<GroupByOperator> listGroupByOperatorsProcessed) {
+      this.listGroupByOperatorsProcessed = listGroupByOperatorsProcessed;
+    }
+
+    public HiveConf getConf() {
+      return conf;
+    }
+
+    public void setConf(HiveConf conf) {
+      this.conf = conf;
+    }
   }
 }

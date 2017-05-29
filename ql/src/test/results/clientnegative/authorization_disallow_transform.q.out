@@ -1,0 +1,13 @@
+PREHOOK: query: set role ALL
+PREHOOK: type: SHOW_ROLES
+POSTHOOK: query: set role ALL
+POSTHOOK: type: SHOW_ROLES
+PREHOOK: query: create table t1(i int)
+PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:default
+PREHOOK: Output: default@t1
+POSTHOOK: query: create table t1(i int)
+POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:default
+POSTHOOK: Output: default@t1
+FAILED: HiveAccessControlException Permission denied: Principal [name=hive_test_user, type=USER] does not have following privileges for operation QUERY [[SELECT] on Object [type=LOCAL_URI, name=cat]]

@@ -23,16 +23,16 @@ import java.util.ArrayList;
 
 import org.antlr.runtime.Token;
 import org.antlr.runtime.tree.CommonTree;
+import org.antlr.runtime.tree.Tree;
 import org.apache.hadoop.hive.ql.lib.Node;
 
 /**
- * @author athusoo
  *
  */
 public class ASTNode extends CommonTree implements Node,Serializable {
   private static final long serialVersionUID = 1L;
 
-  private ASTNodeOrigin origin;
+  private transient ASTNodeOrigin origin;
 
   public ASTNode() {
   }
@@ -47,11 +47,22 @@ public class ASTNode extends CommonTree implements Node,Serializable {
     super(t);
   }
 
+  public ASTNode(ASTNode node) {
+    super(node);
+    this.origin = node.origin;
+  }
+
+  @Override
+  public Tree dupNode() {
+    return new ASTNode(this);
+  }
+
   /*
    * (non-Javadoc)
    *
    * @see org.apache.hadoop.hive.ql.lib.Node#getChildren()
    */
+  @Override
   public ArrayList<Node> getChildren() {
     if (super.getChildCount() == 0) {
       return null;
@@ -71,7 +82,7 @@ public class ASTNode extends CommonTree implements Node,Serializable {
    * @see org.apache.hadoop.hive.ql.lib.Node#getName()
    */
   public String getName() {
-    return (new Integer(super.getToken().getType())).toString();
+    return (Integer.valueOf(super.getToken().getType())).toString();
   }
 
   /**
@@ -91,22 +102,28 @@ public class ASTNode extends CommonTree implements Node,Serializable {
   }
 
   public String dump() {
-    StringBuilder sb = new StringBuilder();
+    StringBuilder sb = new StringBuilder("\n");
+    dump(sb, "");
+    return sb.toString();
+  }
 
-    sb.append('(');
+  private StringBuilder dump(StringBuilder sb, String ws) {
+    sb.append(ws);
     sb.append(toString());
+    sb.append("\n");
+
     ArrayList<Node> children = getChildren();
     if (children != null) {
       for (Node node : getChildren()) {
         if (node instanceof ASTNode) {
-          sb.append(((ASTNode) node).dump());
+          ((ASTNode) node).dump(sb, ws + "   ");
         } else {
-          sb.append("NON-ASTNODE!!");
+          sb.append(ws);
+          sb.append("   NON-ASTNODE!!");
+          sb.append("\n");
         }
       }
     }
-    sb.append(')');
-    return sb.toString();
+    return sb;
   }
-
 }

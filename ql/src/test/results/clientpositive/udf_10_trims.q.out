@@ -1,7 +1,10 @@
 PREHOOK: query: CREATE TABLE dest1(c1 STRING) STORED AS TEXTFILE
 PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:default
+PREHOOK: Output: default@dest1
 POSTHOOK: query: CREATE TABLE dest1(c1 STRING) STORED AS TEXTFILE
 POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@dest1
 PREHOOK: query: EXPLAIN
 INSERT OVERWRITE TABLE dest1
@@ -15,54 +18,47 @@ SELECT trim(trim(trim(trim(trim(trim(trim(trim(trim(trim( '  abc  '))))))))))
 FROM src
 WHERE src.key = 86
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF src)) (TOK_INSERT (TOK_DESTINATION (TOK_TAB dest1)) (TOK_SELECT (TOK_SELEXPR (TOK_FUNCTION trim (TOK_FUNCTION trim (TOK_FUNCTION trim (TOK_FUNCTION trim (TOK_FUNCTION trim (TOK_FUNCTION trim (TOK_FUNCTION trim (TOK_FUNCTION trim (TOK_FUNCTION trim (TOK_FUNCTION trim '  abc  ')))))))))))) (TOK_WHERE (= (. (TOK_TABLE_OR_COL src) key) 86))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-5 depends on stages: Stage-1 , consists of Stage-4, Stage-3
+  Stage-7 depends on stages: Stage-1 , consists of Stage-4, Stage-3, Stage-5
   Stage-4
-  Stage-0 depends on stages: Stage-4, Stage-3
+  Stage-0 depends on stages: Stage-4, Stage-3, Stage-6
   Stage-2 depends on stages: Stage-0
   Stage-3
+  Stage-5
+  Stage-6 depends on stages: Stage-5
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        src 
+      Map Operator Tree:
           TableScan
             alias: src
+            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
-              predicate:
-                  expr: (key = 86)
-                  type: boolean
-              Filter Operator
-                predicate:
-                    expr: (key = 86)
-                    type: boolean
-                Select Operator
-                  expressions:
-                        expr: trim(trim(trim(trim(trim(trim(trim(trim(trim(trim('  abc  '))))))))))
-                        type: string
-                  outputColumnNames: _col0
-                  File Output Operator
-                    compressed: false
-                    GlobalTableId: 1
-                    table:
-                        input format: org.apache.hadoop.mapred.TextInputFormat
-                        output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-                        serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                        name: dest1
+              predicate: (UDFToDouble(key) = 86.0) (type: boolean)
+              Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+              Select Operator
+                expressions: 'abc' (type: string)
+                outputColumnNames: _col0
+                Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+                File Output Operator
+                  compressed: false
+                  Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+                  table:
+                      input format: org.apache.hadoop.mapred.TextInputFormat
+                      output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                      serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                      name: default.dest1
 
-  Stage: Stage-5
+  Stage: Stage-7
     Conditional Operator
 
   Stage: Stage-4
     Move Operator
       files:
           hdfs directory: true
-          destination: pfile:/data/users/nzhang/work/784/apache-hive/build/ql/scratchdir/hive_2010-09-14_17-57-19_255_7754784838144044480/-ext-10000
+#### A masked pattern was here ####
 
   Stage: Stage-0
     Move Operator
@@ -72,24 +68,40 @@ STAGE PLANS:
               input format: org.apache.hadoop.mapred.TextInputFormat
               output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              name: dest1
+              name: default.dest1
 
   Stage: Stage-2
     Stats-Aggr Operator
 
   Stage: Stage-3
     Map Reduce
-      Alias -> Map Operator Tree:
-        pfile:/data/users/nzhang/work/784/apache-hive/build/ql/scratchdir/hive_2010-09-14_17-57-19_255_7754784838144044480/-ext-10002 
+      Map Operator Tree:
+          TableScan
             File Output Operator
               compressed: false
-              GlobalTableId: 0
               table:
                   input format: org.apache.hadoop.mapred.TextInputFormat
                   output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
                   serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                  name: dest1
+                  name: default.dest1
 
+  Stage: Stage-5
+    Map Reduce
+      Map Operator Tree:
+          TableScan
+            File Output Operator
+              compressed: false
+              table:
+                  input format: org.apache.hadoop.mapred.TextInputFormat
+                  output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                  serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                  name: default.dest1
+
+  Stage: Stage-6
+    Move Operator
+      files:
+          hdfs directory: true
+#### A masked pattern was here ####
 
 PREHOOK: query: INSERT OVERWRITE TABLE dest1
 SELECT trim(trim(trim(trim(trim(trim(trim(trim(trim(trim( '  abc  '))))))))))

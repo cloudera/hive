@@ -19,7 +19,7 @@ package org.apache.hadoop.hive.ql.udf.generic;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.Random;
 import org.apache.hadoop.hive.serde2.io.DoubleWritable;
 
@@ -41,25 +41,18 @@ public class NumericHistogram {
     double y;
 
     public int compareTo(Object other) {
-      Coord o = (Coord) other;
-      if(x < o.x) {
-        return -1;
-      }
-      if(x > o.x) {
-        return 1;
-      }
-      return 0;
+      return Double.compare(x, ((Coord) other).x);
     }
   };
 
   // Class variables
   private int nbins;
   private int nusedbins;
-  private Coord[] bins;
+  private ArrayList<Coord> bins;
   private Random prng;
 
   /**
-   * Creates a new histogram object. Note that the allocate() or merge() 
+   * Creates a new histogram object. Note that the allocate() or merge()
    * method must be called before the histogram can be used.
    */
   public NumericHistogram() {
@@ -81,7 +74,7 @@ public class NumericHistogram {
     bins = null;
     nbins = nusedbins = 0;
   }
-  
+
   /**
    * Returns the number of bins currently being used by the histogram.
    */
@@ -91,7 +84,7 @@ public class NumericHistogram {
 
   /**
    * Returns true if this histogram object has been initialized by calling merge()
-   * or allocate(). 
+   * or allocate().
    */
   public boolean isReady() {
     return nbins != 0;
@@ -101,7 +94,7 @@ public class NumericHistogram {
    * Returns a particular histogram bin.
    */
   public Coord getBin(int b) {
-    return bins[b];
+    return bins.get(b);
   }
 
   /**
@@ -111,10 +104,7 @@ public class NumericHistogram {
    */
   public void allocate(int num_bins) {
     nbins = num_bins;
-    bins = new Coord[nbins+1]; 
-    for(int i = 0; i < nbins+1; i++) {
-      bins[i] = new Coord();
-    }
+    bins = new ArrayList<Coord>();
     nusedbins = 0;
   }
 
@@ -123,7 +113,7 @@ public class NumericHistogram {
    * it with the current histogram object.
    *
    * @param other A serialized histogram created by the serialize() method
-   * @see merge
+   * @see #merge
    */
   public void merge(List<DoubleWritable> other) {
     if(other == null) {
@@ -131,35 +121,36 @@ public class NumericHistogram {
     }
 
     if(nbins == 0 || nusedbins == 0)  {
-      // Our aggregation buffer has nothing in it, so just copy over 'other' 
+      // Our aggregation buffer has nothing in it, so just copy over 'other'
       // by deserializing the ArrayList of (x,y) pairs into an array of Coord objects
       nbins = (int) other.get(0).get();
-      nusedbins = (other.size()-1)/2; 
-      bins = new Coord[nbins+1]; // +1 to hold a temporary bin for insert()
-      for(int i = 1; i < other.size(); i+=2) {
-        bins[(i-1)/2] = new Coord();
-        bins[(i-1)/2].x = other.get(i).get();
-        bins[(i-1)/2].y = other.get(i+1).get();
+      nusedbins = (other.size()-1)/2;
+      bins = new ArrayList<Coord>(nusedbins);
+      for (int i = 1; i < other.size(); i+=2) {
+        Coord bin = new Coord();
+        bin.x = other.get(i).get();
+        bin.y = other.get(i+1).get();
+        bins.add(bin);
       }
     } else {
       // The aggregation buffer already contains a partial histogram. Therefore, we need
       // to merge histograms using Algorithm #2 from the Ben-Haim and Tom-Tov paper.
-      Coord[] tmp_bins = new Coord[nusedbins + (other.size()-1)/2];
-      for(int j = 0; j < tmp_bins.length; j++) {
-        tmp_bins[j] = new Coord();
-      }
 
+      ArrayList<Coord> tmp_bins = new ArrayList<Coord>(nusedbins + (other.size()-1)/2);
       // Copy all the histogram bins from us and 'other' into an overstuffed histogram
-      int i;
-      for(i = 0; i < nusedbins; i++) {
-        tmp_bins[i].x = bins[i].x;
-        tmp_bins[i].y = bins[i].y;
+      for (int i = 0; i < nusedbins; i++) {
+        Coord bin = new Coord();
+        bin.x = bins.get(i).x;
+        bin.y = bins.get(i).y;
+        tmp_bins.add(bin);
       }
-      for(int j = 1; j < other.size(); j+=2, i++) {
-        tmp_bins[i].x = other.get(j).get();
-        tmp_bins[i].y = other.get(j+1).get();
+      for (int j = 1; j < other.size(); j += 2) {
+        Coord bin = new Coord();
+        bin.x = other.get(j).get();
+        bin.y = other.get(j+1).get();
+        tmp_bins.add(bin);
       }
-      Arrays.sort(tmp_bins);
+      Collections.sort(tmp_bins);
 
       // Now trim the overstuffed histogram down to the correct number of bins
       bins = tmp_bins;
@@ -185,10 +176,10 @@ public class NumericHistogram {
     int bin = 0;
     for(int l=0, r=nusedbins; l < r; ) {
       bin = (l+r)/2;
-      if(bins[bin].x > v) {
+      if (bins.get(bin).x > v) {
         r = bin;
       } else {
-        if(bins[bin].x < v) {
+        if (bins.get(bin).x < v) {
           l = ++bin;
         } else {
           break; // break loop on equal comparator
@@ -200,23 +191,22 @@ public class NumericHistogram {
     // Otherwise, we need to insert a new bin and trim the resulting histogram back to size.
     // A possible optimization here might be to set some threshold under which 'v' is just
     // assumed to be equal to the closest bin -- if fabs(v-bins[bin].x) < THRESHOLD, then
-    // just increment 'bin'. This is not done now because we don't want to make any 
+    // just increment 'bin'. This is not done now because we don't want to make any
     // assumptions about the range of numeric data being analyzed.
-    if(bin < nusedbins && bins[bin].x == v) {
-      bins[bin].y++;
+    if (bin < nusedbins && bins.get(bin).x == v) {
+      bins.get(bin).y++;
     } else {
-      for(int i = nusedbins; i > bin; i--) {
-        bins[i].x = bins[i-1].x;
-        bins[i].y = bins[i-1].y;
-      }
-      bins[bin].x = v; // new bins bin for value 'v'
-      bins[bin].y = 1; // of height 1 unit
+      Coord newBin = new Coord();
+      newBin.x = v;
+      newBin.y = 1;
+      bins.add(bin, newBin);
 
       // Trim the bins down to the correct number of bins.
-      if(++nusedbins > nbins) {
+      if (++nusedbins > nbins) {
         trim();
       }
     }
+
   }
 
   /**
@@ -227,10 +217,10 @@ public class NumericHistogram {
   private void trim() {
     while(nusedbins > nbins) {
       // Find the closest pair of bins in terms of x coordinates. Break ties randomly.
-      double smallestdiff = bins[1].x - bins[0].x;
+      double smallestdiff = bins.get(1).x - bins.get(0).x;
       int smallestdiffloc = 0, smallestdiffcount = 1;
       for(int i = 1; i < nusedbins-1; i++) {
-        double diff = bins[i+1].x - bins[i].x;
+        double diff = bins.get(i+1).x - bins.get(i).x;
         if(diff < smallestdiff)  {
           smallestdiff = diff;
           smallestdiffloc = i;
@@ -244,18 +234,20 @@ public class NumericHistogram {
 
       // Merge the two closest bins into their average x location, weighted by their heights.
       // The height of the new bin is the sum of the heights of the old bins.
-      double d = bins[smallestdiffloc].y + bins[smallestdiffloc+1].y;
-      bins[smallestdiffloc].x *= bins[smallestdiffloc].y / d;
-      bins[smallestdiffloc].x += bins[smallestdiffloc+1].x / d *
-        bins[smallestdiffloc+1].y;
-      bins[smallestdiffloc].y = d;
+      // double d = bins[smallestdiffloc].y + bins[smallestdiffloc+1].y;
+      // bins[smallestdiffloc].x *= bins[smallestdiffloc].y / d;
+      // bins[smallestdiffloc].x += bins[smallestdiffloc+1].x / d *
+      //   bins[smallestdiffloc+1].y;
+      // bins[smallestdiffloc].y = d;
 
+      double d = bins.get(smallestdiffloc).y + bins.get(smallestdiffloc+1).y;
+      Coord smallestdiffbin = bins.get(smallestdiffloc);
+      smallestdiffbin.x *= smallestdiffbin.y / d;
+      smallestdiffbin.x += bins.get(smallestdiffloc+1).x / d * bins.get(smallestdiffloc+1).y;
+      smallestdiffbin.y = d;
       // Shift the remaining bins left one position
-      for(int i = smallestdiffloc+1; i < nusedbins-1; i++) {
-        bins[i].x = bins[i+1].x;
-        bins[i].y = bins[i+1].y;
-      }
-      nusedbins--;      
+      bins.remove(smallestdiffloc+1);
+      nusedbins--;
     }
   }
 
@@ -271,17 +263,19 @@ public class NumericHistogram {
     double sum = 0, csum = 0;
     int b;
     for(b = 0; b < nusedbins; b++)  {
-      sum += bins[b].y;
+      sum += bins.get(b).y;
     }
     for(b = 0; b < nusedbins; b++) {
-      csum += bins[b].y;
+      csum += bins.get(b).y;
       if(csum / sum >= q) {
         if(b == 0) {
-          return bins[b].x;
+          return bins.get(b).x;
         }
-        csum -= bins[b].y;
-        double r = bins[b-1].x + (q*sum - csum) * (bins[b].x-bins[b-1].x)/(bins[b].y);
-        return r;                     
+
+        csum -= bins.get(b).y;
+        double r = bins.get(b-1).x +
+          (q*sum - csum) * (bins.get(b).x - bins.get(b-1).x)/(bins.get(b).y);
+        return r;
       }
     }
     return -1; // for Xlint, code will never reach here
@@ -289,26 +283,30 @@ public class NumericHistogram {
 
   /**
    * In preparation for a Hive merge() call, serializes the current histogram object into an
-   * ArrayList of DoubleWritable objects. This list is deserialized and merged by the 
+   * ArrayList of DoubleWritable objects. This list is deserialized and merged by the
    * merge method.
    *
    * @return An ArrayList of Hadoop DoubleWritable objects that represents the current
    * histogram.
-   * @see merge(ArrayList<DoubleWritable>)
+   * @see #merge
    */
   public ArrayList<DoubleWritable> serialize() {
-    ArrayList<DoubleWritable> result = new ArrayList<DoubleWritable>();    
+    ArrayList<DoubleWritable> result = new ArrayList<DoubleWritable>();
 
-    // Return a single ArrayList where the first element is the number of bins bins, 
+    // Return a single ArrayList where the first element is the number of bins bins,
     // and subsequent elements represent bins (x,y) pairs.
     result.add(new DoubleWritable(nbins));
     if(bins != null) {
       for(int i = 0; i < nusedbins; i++) {
-        result.add(new DoubleWritable(bins[i].x));
-        result.add(new DoubleWritable(bins[i].y));
+        result.add(new DoubleWritable(bins.get(i).x));
+        result.add(new DoubleWritable(bins.get(i).y));
       }
     }
 
     return result;
+  }
+
+  public int getNumBins() {
+    return bins == null ? 0 : bins.size();
   }
 }

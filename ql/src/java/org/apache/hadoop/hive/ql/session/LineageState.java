@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.exec.ColumnInfo;
 import org.apache.hadoop.hive.ql.exec.FileSinkOperator;
@@ -42,7 +43,7 @@ public class LineageState {
    * time and is then later used to created the mapping from
    * movetask to the set of filesink operators.
    */
-  private final Map<String, FileSinkOperator> dirToFop;
+  private final Map<Path, FileSinkOperator> dirToFop;
 
   /**
    * The lineage context index for this query.
@@ -59,8 +60,9 @@ public class LineageState {
    * Constructor.
    */
   public LineageState() {
-    dirToFop = new HashMap<String, FileSinkOperator>();
+    dirToFop = new HashMap<Path, FileSinkOperator>();
     linfo = new LineageInfo();
+    index = new Index();
   }
 
   /**
@@ -69,7 +71,7 @@ public class LineageState {
    * @param dir The directory name.
    * @param fop The file sink operator.
    */
-  public void mapDirToFop(String dir, FileSinkOperator fop) {
+  public void mapDirToFop(Path dir, FileSinkOperator fop) {
     dirToFop.put(dir, fop);
   }
 
@@ -80,7 +82,7 @@ public class LineageState {
    * @param dc The associated data container.
    * @param cols The list of columns.
    */
-  public void setLineage(String dir, DataContainer dc,
+  public void setLineage(Path dir, DataContainer dc,
       List<FieldSchema> cols) {
     // First lookup the file sink operator from the load work.
     FileSinkOperator fop = dirToFop.get(dir);
@@ -108,11 +110,20 @@ public class LineageState {
   }
 
   /**
-   * Sets the index for the lineage state.
+   * Gets the index for the lineage state.
    *
-   * @param index The index derived from lineage context.
+   * @return Index.
    */
-  public void setIndex(Index index) {
-    this.index = index;
+  public Index getIndex() {
+    return index;
+  }
+
+  /**
+   * Clear all lineage states
+   */
+  public void clear() {
+    dirToFop.clear();
+    linfo.clear();
+    index.clear();
   }
 }

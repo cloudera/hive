@@ -28,6 +28,9 @@ public class FunctionWork implements Serializable {
   private static final long serialVersionUID = 1L;
   private CreateFunctionDesc createFunctionDesc;
   private DropFunctionDesc dropFunctionDesc;
+  private ReloadFunctionDesc reloadFunctionDesc;
+  private CreateMacroDesc createMacroDesc;
+  private DropMacroDesc dropMacroDesc;
 
   /**
    * For serialization only.
@@ -41,6 +44,18 @@ public class FunctionWork implements Serializable {
 
   public FunctionWork(DropFunctionDesc dropFunctionDesc) {
     this.dropFunctionDesc = dropFunctionDesc;
+  }
+
+  public FunctionWork(ReloadFunctionDesc reloadFunctionDesc) {
+    this.reloadFunctionDesc = reloadFunctionDesc;
+  }
+
+  public FunctionWork(CreateMacroDesc createMacroDesc) {
+    this.createMacroDesc = createMacroDesc;
+  }
+
+  public FunctionWork(DropMacroDesc dropMacroDesc) {
+    this.dropMacroDesc = dropMacroDesc;
   }
 
   public CreateFunctionDesc getCreateFunctionDesc() {
@@ -57,6 +72,22 @@ public class FunctionWork implements Serializable {
 
   public void setDropFunctionDesc(DropFunctionDesc dropFunctionDesc) {
     this.dropFunctionDesc = dropFunctionDesc;
+  }
+
+  public ReloadFunctionDesc getReloadFunctionDesc() {
+    return reloadFunctionDesc;
+  }
+
+  public void setReloadFunctionDesc(ReloadFunctionDesc reloadFunctionDesc) {
+    this.reloadFunctionDesc = reloadFunctionDesc;
+  }
+
+  public CreateMacroDesc getCreateMacroDesc() {
+    return createMacroDesc;
+  }
+
+  public DropMacroDesc getDropMacroDesc() {
+    return dropMacroDesc;
   }
 
 }

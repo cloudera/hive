@@ -1,3 +1,4 @@
+-- SORT_QUERY_RESULTS
 
 explain
 SELECT *

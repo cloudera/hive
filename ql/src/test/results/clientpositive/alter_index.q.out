@@ -1,43 +1,61 @@
 PREHOOK: query: drop index src_index_8 on src
 PREHOOK: type: DROPINDEX
+PREHOOK: Input: default@src
 POSTHOOK: query: drop index src_index_8 on src
 POSTHOOK: type: DROPINDEX
-PREHOOK: query: create index src_index_8 on table src(key) as 'compact' WITH DEFERRED REBUILD IDXPROPERTIES ("prop1"="val1", "prop2"="val2")
+POSTHOOK: Input: default@src
+PREHOOK: query: create index src_index_8 on table default.src(key) as 'compact' WITH DEFERRED REBUILD IDXPROPERTIES ("prop1"="val1", "prop2"="val2")
 PREHOOK: type: CREATEINDEX
-POSTHOOK: query: create index src_index_8 on table src(key) as 'compact' WITH DEFERRED REBUILD IDXPROPERTIES ("prop1"="val1", "prop2"="val2")
+PREHOOK: Input: default@src
+POSTHOOK: query: create index src_index_8 on table default.src(key) as 'compact' WITH DEFERRED REBUILD IDXPROPERTIES ("prop1"="val1", "prop2"="val2")
 POSTHOOK: type: CREATEINDEX
+POSTHOOK: Input: default@src
+POSTHOOK: Output: default@default__src_src_index_8__
 PREHOOK: query: desc extended default__src_src_index_8__
 PREHOOK: type: DESCTABLE
+PREHOOK: Input: default@default__src_src_index_8__
 POSTHOOK: query: desc extended default__src_src_index_8__
 POSTHOOK: type: DESCTABLE
-key	string	default
-_bucketname	string	
-_offsets	array<bigint>	
+POSTHOOK: Input: default@default__src_src_index_8__
+key                 	string              	default             
+_bucketname         	string              	                    
+_offsets            	array<bigint>       	                    
 	 	 
-Detailed Table Information	Table(tableName:default__src_src_index_8__, dbName:default, owner:null, createTime:1288855262, lastAccessTime:0, retention:0, sd:StorageDescriptor(cols:[FieldSchema(name:key, type:string, comment:default), FieldSchema(name:_bucketname, type:string, comment:), FieldSchema(name:_offsets, type:array<bigint>, comment:)], location:pfile:/home/mwang/Projects/hive/build/ql/test/data/warehouse/default__src_src_index_8__, inputFormat:org.apache.hadoop.mapred.TextInputFormat, outputFormat:org.apache.hadoop.hive.ql.io.IgnoreKeyTextOutputFormat, compressed:false, numBuckets:-1, serdeInfo:SerDeInfo(name:null, serializationLib:org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe, parameters:{serialization.format=1}), bucketCols:[], sortCols:[Order(col:key, order:1)], parameters:{}), partitionKeys:[], parameters:{transient_lastDdlTime=1288855262}, viewOriginalText:null, viewExpandedText:null, tableType:INDEX_TABLE)	
-PREHOOK: query: alter index src_index_8 on src set IDXPROPERTIES ("prop1"="val1_new", "prop3"="val3")
+#### A masked pattern was here ####
+PREHOOK: query: alter index src_index_8 on default.src set IDXPROPERTIES ("prop1"="val1_new", "prop3"="val3")
 PREHOOK: type: ALTERINDEX_PROPS
-POSTHOOK: query: alter index src_index_8 on src set IDXPROPERTIES ("prop1"="val1_new", "prop3"="val3")
+POSTHOOK: query: alter index src_index_8 on default.src set IDXPROPERTIES ("prop1"="val1_new", "prop3"="val3")
 POSTHOOK: type: ALTERINDEX_PROPS
 PREHOOK: query: desc extended default__src_src_index_8__
 PREHOOK: type: DESCTABLE
+PREHOOK: Input: default@default__src_src_index_8__
 POSTHOOK: query: desc extended default__src_src_index_8__
 POSTHOOK: type: DESCTABLE
-key	string	default
-_bucketname	string	
-_offsets	array<bigint>	
+POSTHOOK: Input: default@default__src_src_index_8__
+key                 	string              	default             
+_bucketname         	string              	                    
+_offsets            	array<bigint>       	                    
 	 	 
-Detailed Table Information	Table(tableName:default__src_src_index_8__, dbName:default, owner:null, createTime:1288855262, lastAccessTime:0, retention:0, sd:StorageDescriptor(cols:[FieldSchema(name:key, type:string, comment:default), FieldSchema(name:_bucketname, type:string, comment:), FieldSchema(name:_offsets, type:array<bigint>, comment:)], location:pfile:/home/mwang/Projects/hive/build/ql/test/data/warehouse/default__src_src_index_8__, inputFormat:org.apache.hadoop.mapred.TextInputFormat, outputFormat:org.apache.hadoop.hive.ql.io.IgnoreKeyTextOutputFormat, compressed:false, numBuckets:-1, serdeInfo:SerDeInfo(name:null, serializationLib:org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe, parameters:{serialization.format=1}), bucketCols:[], sortCols:[Order(col:key, order:1)], parameters:{}), partitionKeys:[], parameters:{transient_lastDdlTime=1288855262}, viewOriginalText:null, viewExpandedText:null, tableType:INDEX_TABLE)	
-PREHOOK: query: drop index src_index_8 on src
+#### A masked pattern was here ####
+PREHOOK: query: drop index src_index_8 on default.src
 PREHOOK: type: DROPINDEX
-POSTHOOK: query: drop index src_index_8 on src
+PREHOOK: Input: default@src
+POSTHOOK: query: drop index src_index_8 on default.src
 POSTHOOK: type: DROPINDEX
+POSTHOOK: Input: default@src
 PREHOOK: query: show tables
 PREHOOK: type: SHOWTABLES
 POSTHOOK: query: show tables
 POSTHOOK: type: SHOWTABLES
+alltypesorc
+cbo_t1
+cbo_t2
+cbo_t3
+lineitem
+part
 src
 src1
+src_cbo
 src_json
 src_sequencefile
 src_thrift

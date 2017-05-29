@@ -22,6 +22,7 @@ import java.io.Serializable;
 import java.util.HashMap;
 
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.ql.lockmgr.DbTxnManager;
 
 /**
  * ShowLocksDesc.
@@ -31,9 +32,11 @@ import org.apache.hadoop.fs.Path;
 public class ShowLocksDesc extends DDLDesc implements Serializable {
   private static final long serialVersionUID = 1L;
   String resFile;
+  String dbName;
   String tableName;
   HashMap<String, String> partSpec;
   boolean isExt;
+  boolean isNewLockFormat;
 
   /**
    * table name for the result of show locks.
@@ -44,12 +47,24 @@ public class ShowLocksDesc extends DDLDesc implements Serializable {
    */
   private static final String schema = "tab_name,mode#string:string";
 
+  /**
+   * Schema for use with db txn manager.
+   */
+  private static final String newFormatSchema = "lockid,database,table,partition,lock_state," +
+      "lock_type,transaction_id,last_heartbeat,acquired_at,user," +
+      "hostname#string:string:string:string:string:string:string:string:string:string:string";
+
+  public String getDatabase() {
+    return dbName;
+  }
+
   public String getTable() {
     return table;
   }
 
   public String getSchema() {
-    return schema;
+    if (isNewLockFormat) return newFormatSchema;
+    else return schema;
   }
 
   public ShowLocksDesc() {
@@ -58,12 +73,33 @@ public class ShowLocksDesc extends DDLDesc implements Serializable {
   /**
    * @param resFile
    */
+  public ShowLocksDesc(Path resFile, String dbName, boolean isExt, boolean isNewFormat) {
+    this.resFile   = resFile.toString();
+    this.partSpec  = null;
+    this.tableName = null;
+    this.isExt     = isExt;
+    this.dbName = dbName;
+    isNewLockFormat = isNewFormat;
+  }
+
+  /**
+   * @param resFile
+   */
   public ShowLocksDesc(Path resFile, String tableName,
-                       HashMap<String, String> partSpec, boolean isExt) {
+                       HashMap<String, String> partSpec, boolean isExt, boolean isNewFormat) {
     this.resFile   = resFile.toString();
     this.partSpec  = partSpec;
     this.tableName = tableName;
     this.isExt     = isExt;
+    isNewLockFormat = isNewFormat;
+  }
+
+  public String getDbName() {
+    return dbName;
+  }
+
+  public void setDbName(String dbName) {
+    this.dbName = dbName;
   }
 
   /**
@@ -127,5 +163,9 @@ public class ShowLocksDesc extends DDLDesc implements Serializable {
    */
   public void setExt(boolean isExt) {
     this.isExt = isExt;
+  }
+
+  public boolean isNewFormat() {
+    return isNewLockFormat;
   }
 }

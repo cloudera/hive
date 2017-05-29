@@ -25,6 +25,10 @@ import java.util.Date;
 
 import org.apache.hadoop.hive.ql.exec.Description;
 import org.apache.hadoop.hive.ql.exec.UDF;
+import org.apache.hadoop.hive.ql.exec.vector.VectorizedExpressions;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.VectorUDFSecondLong;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.VectorUDFSecondString;
+import org.apache.hadoop.hive.serde2.io.TimestampWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 
@@ -40,20 +44,21 @@ import org.apache.hadoop.io.Text;
     + "  > SELECT _FUNC_('2009-07-30 12:58:59') FROM src LIMIT 1;\n"
     + "  59\n"
     + "  > SELECT _FUNC_('12:58:59') FROM src LIMIT 1;\n" + "  59")
+@VectorizedExpressions({VectorUDFSecondLong.class, VectorUDFSecondString.class})
 public class UDFSecond extends UDF {
   private final SimpleDateFormat formatter1 = new SimpleDateFormat(
       "yyyy-MM-dd HH:mm:ss");
   private final SimpleDateFormat formatter2 = new SimpleDateFormat("HH:mm:ss");
   private final Calendar calendar = Calendar.getInstance();
 
-  private IntWritable result = new IntWritable();
+  private final IntWritable result = new IntWritable();
 
   public UDFSecond() {
   }
 
   /**
    * Get the minute from a date string.
-   * 
+   *
    * @param dateString
    *          the dateString in the format of "yyyy-MM-dd HH:mm:ss" or
    *          "yyyy-MM-dd".
@@ -79,6 +84,16 @@ public class UDFSecond extends UDF {
     } catch (ParseException e) {
       return null;
     }
+  }
+
+  public IntWritable evaluate(TimestampWritable t) {
+    if (t == null) {
+      return null;
+    }
+
+    calendar.setTime(t.getTimestamp());
+    result.set(calendar.get(Calendar.SECOND));
+    return result;
   }
 
 }

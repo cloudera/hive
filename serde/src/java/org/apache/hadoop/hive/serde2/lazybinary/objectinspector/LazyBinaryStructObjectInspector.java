@@ -26,15 +26,24 @@ import org.apache.hadoop.hive.serde2.objectinspector.StructField;
 
 /**
  * ObjectInspector for LazyBinaryStruct.
- * 
+ *
  * @see LazyBinaryStruct
  */
 public class LazyBinaryStructObjectInspector extends
     StandardStructObjectInspector {
 
+  protected LazyBinaryStructObjectInspector() {
+    super();
+  }
   protected LazyBinaryStructObjectInspector(List<String> structFieldNames,
       List<ObjectInspector> structFieldObjectInspectors) {
     super(structFieldNames, structFieldObjectInspectors);
+  }
+
+  protected LazyBinaryStructObjectInspector(List<String> structFieldNames,
+      List<ObjectInspector> structFieldObjectInspectors,
+      List<String> structFieldComments) {
+    super(structFieldNames, structFieldObjectInspectors, structFieldComments);
   }
 
   protected LazyBinaryStructObjectInspector(List<StructField> fields) {
@@ -62,5 +71,9 @@ public class LazyBinaryStructObjectInspector extends
     }
     LazyBinaryStruct struct = (LazyBinaryStruct) data;
     return struct.getFieldsAsList();
+  }
+
+  public StructField getStructFieldRef(int index) {
+    return fields.get(index);
   }
 }

@@ -22,9 +22,9 @@ import java.io.Serializable;
 import java.util.List;
 
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.ql.Context;
 import org.apache.hadoop.hive.ql.DriverContext;
 import org.apache.hadoop.hive.ql.QueryPlan;
+import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.plan.ConditionalResolver;
 import org.apache.hadoop.hive.ql.plan.ConditionalWork;
 import org.apache.hadoop.hive.ql.plan.api.StageType;
@@ -81,24 +81,38 @@ public class ConditionalTask extends Task<ConditionalWork> implements Serializab
     resTasks = resolver.getTasks(conf, resolverCtx);
     resolved = true;
 
+    try {
+      resolveTask(driverContext);
+    } catch (Exception e) {
+      setException(e);
+      return 1;
+    }
+    return 0;
+  }
+
+  private void resolveTask(DriverContext driverContext) throws HiveException {
     for (Task<? extends Serializable> tsk : getListTasks()) {
       if (!resTasks.contains(tsk)) {
-        driverContext.getRunnable().remove(tsk);
-        console.printInfo(ExecDriver.getJobEndMsg("" + Utilities.randGen.nextInt())
-            + ", job is filtered out (removed at runtime).");
+        driverContext.remove(tsk);
+        console.printInfo(tsk.getId() + " is filtered out by condition resolver.");
         if (tsk.isMapRedTask()) {
           driverContext.incCurJobNo(1);
         }
         //recursively remove this task from its children's parent task
         tsk.removeFromChildrenTasks();
       } else {
+        if (getParentTasks() != null) {
+          // This makes it so that we can go back up the tree later
+          for (Task<? extends Serializable> task : getParentTasks()) {
+            task.addDependentTask(tsk);
+          }
+        }
         // resolved task
-        if (!driverContext.getRunnable().contains(tsk)) {
-          driverContext.addToRunnable(tsk);
+        if (driverContext.addToRunnable(tsk)) {
+          console.printInfo(tsk.getId() + " is selected by condition resolver.");
         }
       }
     }
-    return 0;
   }
 
 
@@ -196,15 +210,6 @@ public class ConditionalTask extends Task<ConditionalWork> implements Serializab
       }
     }
     return ret;
-  }
-
-  @Override
-  protected void localizeMRTmpFilesImpl(Context ctx) {
-    if (getListTasks() != null) {
-      for (Task<? extends Serializable> t : getListTasks()) {
-        t.localizeMRTmpFiles(ctx);
-      }
-    }
   }
 
   @Override

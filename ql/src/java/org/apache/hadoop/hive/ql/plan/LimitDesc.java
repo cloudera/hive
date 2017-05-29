@@ -18,16 +18,16 @@
 
 package org.apache.hadoop.hive.ql.plan;
 
-import java.io.Serializable;
 
 /**
  * LimitDesc.
  *
  */
 @Explain(displayName = "Limit")
-public class LimitDesc implements Serializable {
+public class LimitDesc extends AbstractOperatorDesc {
   private static final long serialVersionUID = 1L;
   private int limit;
+  private int leastRows = -1;
 
   public LimitDesc() {
   }
@@ -36,12 +36,21 @@ public class LimitDesc implements Serializable {
     this.limit = limit;
   }
 
+  @Explain(displayName = "Number of rows")
   public int getLimit() {
     return limit;
   }
 
   public void setLimit(final int limit) {
     this.limit = limit;
+  }
+
+  public int getLeastRows() {
+    return leastRows;
+  }
+
+  public void setLeastRows(int leastRows) {
+    this.leastRows = leastRows;
   }
 
 }

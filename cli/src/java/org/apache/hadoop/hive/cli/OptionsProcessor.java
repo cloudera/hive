@@ -18,171 +18,120 @@
 
 package org.apache.hadoop.hive.cli;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.ListIterator;
+import java.util.HashMap;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.Properties;
 
-import org.apache.commons.cli2.Argument;
-import org.apache.commons.cli2.CommandLine;
-import org.apache.commons.cli2.Group;
-import org.apache.commons.cli2.Option;
-import org.apache.commons.cli2.OptionException;
-import org.apache.commons.cli2.WriteableCommandLine;
-import org.apache.commons.cli2.builder.ArgumentBuilder;
-import org.apache.commons.cli2.builder.DefaultOptionBuilder;
-import org.apache.commons.cli2.builder.GroupBuilder;
-import org.apache.commons.cli2.commandline.Parser;
-import org.apache.commons.cli2.option.PropertyOption;
-import org.apache.commons.cli2.resource.ResourceConstants;
+import org.apache.commons.cli.GnuParser;
+import org.apache.commons.cli.HelpFormatter;
+import org.apache.commons.cli.Option;
+import org.apache.commons.cli.OptionBuilder;
+import org.apache.commons.cli.Options;
+import org.apache.commons.cli.ParseException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 /**
  * OptionsProcessor.
- * 
+ *
  */
 public class OptionsProcessor {
-
   protected static final Log l4j = LogFactory.getLog(OptionsProcessor.class.getName());
+  private final Options options = new Options();
+  private org.apache.commons.cli.CommandLine commandLine;
+  Map<String, String> hiveVariables = new HashMap<String, String>();
 
-  private final Parser parser = new Parser();
-  private final Option confOptions, initFilesOption, isSilentOption,
-    execOption, fileOption, isHelpOption;
-
-  /**
-   * Shamelessly cloned from Hadoop streaming take in multiple -hiveconf x=y parameters.
-   */
-  class MultiPropertyOption extends PropertyOption {
-    private String optionString;
-    private boolean keyValue;
-
-    MultiPropertyOption() {
-      super();
-    }
-
-    MultiPropertyOption(final String optionString, final String description, final int id, boolean keyValue) {
-      super(optionString, description, id);
-      this.optionString = optionString;
-      this.keyValue = keyValue;
-    }
-
-    @Override
-    public boolean canProcess(final WriteableCommandLine commandLine, final String argument) {
-      boolean ret = (argument != null) && argument.startsWith(optionString);
-
-      return ret;
-    }
-
-    @Override
-    public void process(final WriteableCommandLine commandLine, final ListIterator arguments)
-        throws OptionException {
-      final String arg = (String) arguments.next();
-
-      if (!canProcess(commandLine, arg)) {
-        throw new OptionException(this, ResourceConstants.UNEXPECTED_TOKEN, arg);
-      }
-
-      ArrayList properties = new ArrayList();
-      String next = "";
-      while (arguments.hasNext()) {
-        next = (String) arguments.next();
-        if (!next.startsWith("-")) {
-
-          if (keyValue && (next.indexOf("=") == -1)) {
-            throw new OptionException(this, ResourceConstants.UNEXPECTED_TOKEN, "argument: '"
-                + next + "' is not of the form x=y");
-          }
-          properties.add(next);
-        } else {
-          arguments.previous();
-          break;
-        }
-      }
-
-      // add to any existing values (support specifying args multiple times)
-      List<String> oldVal = (List<String>) commandLine.getValue(this);
-      if (oldVal == null) {
-        commandLine.addValue(this, properties);
-      } else {
-        oldVal.addAll(properties);
-      }
-    }
-  }
-
-  private Option createBoolOption(DefaultOptionBuilder builder, String longName, String shortName,
-      String desc) {
-    builder.reset();
-    if (longName == null) {
-      return builder.withShortName(shortName).withDescription(desc).create();
-    } else {
-      return builder.withShortName(shortName).withLongName(longName).withDescription(desc).create();
-    }
-  }
-
-  private Option createOptionWithArg(DefaultOptionBuilder builder, String longName,
-      String shortName, String desc, Argument arg) {
-    builder.reset();
-
-    DefaultOptionBuilder dob = builder.withShortName(shortName).withArgument(arg).withDescription(
-        desc);
-
-    if (longName != null) {
-      dob = dob.withLongName(longName);
-    }
-
-    return dob.create();
-  }
-
+  @SuppressWarnings("static-access")
   public OptionsProcessor() {
-    DefaultOptionBuilder builder = new DefaultOptionBuilder("-", "-", false);
 
-    ArgumentBuilder argBuilder = new ArgumentBuilder();
+    // -database database
+    options.addOption(OptionBuilder
+        .hasArg()
+        .withArgName("databasename")
+        .withLongOpt("database")
+        .withDescription("Specify the database to use")
+        .create());
 
-    // -e
-    execOption = createOptionWithArg(builder, "exec", "e", "execute the following command",
-        argBuilder.withMinimum(1).withMaximum(1).create());
+    // -e 'quoted-query-string'
+    options.addOption(OptionBuilder
+        .hasArg()
+        .withArgName("quoted-query-string")
+        .withDescription("SQL from command line")
+        .create('e'));
 
-    // -f
-    fileOption = createOptionWithArg(builder, "file", "f",
-        "execute commands from the following file", argBuilder.withMinimum(1).withMaximum(1)
-            .create());
+    // -f <query-file>
+    options.addOption(OptionBuilder
+        .hasArg()
+        .withArgName("filename")
+        .withDescription("SQL from files")
+        .create('f'));
 
-    // -S
-    isSilentOption = createBoolOption(builder, "silent", "S", "silent mode");
+    // -i <init-query-file>
+    options.addOption(OptionBuilder
+        .hasArg()
+        .withArgName("filename")
+        .withDescription("Initialization SQL file")
+        .create('i'));
 
-    // -help
-    isHelpOption = createBoolOption(builder, "help", "h", "help");
+    // -hiveconf x=y
+    options.addOption(OptionBuilder
+        .withValueSeparator()
+        .hasArgs(2)
+        .withArgName("property=value")
+        .withLongOpt("hiveconf")
+        .withDescription("Use value for given property")
+        .create());
 
-    // -hiveconf var=val
-    confOptions = new MultiPropertyOption("-hiveconf",
-      "(n=v) Optional. Add or override Hive/Hadoop properties.", 'D', true);
+    // Substitution option -d, --define
+    options.addOption(OptionBuilder
+        .withValueSeparator()
+        .hasArgs(2)
+        .withArgName("key=value")
+        .withLongOpt("define")
+        .withDescription("Variable subsitution to apply to hive commands. e.g. -d A=B or --define A=B")
+        .create('d'));
 
-    initFilesOption = new MultiPropertyOption(
-      "-i", "File to run before other commands", 'I', false);
+    // Substitution option --hivevar
+    options.addOption(OptionBuilder
+        .withValueSeparator()
+        .hasArgs(2)
+        .withArgName("key=value")
+        .withLongOpt("hivevar")
+        .withDescription("Variable subsitution to apply to hive commands. e.g. --hivevar A=B")
+        .create());
 
-    new PropertyOption();
-    Group allOptions =
-      new GroupBuilder().withOption(confOptions).withOption(initFilesOption)
-      .withOption(isSilentOption).withOption(isHelpOption)
-      .withOption(execOption).withOption(fileOption).create();
-    parser.setGroup(allOptions);
+    // [-S|--silent]
+    options.addOption(new Option("S", "silent", false, "Silent mode in interactive shell"));
+
+    // [-v|--verbose]
+    options.addOption(new Option("v", "verbose", false, "Verbose mode (echo executed SQL to the console)"));
+
+    // [-H|--help]
+    options.addOption(new Option("H", "help", false, "Print help information"));
+
   }
-
-  private CommandLine cmdLine;
 
   public boolean process_stage1(String[] argv) {
     try {
-      cmdLine = parser.parse(argv);
-
-      List<String> hiveConfArgs = (List<String>) cmdLine.getValue(confOptions);
-      if (null != hiveConfArgs) {
-        for (String s : hiveConfArgs) {
-          String[] parts = s.split("=", 2);
-          System.setProperty(parts[0], parts[1]);
-        }
+      commandLine = new GnuParser().parse(options, argv);
+      Properties confProps = commandLine.getOptionProperties("hiveconf");
+      for (String propKey : confProps.stringPropertyNames()) {
+        System.setProperty(propKey, confProps.getProperty(propKey));
       }
-    } catch (OptionException oe) {
-      System.err.println(oe.getMessage());
+
+      Properties hiveVars = commandLine.getOptionProperties("define");
+      for (String propKey : hiveVars.stringPropertyNames()) {
+        hiveVariables.put(propKey, hiveVars.getProperty(propKey));
+      }
+
+      Properties hiveVars2 = commandLine.getOptionProperties("hivevar");
+      for (String propKey : hiveVars2.stringPropertyNames()) {
+        hiveVariables.put(propKey, hiveVars2.getProperty(propKey));
+      }
+    } catch (ParseException e) {
+      System.err.println(e.getMessage());
+      printUsage();
       return false;
     }
     return true;
@@ -190,55 +139,48 @@ public class OptionsProcessor {
 
   public boolean process_stage2(CliSessionState ss) {
     ss.getConf();
-    // -S
-    ss.setIsSilent(cmdLine.hasOption(isSilentOption));
-    // -e
-    ss.execString = (String) cmdLine.getValue(execOption);
-    // -f
-    ss.fileName = (String) cmdLine.getValue(fileOption);
-    // -i
-    List<String> initFiles = (List<String>) cmdLine.getValue(initFilesOption);
-    if (null != initFiles) {
-      ss.initFiles = initFiles;
-    }
-    // -h
-    if (cmdLine.hasOption(isHelpOption)) {
-      printUsage(null);
-      return false;
-    }
-    if (ss.execString != null && ss.fileName != null) {
-      printUsage("-e and -f option cannot be specified simultaneously");
+
+    if (commandLine.hasOption('H')) {
+      printUsage();
       return false;
     }
 
-    List<String> hiveConfArgs = (List<String>) cmdLine.getValue(confOptions);
-    if (null != hiveConfArgs) {
-      for (String s : hiveConfArgs) {
-        String[] parts = s.split("=", 2);
-        ss.cmdProperties.setProperty(parts[0], parts[1]);
+    ss.setIsSilent(commandLine.hasOption('S'));
+
+    ss.database = commandLine.getOptionValue("database");
+
+    ss.execString = commandLine.getOptionValue('e');
+
+    ss.fileName = commandLine.getOptionValue('f');
+
+    ss.setIsVerbose(commandLine.hasOption('v'));
+
+    String[] initFiles = commandLine.getOptionValues('i');
+    if (null != initFiles) {
+      ss.initFiles = Arrays.asList(initFiles);
+    }
+
+    if (ss.execString != null && ss.fileName != null) {
+      System.err.println("The '-e' and '-f' options cannot be specified simultaneously");
+      printUsage();
+      return false;
+    }
+
+    if (commandLine.hasOption("hiveconf")) {
+      Properties confProps = commandLine.getOptionProperties("hiveconf");
+      for (String propKey : confProps.stringPropertyNames()) {
+        ss.cmdProperties.setProperty(propKey, confProps.getProperty(propKey));
       }
     }
 
     return true;
   }
 
-  public void printUsage(String error) {
-    if (error != null) {
-      System.err.println("Invalid arguments: " + error);
-    }
-    System.err.println("");
-    System.err.println(
-      "Usage: hive [--config confdir] [-hiveconf x=y]* [-i <init-filename>]*"
-      + " [-f <filename>|-e <query-string>] [-S]");
-    System.err.println("");
-    System.err.println("  -i <filename>             init Sql file");
-    System.err.println("  -e 'quoted query string'  Sql from command line");
-    System.err.println("  -f <filename>             Sql from files");
-    System.err.println("  -S                        Silent mode in interactive shell");
-    System.err.println("");
-    System.err.println("-e and -f cannot be specified together. In the absence of these");
-    System.err.println(" options, interactive shell is started.");
-    System.err.println("");
+  private void printUsage() {
+    new HelpFormatter().printHelp("hive", options);
+  }
 
+  public Map<String, String> getHiveVariables() {
+    return hiveVariables;
   }
 }

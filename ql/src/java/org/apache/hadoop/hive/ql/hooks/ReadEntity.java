@@ -19,9 +19,14 @@
 package org.apache.hadoop.hive.ql.hooks;
 
 import java.io.Serializable;
-import java.net.URI;
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
 
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.ql.metadata.Partition;
 import org.apache.hadoop.hive.ql.metadata.Table;
 
@@ -29,145 +34,107 @@ import org.apache.hadoop.hive.ql.metadata.Table;
  * This class encapsulates the information on the partition and tables that are
  * read by the query.
  */
-public class ReadEntity implements Serializable {
+public class ReadEntity extends Entity implements Serializable {
 
-  private static final long serialVersionUID = 1L;
-  
-  /**
-   * The table.
-   */
-  private Table t;
+  // Consider a query like: select * from V, where the view V is defined as:
+  // select * from T
+  // The inputs will contain V and T (parent: V)
+  // T will be marked as an indirect entity using isDirect flag.
+  // This will help in distinguishing from the case where T is a direct dependency
+  // For example in the case of "select * from V join T ..." T would be direct dependency
+  private boolean isDirect = true;
 
-  /**
-   * The partition. This is null for a non partitioned table.
-   */
-  private Partition p;
+  // Note that we do not need a lock for this entity.  This is used by operations like alter
+  // table ... partition where its actually the partition that needs locked even though the table
+  // is marked as being read.  Defaults to true as that is the most common case.
+  private boolean needsLock = true;
 
-  /**
-   * This is derived from t and p, but we need to serialize this field to make sure
-   * ReadEntity.hashCode() does not need to recursively read into t and p. 
-   */
-  private String name;
-  
-  public String getName() {
-    return name;
-  }
+  // When true indicates that this object is being read as part of an update or delete.  This is
+  // important because in that case we shouldn't acquire a lock for it or authorize the read.
+  // These will be handled by the output to the table instead.
+  private boolean isUpdateOrDelete = false;
 
-  public void setName(String name) {
-    this.name = name;
-  }
+  // For views, the entities can be nested - by default, entities are at the top level
+  // Must be deterministic order set for consistent q-test output across Java versions
+  private final Set<ReadEntity> parents = new LinkedHashSet<ReadEntity>();
 
-  public void setP(Partition p) {
-    this.p = p;
-  }
-
-  public void setT(Table t) {
-    this.t = t;
-  }
-
-  public Partition getP() {
-    return p;
-  }
-
-  public Table getT() {
-    return t;
-  }
+  // The accessed columns of query
+  private final List<String> accessedColumns = new ArrayList<String>();
 
   /**
    * For serialization only.
    */
   public ReadEntity() {
+    super();
   }
-  
+
+  /**
+   * Constructor for a database.
+   */
+  public ReadEntity(Database database) {
+    super(database, true);
+  }
+
   /**
    * Constructor.
-   * 
+   *
    * @param t
    *          The Table that the query reads from.
    */
   public ReadEntity(Table t) {
-    this.t = t;
-    p = null;
-    name = computeName();
+    super(t, true);
+  }
+
+  private void initParent(ReadEntity parent) {
+    if (parent != null) {
+      this.parents.add(parent);
+    }
+  }
+
+  public ReadEntity(Table t, ReadEntity parent) {
+    super(t, true);
+    initParent(parent);
+  }
+
+  public ReadEntity(Table t, ReadEntity parent, boolean isDirect) {
+    this(t, parent);
+    this.isDirect = isDirect;
   }
 
   /**
-   * Constructor given a partiton.
-   * 
+   * Constructor given a partition.
+   *
    * @param p
    *          The partition that the query reads from.
    */
   public ReadEntity(Partition p) {
-    t = p.getTable();
-    this.p = p;
-    name = computeName();
+    super(p, true);
   }
 
-  private String computeName() {
-    if (p != null) {
-      return p.getTable().getDbName() + "@" + p.getTable().getTableName() + "@"
-          + p.getName();
-    } else {
-      return t.getDbName() + "@" + t.getTableName();
-    }
+  public ReadEntity(Partition p, ReadEntity parent) {
+    super(p, true);
+    initParent(parent);
   }
-  
-  /**
-   * Enum that tells what time of a read entity this is.
-   */
-  public static enum Type {
-    TABLE, PARTITION
-  };
 
-  /**
-   * Get the type.
-   */
-  public Type getType() {
-    return p == null ? Type.TABLE : Type.PARTITION;
+  public ReadEntity(Partition p, ReadEntity parent, boolean isDirect) {
+    this(p, parent);
+    this.isDirect = isDirect;
   }
 
   /**
-   * Get the parameter map of the Entity.
+   * Constructor for a file.
+   *
+   * @param d
+   *          The name of the directory that is being written to.
+   * @param islocal
+   *          Flag to decide whether this directory is local or in dfs.
    */
-  public Map<String, String> getParameters() {
-    if (p != null) {
-      return p.getParameters();
-    } else {
-      return t.getParameters();
-    }
+  public ReadEntity(Path d, boolean islocal) {
+    super(d, islocal, true);
   }
 
-  /**
-   * Get the location of the entity.
-   */
-  public URI getLocation() {
-    if (p != null) {
-      return p.getDataLocation();
-    } else {
-      return t.getDataLocation();
-    }
-  }
-
-  /**
-   * Get partition entity.
-   */
-  public Partition getPartition() {
-    return p;
-  }
-
-  /**
-   * Get table entity.
-   */
-  public Table getTable() {
-    return t;
-  }
-
-  /**
-   * toString function.
-   */
-  @Override
-  public String toString() {
-    return name;
+  public Set<ReadEntity> getParents() {
+    return parents;
   }
 
   /**
@@ -187,11 +154,31 @@ public class ReadEntity implements Serializable {
     }
   }
 
-  /**
-   * Hashcode function.
-   */
-  @Override
-  public int hashCode() {
-    return toString().hashCode();
+  public boolean isDirect() {
+    return isDirect;
+  }
+
+  public void setDirect(boolean isDirect) {
+    this.isDirect = isDirect;
+  }
+
+  public boolean needsLock() {
+    return needsLock;
+  }
+
+  public void noLockNeeded() {
+    needsLock = false;
+  }
+
+  public List<String> getAccessedColumns() {
+    return accessedColumns;
+  }
+
+  public void setUpdateOrDelete(boolean isUpdateOrDelete) {
+    this.isUpdateOrDelete = isUpdateOrDelete;
+  }
+
+  public boolean isUpdateOrDelete() {
+    return isUpdateOrDelete;
   }
 }

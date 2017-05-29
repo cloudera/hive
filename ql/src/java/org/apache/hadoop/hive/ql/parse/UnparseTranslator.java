@@ -19,25 +19,34 @@
 package org.apache.hadoop.hive.ql.parse;
 
 import java.util.ArrayList;
-import java.util.Map;
 import java.util.List;
+import java.util.Map;
 import java.util.NavigableMap;
 import java.util.TreeMap;
 
 import org.antlr.runtime.TokenRewriteStream;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.ql.metadata.HiveUtils;
 
 /**
  * UnparseTranslator is used to "unparse" objects such as views when their
- * definition is stored.
+ * definition is stored. It has a translations map where its possible to replace all the
+ * text with the appropriate escaped version [say invites.ds will be replaced with
+ * `invites`.`ds` and the entire query is processed like this and stored as
+ * Extended text in table's metadata]. This holds all individual translations and
+ * where they apply in the stream. The unparse is lazy and happens when
+ * SemanticAnalyzer.saveViewDefinition() calls TokenRewriteStream.toString().
+ *
  */
 class UnparseTranslator {
   // key is token start index
   private final NavigableMap<Integer, Translation> translations;
   private final List<CopyTranslation> copyTranslations;
   private boolean enabled;
+  private Configuration conf;
 
-  public UnparseTranslator() {
+  public UnparseTranslator(Configuration conf) {
+    this.conf = conf;
     translations = new TreeMap<Integer, Translation>();
     copyTranslations = new ArrayList<CopyTranslation>();
   }
@@ -57,14 +66,20 @@ class UnparseTranslator {
   }
 
   /**
-   * Register a translation to be performed as part of unparse.
-   * The translation must not overlap with any previously
-   * registered translations (unless it is identical to an
-   * existing translation, in which case it is ignored).
-   * 
+   * Register a translation to be performed as part of unparse. ANTLR imposes
+   * strict conditions on the translations and errors out during
+   * TokenRewriteStream.toString() if there is an overlap. It expects all
+   * the translations to be disjoint (See HIVE-2439).
+   * If the translation overlaps with any previously
+   * registered translation, then it must be either
+   * identical or a prefix (in which cases it is ignored),
+   * or else it must extend the existing translation (i.e.
+   * the existing translation must be a prefix/suffix of the new translation).
+   * All other overlap cases result in assertion failures.
+   *
    * @param node
    *          target node whose subtree is to be replaced
-   * 
+   *
    * @param replacementText
    *          text to use as replacement
    */
@@ -82,39 +97,82 @@ class UnparseTranslator {
 
     int tokenStartIndex = node.getTokenStartIndex();
     int tokenStopIndex = node.getTokenStopIndex();
-
+    if (tokenStopIndex < 0) {
+      // this is for artificially added tokens
+      return;
+    }
     Translation translation = new Translation();
     translation.tokenStopIndex = tokenStopIndex;
     translation.replacementText = replacementText;
 
-    // Sanity check: no overlap with regions already being expanded
+    // Sanity check for overlap with regions already being expanded
     assert (tokenStopIndex >= tokenStartIndex);
-    Map.Entry<Integer, Translation> existingEntry;
-    existingEntry = translations.floorEntry(tokenStartIndex);
-    if (existingEntry != null) {
-      if (existingEntry.getKey().equals(tokenStartIndex)) {
-        if (existingEntry.getValue().tokenStopIndex == tokenStopIndex) {
-          if (existingEntry.getValue().replacementText.equals(replacementText)) {
-            // exact match for existing mapping: somebody is doing something
-            // redundant, but we'll let it pass
-            return;
-          }
-        }
+
+    List<Integer> subsetEntries = new ArrayList<Integer>();
+    // Is the existing entry and newer entry are subset of one another ?
+    for (Map.Entry<Integer, Translation> existingEntry :
+          translations.headMap(tokenStopIndex, true).entrySet()) {
+      // check if the new entry contains the existing
+      if (existingEntry.getValue().tokenStopIndex <= tokenStopIndex &&
+            existingEntry.getKey() >= tokenStartIndex) {
+        // Collect newer entry is if a super-set of existing entry,
+        assert (replacementText.contains(existingEntry.getValue().replacementText));
+        subsetEntries.add(existingEntry.getKey());
+        // check if the existing entry contains the new
+      } else if (existingEntry.getValue().tokenStopIndex >= tokenStopIndex &&
+            existingEntry.getKey() <= tokenStartIndex) {
+        assert (existingEntry.getValue().replacementText.contains(replacementText));
+        // we don't need to add this new entry since there's already an overlapping one
+        return;
       }
-      assert (existingEntry.getValue().tokenStopIndex < tokenStartIndex);
     }
-    existingEntry = translations.ceilingEntry(tokenStartIndex);
-    if (existingEntry != null) {
-      assert (existingEntry.getKey() > tokenStopIndex);
+    // remove any existing entries that are contained by the new one
+    for (Integer index : subsetEntries) {
+      translations.remove(index);
     }
 
-    // It's all good: create a new entry in the map
+    // It's all good: create a new entry in the map (or update existing one)
     translations.put(tokenStartIndex, translation);
   }
 
   /**
+   * Register a translation for an tabName.
+   *
+   * @param node
+   *          source node (which must be an tabName) to be replaced
+   */
+  void addTableNameTranslation(ASTNode tableName, String currentDatabaseName) {
+    if (!enabled) {
+      return;
+    }
+    if (tableName.getToken().getType() == HiveParser.Identifier) {
+      addIdentifierTranslation(tableName);
+      return;
+    }
+    assert (tableName.getToken().getType() == HiveParser.TOK_TABNAME);
+    assert (tableName.getChildCount() <= 2);
+
+    if (tableName.getChildCount() == 2) {
+      addIdentifierTranslation((ASTNode)tableName.getChild(0));
+      addIdentifierTranslation((ASTNode)tableName.getChild(1));
+    }
+    else {
+      // transform the table reference to an absolute reference (i.e., "db.table")
+      StringBuilder replacementText = new StringBuilder();
+      replacementText.append(HiveUtils.unparseIdentifier(currentDatabaseName, conf));
+      replacementText.append('.');
+
+      ASTNode identifier = (ASTNode)tableName.getChild(0);
+      String identifierText = BaseSemanticAnalyzer.unescapeIdentifier(identifier.getText());
+      replacementText.append(HiveUtils.unparseIdentifier(identifierText, conf));
+
+      addTranslation(identifier, replacementText.toString());
+    }
+  }
+
+  /**
    * Register a translation for an identifier.
-   * 
+   *
    * @param node
    *          source node (which must be an identifier) to be replaced
    */
@@ -125,7 +183,7 @@ class UnparseTranslator {
     assert (identifier.getToken().getType() == HiveParser.Identifier);
     String replacementText = identifier.getText();
     replacementText = BaseSemanticAnalyzer.unescapeIdentifier(replacementText);
-    replacementText = HiveUtils.unparseIdentifier(replacementText);
+    replacementText = HiveUtils.unparseIdentifier(replacementText, conf);
     addTranslation(identifier, replacementText);
   }
 
@@ -158,16 +216,19 @@ class UnparseTranslator {
 
   /**
    * Apply all translations on the given token stream.
-   * 
+   *
    * @param tokenRewriteStream
    *          rewrite-capable stream
    */
   void applyTranslations(TokenRewriteStream tokenRewriteStream) {
     for (Map.Entry<Integer, Translation> entry : translations.entrySet()) {
-      tokenRewriteStream.replace(
-        entry.getKey(),
-        entry.getValue().tokenStopIndex,
-        entry.getValue().replacementText);
+      if (entry.getKey() > 0) { // negative means the key didn't exist in the original 
+                                // stream (i.e.: we changed the tree)
+        tokenRewriteStream.replace(
+           entry.getKey(),
+           entry.getValue().tokenStopIndex,
+           entry.getValue().replacementText);
+      }
     }
     for (CopyTranslation copyTranslation : copyTranslations) {
       String replacementText = tokenRewriteStream.toString(
@@ -204,5 +265,11 @@ class UnparseTranslator {
   private static class CopyTranslation {
     ASTNode targetNode;
     ASTNode sourceNode;
+  }
+
+  public void clear() {
+    translations.clear();
+    copyTranslations.clear();
+    enabled = false;
   }
 }

@@ -19,10 +19,14 @@
 package org.apache.hadoop.hive.ql.plan;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 import org.apache.hadoop.hive.ql.lib.Node;
+import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
 
 /**
  * ExprNodeDesc.
@@ -30,7 +34,7 @@ import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
  */
 public abstract class ExprNodeDesc implements Serializable, Node {
   private static final long serialVersionUID = 1L;
-  TypeInfo typeInfo;
+  protected TypeInfo typeInfo;
 
   public ExprNodeDesc() {
   }
@@ -51,6 +55,11 @@ public abstract class ExprNodeDesc implements Serializable, Node {
   // object equality - isSame means that the objects are semantically equal.
   public abstract boolean isSame(Object o);
 
+  @Override
+  public int hashCode() {
+    return typeInfo.hashCode();
+  }
+
   public TypeInfo getTypeInfo() {
     return typeInfo;
   }
@@ -64,7 +73,11 @@ public abstract class ExprNodeDesc implements Serializable, Node {
     return null;
   }
 
-  @Explain(displayName = "type")
+  public ObjectInspector getWritableObjectInspector() {
+    return TypeInfoUtils
+      .getStandardWritableObjectInspectorFromTypeInfo(typeInfo);
+  }
+
   public String getTypeString() {
     return typeInfo.getTypeName();
   }
@@ -83,4 +96,50 @@ public abstract class ExprNodeDesc implements Serializable, Node {
     return this.getClass().getName();
   }
 
+  // This wraps an instance of an ExprNodeDesc, and makes equals work like isSame, see comment on
+  // isSame
+  public static class ExprNodeDescEqualityWrapper {
+    private ExprNodeDesc exprNodeDesc;
+
+    public ExprNodeDescEqualityWrapper(ExprNodeDesc exprNodeDesc) {
+      this.exprNodeDesc = exprNodeDesc;
+    }
+
+    public ExprNodeDesc getExprNodeDesc() {
+      return exprNodeDesc;
+    }
+
+    public void setExprNodeDesc(ExprNodeDesc exprNodeDesc) {
+      this.exprNodeDesc = exprNodeDesc;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+
+      if (other == null || !(other instanceof ExprNodeDescEqualityWrapper)) {
+        return false;
+      }
+
+      return this.exprNodeDesc.isSame(((ExprNodeDescEqualityWrapper)other).getExprNodeDesc());
+    }
+
+    @Override
+    public int hashCode() {
+      return exprNodeDesc == null ? 0 : exprNodeDesc.hashCode();
+    }
+
+    /* helper function to allow Set()/Collection() operations with ExprNodeDesc */
+    public static Collection<ExprNodeDescEqualityWrapper> transform(
+        Collection<ExprNodeDesc> descs) {
+      if (descs == null) {
+        return null;
+      }
+      final Collection<ExprNodeDescEqualityWrapper> wrapped = new ArrayList<ExprNodeDesc.ExprNodeDescEqualityWrapper>(
+          descs.size());
+      for (ExprNodeDesc desc : descs) {
+        wrapped.add(new ExprNodeDescEqualityWrapper(desc));
+      }
+      return wrapped;
+    }
+  }
 }

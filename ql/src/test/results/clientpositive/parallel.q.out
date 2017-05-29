@@ -1,12 +1,22 @@
-PREHOOK: query: create table if not exists src_a like src
+PREHOOK: query: -- SORT_QUERY_RESULTS
+
+create table if not exists src_a like src
 PREHOOK: type: CREATETABLE
-POSTHOOK: query: create table if not exists src_a like src
+PREHOOK: Output: database:default
+PREHOOK: Output: default@src_a
+POSTHOOK: query: -- SORT_QUERY_RESULTS
+
+create table if not exists src_a like src
 POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@src_a
 PREHOOK: query: create table if not exists src_b like src
 PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:default
+PREHOOK: Output: default@src_b
 POSTHOOK: query: create table if not exists src_b like src
 POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@src_b
 PREHOOK: query: explain
 from (select key, value from src group by key, value) s
@@ -18,158 +28,86 @@ from (select key, value from src group by key, value) s
 insert overwrite table src_a select s.key, s.value group by s.key, s.value
 insert overwrite table src_b select s.key, s.value group by s.key, s.value
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_SUBQUERY (TOK_QUERY (TOK_FROM (TOK_TABREF src)) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_TABLE_OR_COL key)) (TOK_SELEXPR (TOK_TABLE_OR_COL value))) (TOK_GROUPBY (TOK_TABLE_OR_COL key) (TOK_TABLE_OR_COL value)))) s)) (TOK_INSERT (TOK_DESTINATION (TOK_TAB src_a)) (TOK_SELECT (TOK_SELEXPR (. (TOK_TABLE_OR_COL s) key)) (TOK_SELEXPR (. (TOK_TABLE_OR_COL s) value))) (TOK_GROUPBY (. (TOK_TABLE_OR_COL s) key) (. (TOK_TABLE_OR_COL s) value))) (TOK_INSERT (TOK_DESTINATION (TOK_TAB src_b)) (TOK_SELECT (TOK_SELEXPR (. (TOK_TABLE_OR_COL s) key)) (TOK_SELEXPR (. (TOK_TABLE_OR_COL s) value))) (TOK_GROUPBY (. (TOK_TABLE_OR_COL s) key) (. (TOK_TABLE_OR_COL s) value))))
-
 STAGE DEPENDENCIES:
   Stage-2 is a root stage
   Stage-3 depends on stages: Stage-2
   Stage-0 depends on stages: Stage-3
   Stage-4 depends on stages: Stage-0
-  Stage-5 depends on stages: Stage-2
-  Stage-1 depends on stages: Stage-5
-  Stage-6 depends on stages: Stage-1
+  Stage-1 depends on stages: Stage-3
+  Stage-5 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-2
     Map Reduce
-      Alias -> Map Operator Tree:
-        s:src 
+      Map Operator Tree:
           TableScan
             alias: src
+            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
             Select Operator
-              expressions:
-                    expr: key
-                    type: string
-                    expr: value
-                    type: string
+              expressions: key (type: string), value (type: string)
               outputColumnNames: key, value
+              Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
               Group By Operator
-                bucketGroup: false
-                keys:
-                      expr: key
-                      type: string
-                      expr: value
-                      type: string
+                keys: key (type: string), value (type: string)
                 mode: hash
                 outputColumnNames: _col0, _col1
+                Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
-                  key expressions:
-                        expr: _col0
-                        type: string
-                        expr: _col1
-                        type: string
+                  key expressions: _col0 (type: string), _col1 (type: string)
                   sort order: ++
-                  Map-reduce partition columns:
-                        expr: _col0
-                        type: string
-                        expr: _col1
-                        type: string
-                  tag: -1
+                  Map-reduce partition columns: _col0 (type: string), _col1 (type: string)
+                  Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
         Group By Operator
-          bucketGroup: false
-          keys:
-                expr: KEY._col0
-                type: string
-                expr: KEY._col1
-                type: string
+          keys: KEY._col0 (type: string), KEY._col1 (type: string)
           mode: mergepartial
           outputColumnNames: _col0, _col1
-          Select Operator
-            expressions:
-                  expr: _col0
-                  type: string
-                  expr: _col1
-                  type: string
-            outputColumnNames: _col0, _col1
-            Select Operator
-              expressions:
-                    expr: _col0
-                    type: string
-                    expr: _col1
-                    type: string
-              outputColumnNames: _col0, _col1
-              Group By Operator
-                bucketGroup: false
-                keys:
-                      expr: _col0
-                      type: string
-                      expr: _col1
-                      type: string
-                mode: hash
-                outputColumnNames: _col0, _col1
-                File Output Operator
-                  compressed: false
-                  GlobalTableId: 0
-                  table:
-                      input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-                      output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
-            Select Operator
-              expressions:
-                    expr: _col0
-                    type: string
-                    expr: _col1
-                    type: string
-              outputColumnNames: _col0, _col1
-              Group By Operator
-                bucketGroup: false
-                keys:
-                      expr: _col0
-                      type: string
-                      expr: _col1
-                      type: string
-                mode: hash
-                outputColumnNames: _col0, _col1
-                File Output Operator
-                  compressed: false
-                  GlobalTableId: 0
-                  table:
-                      input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-                      output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+          Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+          File Output Operator
+            compressed: false
+            table:
+                input format: org.apache.hadoop.mapred.SequenceFileInputFormat
+                output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe
 
   Stage: Stage-3
     Map Reduce
-      Alias -> Map Operator Tree:
-        file:/tmp/nzhang/hive_2010-09-14_17-13-50_531_2890192072832942497/-mr-10004 
+      Map Operator Tree:
+          TableScan
             Reduce Output Operator
-              key expressions:
-                    expr: _col0
-                    type: string
-                    expr: _col1
-                    type: string
+              key expressions: _col0 (type: string), _col1 (type: string)
               sort order: ++
-              Map-reduce partition columns:
-                    expr: _col0
-                    type: string
-                    expr: _col1
-                    type: string
-              tag: -1
+              Map-reduce partition columns: _col0 (type: string), _col1 (type: string)
+              Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
-        Group By Operator
-          bucketGroup: false
-          keys:
-                expr: KEY._col0
-                type: string
-                expr: KEY._col1
-                type: string
-          mode: mergepartial
-          outputColumnNames: _col0, _col1
-          Select Operator
-            expressions:
-                  expr: _col0
-                  type: string
-                  expr: _col1
-                  type: string
+        Forward
+          Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+          Group By Operator
+            keys: KEY._col0 (type: string), KEY._col1 (type: string)
+            mode: complete
             outputColumnNames: _col0, _col1
+            Statistics: Num rows: 125 Data size: 1328 Basic stats: COMPLETE Column stats: NONE
             File Output Operator
               compressed: false
-              GlobalTableId: 1
+              Statistics: Num rows: 125 Data size: 1328 Basic stats: COMPLETE Column stats: NONE
               table:
                   input format: org.apache.hadoop.mapred.TextInputFormat
                   output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
                   serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                  name: src_a
+                  name: default.src_a
+          Group By Operator
+            keys: KEY._col0 (type: string), KEY._col1 (type: string)
+            mode: complete
+            outputColumnNames: _col0, _col1
+            Statistics: Num rows: 125 Data size: 1328 Basic stats: COMPLETE Column stats: NONE
+            File Output Operator
+              compressed: false
+              Statistics: Num rows: 125 Data size: 1328 Basic stats: COMPLETE Column stats: NONE
+              table:
+                  input format: org.apache.hadoop.mapred.TextInputFormat
+                  output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                  serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                  name: default.src_b
 
   Stage: Stage-0
     Move Operator
@@ -179,53 +117,10 @@ STAGE PLANS:
               input format: org.apache.hadoop.mapred.TextInputFormat
               output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              name: src_a
+              name: default.src_a
 
   Stage: Stage-4
     Stats-Aggr Operator
-
-  Stage: Stage-5
-    Map Reduce
-      Alias -> Map Operator Tree:
-        file:/tmp/nzhang/hive_2010-09-14_17-13-50_531_2890192072832942497/-mr-10005 
-            Reduce Output Operator
-              key expressions:
-                    expr: _col0
-                    type: string
-                    expr: _col1
-                    type: string
-              sort order: ++
-              Map-reduce partition columns:
-                    expr: _col0
-                    type: string
-                    expr: _col1
-                    type: string
-              tag: -1
-      Reduce Operator Tree:
-        Group By Operator
-          bucketGroup: false
-          keys:
-                expr: KEY._col0
-                type: string
-                expr: KEY._col1
-                type: string
-          mode: mergepartial
-          outputColumnNames: _col0, _col1
-          Select Operator
-            expressions:
-                  expr: _col0
-                  type: string
-                  expr: _col1
-                  type: string
-            outputColumnNames: _col0, _col1
-            File Output Operator
-              compressed: false
-              GlobalTableId: 2
-              table:
-                  input format: org.apache.hadoop.mapred.TextInputFormat
-                  output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-                  serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                  name: src_b
 
   Stage: Stage-1
     Move Operator
@@ -235,12 +130,11 @@ STAGE PLANS:
               input format: org.apache.hadoop.mapred.TextInputFormat
               output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              name: src_b
+              name: default.src_b
 
-  Stage: Stage-6
+  Stage: Stage-5
     Stats-Aggr Operator
 
-
 PREHOOK: query: from (select key, value from src group by key, value) s
 insert overwrite table src_a select s.key, s.value group by s.key, s.value
 insert overwrite table src_b select s.key, s.value group by s.key, s.value
@@ -259,18 +153,14 @@ POSTHOOK: Lineage: src_a.key SIMPLE [(src)src.FieldSchema(name:key, type:string,
 POSTHOOK: Lineage: src_a.value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
 POSTHOOK: Lineage: src_b.key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
 POSTHOOK: Lineage: src_b.value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-PREHOOK: query: select * from src_a order by key, value
+PREHOOK: query: select * from src_a
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src_a
-PREHOOK: Output: file:/tmp/nzhang/hive_2010-09-14_17-14-02_165_5274023346481856318/-mr-10000
-POSTHOOK: query: select * from src_a order by key, value
+#### A masked pattern was here ####
+POSTHOOK: query: select * from src_a
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@src_a
-POSTHOOK: Output: file:/tmp/nzhang/hive_2010-09-14_17-14-02_165_5274023346481856318/-mr-10000
-POSTHOOK: Lineage: src_a.key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: src_a.value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: src_b.key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: src_b.value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
+#### A masked pattern was here ####
 0	val_0
 10	val_10
 100	val_100
@@ -580,18 +470,14 @@ POSTHOOK: Lineage: src_b.value SIMPLE [(src)src.FieldSchema(name:value, type:str
 96	val_96
 97	val_97
 98	val_98
-PREHOOK: query: select * from src_b order by key, value
+PREHOOK: query: select * from src_b
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src_b
-PREHOOK: Output: file:/tmp/nzhang/hive_2010-09-14_17-14-06_366_5156248632763644240/-mr-10000
-POSTHOOK: query: select * from src_b order by key, value
+#### A masked pattern was here ####
+POSTHOOK: query: select * from src_b
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@src_b
-POSTHOOK: Output: file:/tmp/nzhang/hive_2010-09-14_17-14-06_366_5156248632763644240/-mr-10000
-POSTHOOK: Lineage: src_a.key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: src_a.value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: src_b.key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: src_b.value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
+#### A masked pattern was here ####
 0	val_0
 10	val_10
 100	val_100
@@ -916,29 +802,17 @@ POSTHOOK: Input: default@src
 POSTHOOK: Output: default@src_a
 POSTHOOK: Output: default@src_b
 POSTHOOK: Lineage: src_a.key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: src_a.key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: src_a.value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
 POSTHOOK: Lineage: src_a.value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
 POSTHOOK: Lineage: src_b.key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: src_b.key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
 POSTHOOK: Lineage: src_b.value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: src_b.value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-PREHOOK: query: select * from src_a order by key, value
+PREHOOK: query: select * from src_a
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src_a
-PREHOOK: Output: file:/tmp/nzhang/hive_2010-09-14_17-14-23_195_3253242643234574753/-mr-10000
-POSTHOOK: query: select * from src_a order by key, value
+#### A masked pattern was here ####
+POSTHOOK: query: select * from src_a
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@src_a
-POSTHOOK: Output: file:/tmp/nzhang/hive_2010-09-14_17-14-23_195_3253242643234574753/-mr-10000
-POSTHOOK: Lineage: src_a.key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: src_a.key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: src_a.value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: src_a.value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: src_b.key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: src_b.key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: src_b.value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: src_b.value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
+#### A masked pattern was here ####
 0	val_0
 10	val_10
 100	val_100
@@ -1248,22 +1122,14 @@ POSTHOOK: Lineage: src_b.value SIMPLE [(src)src.FieldSchema(name:value, type:str
 96	val_96
 97	val_97
 98	val_98
-PREHOOK: query: select * from src_b order by key, value
+PREHOOK: query: select * from src_b
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src_b
-PREHOOK: Output: file:/tmp/nzhang/hive_2010-09-14_17-14-27_387_483746667057079187/-mr-10000
-POSTHOOK: query: select * from src_b order by key, value
+#### A masked pattern was here ####
+POSTHOOK: query: select * from src_b
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@src_b
-POSTHOOK: Output: file:/tmp/nzhang/hive_2010-09-14_17-14-27_387_483746667057079187/-mr-10000
-POSTHOOK: Lineage: src_a.key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: src_a.key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: src_a.value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: src_a.value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: src_b.key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: src_b.key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: src_b.value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: src_b.value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
+#### A masked pattern was here ####
 0	val_0
 10	val_10
 100	val_100

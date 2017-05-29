@@ -22,58 +22,82 @@ import java.io.Serializable;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 
+import org.apache.hadoop.hive.common.JavaUtils;
+import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.ql.exec.FunctionRegistry;
 import org.apache.hadoop.hive.ql.exec.UDF;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentException;
+import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFUtils.ConversionHelper;
+import org.apache.hadoop.hive.serde2.io.HiveDecimalWritable;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory.ObjectInspectorOptions;
+import org.apache.hadoop.hive.serde2.typeinfo.HiveDecimalUtils;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
-import org.apache.hadoop.util.ReflectionUtils;
 
 /**
  * GenericUDFBridge encapsulates UDF to provide the same interface as
  * GenericUDF.
- * 
+ *
  * Note that GenericUDFBridge implements Serializable because the name of the
  * UDF class needs to be serialized with the plan.
- * 
+ *
  */
 public class GenericUDFBridge extends GenericUDF implements Serializable {
+  private static final long serialVersionUID = 4994861742809511113L;
+
   /**
    * The name of the UDF.
    */
-  String udfName;
+  private String udfName;
 
   /**
    * Whether the UDF is an operator or not. This controls how the display string
    * is generated.
    */
-  boolean isOperator;
+  private boolean isOperator;
 
   /**
-   * The underlying UDF class.
+   * The underlying UDF class Name.
    */
-  Class<? extends UDF> udfClass;
+  private String udfClassName;
 
   /**
-   * Greate a new GenericUDFBridge object.
-   * 
+   * The underlying method of the UDF class.
+   */
+  private transient Method udfMethod;
+
+  /**
+   * Helper to convert the parameters before passing to udfMethod.
+   */
+  private transient ConversionHelper conversionHelper;
+  /**
+   * The actual udf object.
+   */
+  private transient UDF udf;
+  /**
+   * The non-deferred real arguments for method invocation.
+   */
+  private transient Object[] realArguments;
+
+  /**
+   * Create a new GenericUDFBridge object.
+   *
    * @param udfName
    *          The name of the corresponding udf.
-   * @param isOperator
-   * @param udfClass
+   * @param isOperator true for operators
+   * @param udfClassName java class name of UDF
    */
   public GenericUDFBridge(String udfName, boolean isOperator,
-      Class<? extends UDF> udfClass) {
+      String udfClassName) {
     this.udfName = udfName;
     this.isOperator = isOperator;
-    this.udfClass = udfClass;
+    this.udfClassName = udfClassName;
   }
-
+ 
   // For Java serialization only
   public GenericUDFBridge() {
   }
@@ -82,8 +106,17 @@ public class GenericUDFBridge extends GenericUDF implements Serializable {
     this.udfName = udfName;
   }
 
+  @Override
   public String getUdfName() {
     return udfName;
+  }
+
+  public String getUdfClassName() {
+    return udfClassName;
+  }
+
+  public void setUdfClassName(String udfClassName) {
+    this.udfClassName = udfClassName;
   }
 
   public boolean isOperator() {
@@ -94,36 +127,23 @@ public class GenericUDFBridge extends GenericUDF implements Serializable {
     this.isOperator = isOperator;
   }
 
-  public void setUdfClass(Class<? extends UDF> udfClass) {
-    this.udfClass = udfClass;
-  }
-
   public Class<? extends UDF> getUdfClass() {
-    return udfClass;
+    try {
+      return (Class<? extends UDF>) Class.forName(udfClassName, true, Utilities.getSessionSpecifiedClassLoader());
+    } catch (ClassNotFoundException e) {
+      throw new RuntimeException(e);
+    }
   }
-
-  /**
-   * The underlying method of the UDF class.
-   */
-  transient Method udfMethod;
-
-  /**
-   * Helper to convert the parameters before passing to udfMethod.
-   */
-  transient ConversionHelper conversionHelper;
-  /**
-   * The actual udf object.
-   */
-  transient UDF udf;
-  /**
-   * The non-deferred real arguments for method invocation.
-   */
-  transient Object[] realArguments;
 
   @Override
   public ObjectInspector initialize(ObjectInspector[] arguments) throws UDFArgumentException {
 
-    udf = (UDF) ReflectionUtils.newInstance(udfClass, null);
+    try {
+      udf = (UDF) Class.forName(udfClassName, true, Utilities.getSessionSpecifiedClassLoader()).newInstance();
+    } catch (Exception e) {
+      throw new UDFArgumentException(
+          "Unable to instantiate UDF implementation class " + udfClassName + ": " + e);
+    }
 
     // Resolve for the method based on argument types
     ArrayList<TypeInfo> argumentTypeInfos = new ArrayList<TypeInfo>(
@@ -162,6 +182,13 @@ public class GenericUDFBridge extends GenericUDF implements Serializable {
     Object result = FunctionRegistry.invoke(udfMethod, udf, conversionHelper
         .convertIfNecessary(realArguments));
 
+    // For non-generic UDF, type info isn't available. This poses a problem for Hive Decimal.
+    // If the returned value is HiveDecimal, we assume maximum precision/scale.
+    if (result != null && result instanceof HiveDecimalWritable) {
+      result = HiveDecimalUtils.enforcePrecisionScale((HiveDecimalWritable) result,
+          HiveDecimal.SYSTEM_DEFAULT_PRECISION, HiveDecimal.SYSTEM_DEFAULT_SCALE);
+    }
+
     return result;
   }
 
@@ -189,6 +216,16 @@ public class GenericUDFBridge extends GenericUDF implements Serializable {
       sb.append(")");
       return sb.toString();
     }
+  }
+
+  @Override
+  public String[] getRequiredJars() {
+    return udf.getRequiredJars();
+  }
+
+  @Override
+  public String[] getRequiredFiles() {
+    return udf.getRequiredFiles();
   }
 
 }

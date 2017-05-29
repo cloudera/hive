@@ -18,27 +18,40 @@
 
 package org.apache.hadoop.hive.serde2;
 
+import java.nio.charset.Charset;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 
-import org.apache.hadoop.hive.common.JavaUtils;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.serde2.AbstractSerDe;
 import org.apache.hadoop.hive.serde2.objectinspector.ListObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.MapObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorUtils;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StructField;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.UnionObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.BinaryObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.BooleanObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.ByteObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.DateObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.DoubleObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.FloatObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.HiveCharObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.HiveDecimalObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.HiveVarcharObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.IntObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.LongObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.ShortObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.StringObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.TimestampObjectInspector;
+import org.apache.hadoop.io.BytesWritable;
+import org.apache.hadoop.io.Text;
 
 /**
  * SerDeUtils.
@@ -54,72 +67,10 @@ public final class SerDeUtils {
   public static final String LBRACE = "{";
   public static final String RBRACE = "}";
 
-  private static HashMap<String, Class<?>> serdes = new HashMap<String, Class<?>>();
+  // lower case null is used within json objects
+  private static final String JSON_NULL = "null";
 
-  public static void registerSerDe(String name, Class<?> serde) {
-    if (serdes.containsKey(name)) {
-      throw new RuntimeException("double registering serde " + name);
-    }
-    serdes.put(name, serde);
-  }
-
-  public static Deserializer lookupDeserializer(String name) throws SerDeException {
-    Class<?> c;
-    if (serdes.containsKey(name)) {
-      c = serdes.get(name);
-    } else {
-      try {
-        c = Class.forName(name, true, JavaUtils.getClassLoader());
-      } catch (ClassNotFoundException e) {
-        throw new SerDeException("SerDe " + name + " does not exist");
-      }
-    }
-    try {
-      return (Deserializer) c.newInstance();
-    } catch (Exception e) {
-      throw new SerDeException(e);
-    }
-  }
-
-  private static List<String> nativeSerDeNames = new ArrayList<String>();
-  static {
-    nativeSerDeNames
-        .add(org.apache.hadoop.hive.serde2.dynamic_type.DynamicSerDe.class
-        .getName());
-    nativeSerDeNames
-        .add(org.apache.hadoop.hive.serde2.MetadataTypedColumnsetSerDe.class
-        .getName());
-    // For backward compatibility
-    nativeSerDeNames.add("org.apache.hadoop.hive.serde.thrift.columnsetSerDe");
-    nativeSerDeNames
-        .add(org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe.class.getName());
-  }
-
-  public static boolean shouldGetColsFromSerDe(String serde) {
-    return (serde != null) && !nativeSerDeNames.contains(serde);
-  }
-
-  private static boolean initCoreSerDes = registerCoreSerDes();
-
-  protected static boolean registerCoreSerDes() {
-    // Eagerly load SerDes so they will register their symbolic names even on
-    // Lazy Loading JVMs
-    try {
-      // loading these classes will automatically register the short names
-      Class
-          .forName(org.apache.hadoop.hive.serde2.MetadataTypedColumnsetSerDe.class
-          .getName());
-      Class.forName(org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe.class
-          .getName());
-      Class
-          .forName(org.apache.hadoop.hive.serde2.thrift.ThriftDeserializer.class
-          .getName());
-    } catch (ClassNotFoundException e) {
-      throw new RuntimeException(
-          "IMPOSSIBLE Exception: Unable to initialize core serdes", e);
-    }
-    return true;
-  }
+  public static final Log LOG = LogFactory.getLog(SerDeUtils.class.getName());
 
   /**
    * Escape a String in JSON format.
@@ -202,19 +153,59 @@ public final class SerDeUtils {
     return (escape.toString());
   }
 
+  /**
+   * Convert a Object to a standard Java object in compliance with JDBC 3.0 (see JDBC 3.0
+   * Specification, Table B-3: Mapping from JDBC Types to Java Object Types).
+   *
+   * This method is kept consistent with {@link HiveResultSetMetaData#hiveTypeToSqlType}.
+   */
+  public static Object toThriftPayload(Object val, ObjectInspector valOI, int version) {
+    if (valOI.getCategory() == ObjectInspector.Category.PRIMITIVE) {
+      if (val == null) {
+        return null;
+      }
+      Object obj = ObjectInspectorUtils.copyToStandardObject(val, valOI,
+          ObjectInspectorUtils.ObjectInspectorCopyOption.JAVA);
+      // uses string type for binary before HIVE_CLI_SERVICE_PROTOCOL_V6
+      if (version < 5 && ((PrimitiveObjectInspector)valOI).getPrimitiveCategory() ==
+          PrimitiveObjectInspector.PrimitiveCategory.BINARY) {
+        // todo HIVE-5269
+        return new String((byte[])obj);
+      }
+      return obj;
+    }
+    // for now, expose non-primitive as a string
+    // TODO: expose non-primitive as a structured object while maintaining JDBC compliance
+    return SerDeUtils.getJSONString(val, valOI);
+  }
+
   public static String getJSONString(Object o, ObjectInspector oi) {
+    return getJSONString(o, oi, JSON_NULL);
+  }
+
+  /**
+   * Use this if you need to have custom representation of top level null .
+   * (ie something other than 'null')
+   * eg, for hive output, we want to to print NULL for a null map object.
+   * @param o Object
+   * @param oi ObjectInspector
+   * @param nullStr The custom string used to represent null value
+   * @return
+   */
+  public static String getJSONString(Object o, ObjectInspector oi, String nullStr) {
     StringBuilder sb = new StringBuilder();
-    buildJSONString(sb, o, oi);
+    buildJSONString(sb, o, oi, nullStr);
     return sb.toString();
   }
 
-  static void buildJSONString(StringBuilder sb, Object o, ObjectInspector oi) {
+
+  static void buildJSONString(StringBuilder sb, Object o, ObjectInspector oi, String nullStr) {
 
     switch (oi.getCategory()) {
     case PRIMITIVE: {
       PrimitiveObjectInspector poi = (PrimitiveObjectInspector) oi;
       if (o == null) {
-        sb.append("null");
+        sb.append(nullStr);
       } else {
         switch (poi.getPrimitiveCategory()) {
         case BOOLEAN: {
@@ -253,6 +244,45 @@ public final class SerDeUtils {
           sb.append('"');
           break;
         }
+        case CHAR: {
+          sb.append('"');
+          sb.append(escapeString(((HiveCharObjectInspector) poi)
+              .getPrimitiveJavaObject(o).toString()));
+          sb.append('"');
+          break;
+        }
+        case VARCHAR: {
+          sb.append('"');
+          sb.append(escapeString(((HiveVarcharObjectInspector) poi)
+              .getPrimitiveJavaObject(o).toString()));
+          sb.append('"');
+          break;
+        }
+        case DATE: {
+          sb.append('"');
+          sb.append(((DateObjectInspector) poi)
+              .getPrimitiveWritableObject(o));
+          sb.append('"');
+          break;
+        }
+        case TIMESTAMP: {
+          sb.append('"');
+          sb.append(((TimestampObjectInspector) poi)
+              .getPrimitiveWritableObject(o));
+          sb.append('"');
+          break;
+        }
+        case BINARY: {
+          BytesWritable bw = ((BinaryObjectInspector) oi).getPrimitiveWritableObject(o);
+          Text txt = new Text();
+          txt.set(bw.getBytes(), 0, bw.getLength());
+          sb.append(txt.toString());
+          break;
+        }
+        case DECIMAL: {
+          sb.append(((HiveDecimalObjectInspector) oi).getPrimitiveJavaObject(o));
+          break;
+        }
         default:
           throw new RuntimeException("Unknown primitive type: "
               + poi.getPrimitiveCategory());
@@ -266,14 +296,14 @@ public final class SerDeUtils {
           .getListElementObjectInspector();
       List<?> olist = loi.getList(o);
       if (olist == null) {
-        sb.append("null");
+        sb.append(nullStr);
       } else {
         sb.append(LBRACKET);
         for (int i = 0; i < olist.size(); i++) {
           if (i > 0) {
             sb.append(COMMA);
           }
-          buildJSONString(sb, olist.get(i), listElementObjectInspector);
+          buildJSONString(sb, olist.get(i), listElementObjectInspector, JSON_NULL);
         }
         sb.append(RBRACKET);
       }
@@ -286,7 +316,7 @@ public final class SerDeUtils {
           .getMapValueObjectInspector();
       Map<?, ?> omap = moi.getMap(o);
       if (omap == null) {
-        sb.append("null");
+        sb.append(nullStr);
       } else {
         sb.append(LBRACE);
         boolean first = true;
@@ -297,9 +327,9 @@ public final class SerDeUtils {
             sb.append(COMMA);
           }
           Map.Entry<?, ?> e = (Map.Entry<?, ?>) entry;
-          buildJSONString(sb, e.getKey(), mapKeyObjectInspector);
+          buildJSONString(sb, e.getKey(), mapKeyObjectInspector, JSON_NULL);
           sb.append(COLON);
-          buildJSONString(sb, e.getValue(), mapValueObjectInspector);
+          buildJSONString(sb, e.getValue(), mapValueObjectInspector, JSON_NULL);
         }
         sb.append(RBRACE);
       }
@@ -309,7 +339,7 @@ public final class SerDeUtils {
       StructObjectInspector soi = (StructObjectInspector) oi;
       List<? extends StructField> structFields = soi.getAllStructFieldRefs();
       if (o == null) {
-        sb.append("null");
+        sb.append(nullStr);
       } else {
         sb.append(LBRACE);
         for (int i = 0; i < structFields.size(); i++) {
@@ -321,7 +351,7 @@ public final class SerDeUtils {
           sb.append(QUOTE);
           sb.append(COLON);
           buildJSONString(sb, soi.getStructFieldData(o, structFields.get(i)),
-              structFields.get(i).getFieldObjectInspector());
+              structFields.get(i).getFieldObjectInspector(), JSON_NULL);
         }
         sb.append(RBRACE);
       }
@@ -330,13 +360,13 @@ public final class SerDeUtils {
     case UNION: {
       UnionObjectInspector uoi = (UnionObjectInspector) oi;
       if (o == null) {
-        sb.append("null");
+        sb.append(nullStr);
       } else {
         sb.append(LBRACE);
         sb.append(uoi.getTag(o));
         sb.append(COLON);
         buildJSONString(sb, uoi.getField(o),
-              uoi.getObjectInspectors().get(uoi.getTag(o)));
+              uoi.getObjectInspectors().get(uoi.getTag(o)), JSON_NULL);
         sb.append(RBRACE);
       }
       break;
@@ -346,6 +376,20 @@ public final class SerDeUtils {
     }
   }
 
+  /**
+   * return false though element is null if nullsafe flag is true for that
+   */
+  public static boolean hasAnyNullObject(List o, StructObjectInspector loi,
+      boolean[] nullSafes) {
+    List<? extends StructField> fields = loi.getAllStructFieldRefs();
+    for (int i = 0; i < o.size();i++) {
+      if ((nullSafes == null || !nullSafes[i])
+          && hasAnyNullObject(o.get(i), fields.get(i).getFieldObjectInspector())) {
+        return true;
+      }
+    }
+    return false;
+  }
   /**
    * True if Object passed is representing null object.
    *
@@ -445,7 +489,71 @@ public final class SerDeUtils {
     }
   }
 
+  /**
+   * Returns the union of table and partition properties,
+   * with partition properties taking precedence.
+   * @param tblProps
+   * @param partProps
+   * @return the overlayed properties
+   */
+  public static Properties createOverlayedProperties(Properties tblProps, Properties partProps) {
+    Properties props = new Properties();
+    props.putAll(tblProps);
+    if (partProps != null) {
+      props.putAll(partProps);
+    }
+    return props;
+  }
+
+  /**
+   * Initializes a SerDe.
+   * @param deserializer
+   * @param conf
+   * @param tblProps
+   * @param partProps
+   * @throws SerDeException
+   */
+  public static void initializeSerDe(Deserializer deserializer, Configuration conf,
+                                            Properties tblProps, Properties partProps)
+                                                throws SerDeException {
+    if (deserializer instanceof AbstractSerDe) {
+      ((AbstractSerDe) deserializer).initialize(conf, tblProps, partProps);
+      String msg = ((AbstractSerDe) deserializer).getConfigurationErrors();
+      if (msg != null && !msg.isEmpty()) {
+        throw new SerDeException(msg);
+      }
+    } else {
+      deserializer.initialize(conf, createOverlayedProperties(tblProps, partProps));
+    }
+  }
+
+  /**
+   * Initializes a SerDe.
+   * @param deserializer
+   * @param conf
+   * @param tblProps
+   * @param partProps
+   * @throws SerDeException
+   */
+  public static void initializeSerDeWithoutErrorCheck(Deserializer deserializer,
+                                                      Configuration conf, Properties tblProps,
+                                                      Properties partProps) throws SerDeException {
+    if (deserializer instanceof AbstractSerDe) {
+      ((AbstractSerDe) deserializer).initialize(conf, tblProps, partProps);
+    } else {
+      deserializer.initialize(conf, createOverlayedProperties(tblProps, partProps));
+    }
+  }
+
   private SerDeUtils() {
     // prevent instantiation
+  }
+
+  public static Text transformTextToUTF8(Text text, Charset previousCharset) {
+    return new Text(new String(text.getBytes(), 0, text.getLength(), previousCharset));
+  }
+
+  public static Text transformTextFromUTF8(Text text, Charset targetCharset) {
+    return new Text(new String(text.getBytes(), 0, text.getLength()).getBytes(targetCharset));
   }
 }

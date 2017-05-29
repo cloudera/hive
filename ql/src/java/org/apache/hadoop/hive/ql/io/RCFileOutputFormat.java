@@ -25,6 +25,7 @@ import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.serde2.columnar.BytesRefArrayWritable;
 import org.apache.hadoop.io.Writable;
@@ -44,30 +45,30 @@ import org.apache.hadoop.util.ReflectionUtils;
  */
 public class RCFileOutputFormat extends
     FileOutputFormat<WritableComparable, BytesRefArrayWritable> implements
-    HiveOutputFormat<WritableComparable, Writable> {
+    HiveOutputFormat<WritableComparable, BytesRefArrayWritable> {
 
   /**
    * set number of columns into the given configuration.
-   * 
+   *
    * @param conf
    *          configuration instance which need to set the column number
    * @param columnNum
    *          column number for RCFile's Writer
-   * 
+   *
    */
   public static void setColumnNumber(Configuration conf, int columnNum) {
     assert columnNum > 0;
-    conf.setInt(RCFile.COLUMN_NUMBER_CONF_STR, columnNum);
+    conf.setInt(HiveConf.ConfVars.HIVE_RCFILE_COLUMN_NUMBER_CONF.varname, columnNum);
   }
 
   /**
    * Returns the number of columns set in the conf for writers.
-   * 
+   *
    * @param conf
    * @return number of columns for RCFile's writer
    */
   public static int getColumnNumber(Configuration conf) {
-    return conf.getInt(RCFile.COLUMN_NUMBER_CONF_STR, 0);
+    return HiveConf.getIntVar(conf, HiveConf.ConfVars.HIVE_RCFILE_COLUMN_NUMBER_CONF);
   }
 
   /** {@inheritDoc} */
@@ -77,9 +78,6 @@ public class RCFileOutputFormat extends
 
     Path outputPath = getWorkOutputPath(job);
     FileSystem fs = outputPath.getFileSystem(job);
-    if (!fs.exists(outputPath)) {
-      fs.mkdirs(outputPath);
-    }
     Path file = new Path(outputPath, name);
     CompressionCodec codec = null;
     if (getCompressOutput(job)) {
@@ -105,7 +103,7 @@ public class RCFileOutputFormat extends
 
   /**
    * create the final out file.
-   * 
+   *
    * @param jc
    *          the job configuration file
    * @param finalOutPath
@@ -134,15 +132,16 @@ public class RCFileOutputFormat extends
     }
 
     RCFileOutputFormat.setColumnNumber(jc, cols.length);
-    final RCFile.Writer outWriter = Utilities.createRCFileWriter
-      (jc, finalOutPath.getFileSystem(jc),
-       finalOutPath, isCompressed);
+    final RCFile.Writer outWriter = Utilities.createRCFileWriter(jc,
+    finalOutPath.getFileSystem(jc), finalOutPath, isCompressed, progress);
 
     return new org.apache.hadoop.hive.ql.exec.FileSinkOperator.RecordWriter() {
+      @Override
       public void write(Writable r) throws IOException {
         outWriter.append(r);
       }
 
+      @Override
       public void close(boolean abort) throws IOException {
         outWriter.close();
       }

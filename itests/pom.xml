@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>org.apache.hive</groupId>
+    <artifactId>hive</artifactId>
+    <version>1.1.0-cdh5.5.0</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>hive-it</artifactId>
+  <packaging>pom</packaging>
+  <name>Hive Integration - Parent</name>
+
+  <properties>
+    <hive.path.to.root>..</hive.path.to.root>
+  </properties>
+
+  <modules>
+   <module>custom-serde</module>
+   <module>hcatalog-unit</module>
+   <module>hive-unit</module>
+   <module>util</module>
+   <module>test-serde</module>
+   <module>qtest</module>
+   <module>hive-jmh</module>
+  </modules>
+
+  <profiles>
+    <profile>
+      <id>hadoop-2</id>
+      <modules>
+        <module>qtest-spark</module>
+        <module>hive-unit-hadoop2</module>
+        <module>hive-minikdc</module>
+      </modules>
+    </profile>
+    <profile>
+      <id>hadoop-1</id>
+      <modules>
+        <module>qtest-spark</module>
+      </modules>
+    </profile>
+  </profiles>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>download-spark</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <configuration>
+              <target>
+                <echo file="target/download.sh">
+                  set -x
+                  /bin/pwd
+                  BASE_DIR=./target
+                  HIVE_ROOT=$BASE_DIR/../../../
+                  DOWNLOAD_DIR=./../thirdparty
+                  download() {
+                    url=$1;
+                    finalName=$2
+                    tarName=$(basename $url)
+                    rm -rf $BASE_DIR/$finalName
+                    if [[ ! -f $DOWNLOAD_DIR/$tarName ]]
+                    then
+                     curl -Sso $DOWNLOAD_DIR/$tarName $url
+                    fi
+                    tar -zxf $DOWNLOAD_DIR/$tarName -C $BASE_DIR
+                    mv $BASE_DIR/spark-${spark.version} $BASE_DIR/$finalName
+                  }
+                  mkdir -p $DOWNLOAD_DIR
+                  download "http://repos.jenkins.cloudera.com/cdh5.5.0-static/cdh/5/spark-latest.tar.gz" "spark"
+                  cp -f $HIVE_ROOT/data/conf/spark/log4j.properties $BASE_DIR/spark/conf/
+                </echo>
+              </target>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

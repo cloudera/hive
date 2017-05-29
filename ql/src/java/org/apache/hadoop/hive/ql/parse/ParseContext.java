@@ -20,27 +20,36 @@ package org.apache.hadoop.hive.ql.parse;
 
 import java.io.Serializable;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.Context;
+import org.apache.hadoop.hive.ql.QueryProperties;
 import org.apache.hadoop.hive.ql.exec.AbstractMapJoinOperator;
+import org.apache.hadoop.hive.ql.exec.FetchTask;
 import org.apache.hadoop.hive.ql.exec.GroupByOperator;
 import org.apache.hadoop.hive.ql.exec.JoinOperator;
+import org.apache.hadoop.hive.ql.exec.ListSinkOperator;
 import org.apache.hadoop.hive.ql.exec.MapJoinOperator;
 import org.apache.hadoop.hive.ql.exec.Operator;
+import org.apache.hadoop.hive.ql.exec.ReduceSinkOperator;
+import org.apache.hadoop.hive.ql.exec.SMBMapJoinOperator;
 import org.apache.hadoop.hive.ql.exec.TableScanOperator;
+import org.apache.hadoop.hive.ql.exec.Task;
 import org.apache.hadoop.hive.ql.hooks.LineageInfo;
-import org.apache.hadoop.hive.ql.metadata.Table;
+import org.apache.hadoop.hive.ql.hooks.ReadEntity;
+import org.apache.hadoop.hive.ql.optimizer.ppr.PartitionPruner;
 import org.apache.hadoop.hive.ql.optimizer.unionproc.UnionProcContext;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
+import org.apache.hadoop.hive.ql.plan.FilterDesc.sampleDesc;
 import org.apache.hadoop.hive.ql.plan.LoadFileDesc;
 import org.apache.hadoop.hive.ql.plan.LoadTableDesc;
 import org.apache.hadoop.hive.ql.plan.MapJoinDesc;
-import org.apache.hadoop.hive.ql.plan.FilterDesc.sampleDesc;
+import org.apache.hadoop.hive.ql.plan.OperatorDesc;
+import org.apache.hadoop.hive.ql.plan.TableDesc;
 
 /**
  * Parse Context: The current parse context. This is passed to the optimizer
@@ -58,12 +67,13 @@ public class ParseContext {
   private HashMap<TableScanOperator, ExprNodeDesc> opToPartPruner;
   private HashMap<TableScanOperator, PrunedPartitionList> opToPartList;
   private HashMap<TableScanOperator, sampleDesc> opToSamplePruner;
-  private HashMap<String, Operator<? extends Serializable>> topOps;
-  private HashMap<String, Operator<? extends Serializable>> topSelOps;
-  private LinkedHashMap<Operator<? extends Serializable>, OpParseContext> opParseCtx;
-  private Map<JoinOperator, QBJoinTree> joinContext;
-  private Map<MapJoinOperator, QBJoinTree> mapJoinContext;
-  private HashMap<TableScanOperator, Table> topToTable;
+  private Map<TableScanOperator, Map<String, ExprNodeDesc>> opToPartToSkewedPruner;
+  private HashMap<String, Operator<? extends OperatorDesc>> topOps;
+  private Set<JoinOperator> joinOps;
+  private Set<MapJoinOperator> mapJoinOps;
+  private Set<SMBMapJoinOperator> smbMapJoinOps;
+  private List<ReduceSinkOperator> reduceSinkOperatorsAddedByEnforceBucketingSorting;
+  private HashMap<String, SplitSample> nameToSplitSample;
   private List<LoadTableDesc> loadTableWork;
   private List<LoadFileDesc> loadFileWork;
   private Context ctx;
@@ -76,43 +86,44 @@ public class ParseContext {
   // reducer
   private Map<GroupByOperator, Set<String>> groupOpToInputTables;
   private Map<String, PrunedPartitionList> prunedPartitions;
+  private Map<String, ReadEntity> viewAliasToInput;
 
   /**
    * The lineage information.
    */
   private LineageInfo lInfo;
 
-  // is set to true if the expression only contains partitioning columns and not
-  // any other column reference.
-  // This is used to optimize select * from table where ... scenario, when the
-  // where condition only references
-  // partitioning columns - the partitions are identified and streamed directly
-  // to the client without requiring
-  // a map-reduce job
-  private boolean hasNonPartCols;
+  private GlobalLimitCtx globalLimitCtx;
+
+  private HashSet<ReadEntity> semanticInputs;
+  private List<Task<? extends Serializable>> rootTasks;
+
+  private FetchTask fetchTask;
+  private QueryProperties queryProperties;
+
+  private TableDesc fetchTabledesc;
+  private Operator<?> fetchSource;
+  private ListSinkOperator fetchSink;
 
   public ParseContext() {
   }
 
   /**
+   * @param conf
    * @param qb
    *          current QB
    * @param ast
    *          current parse tree
    * @param opToPartPruner
    *          map from table scan operator to partition pruner
+   * @param opToPartList
    * @param topOps
    *          list of operators for the top query
-   * @param topSelOps
-   *          list of operators for the selects introduced for column pruning
    * @param opParseCtx
    *          operator parse context - contains a mapping from operator to
    *          operator parse state (row resolver etc.)
-   * @param joinContext
+   * @param joinOps
    *          context needed join processing (map join specifically)
-   * @param topToTable
-   *          the top tables being processed
-   * @param fopToTable the table schemas that are being inserted into
    * @param loadTableWork
    *          list of destination tables being loaded
    * @param loadFileWork
@@ -120,12 +131,17 @@ public class ParseContext {
    * @param ctx
    *          parse context
    * @param idToTableNameMap
-   * @param destTableId
    * @param uCtx
+   * @param destTableId
    * @param listMapJoinOpsNoReducer
    *          list of map join operators with no reducer
+   * @param groupOpToInputTables
+   * @param prunedPartitions
    * @param opToSamplePruner
    *          operator to sample pruner map
+   * @param globalLimitCtx
+   * @param nameToSplitSample
+   * @param rootTasks
    */
   public ParseContext(
       HiveConf conf,
@@ -133,39 +149,49 @@ public class ParseContext {
       ASTNode ast,
       HashMap<TableScanOperator, ExprNodeDesc> opToPartPruner,
       HashMap<TableScanOperator, PrunedPartitionList> opToPartList,
-      HashMap<String, Operator<? extends Serializable>> topOps,
-      HashMap<String, Operator<? extends Serializable>> topSelOps,
-      LinkedHashMap<Operator<? extends Serializable>, OpParseContext> opParseCtx,
-      Map<JoinOperator, QBJoinTree> joinContext,
-      HashMap<TableScanOperator, Table> topToTable,
+      HashMap<String, Operator<? extends OperatorDesc>> topOps,
+      Set<JoinOperator> joinOps,
+      Set<SMBMapJoinOperator> smbMapJoinOps,
       List<LoadTableDesc> loadTableWork, List<LoadFileDesc> loadFileWork,
       Context ctx, HashMap<String, String> idToTableNameMap, int destTableId,
       UnionProcContext uCtx, List<AbstractMapJoinOperator<? extends MapJoinDesc>> listMapJoinOpsNoReducer,
       Map<GroupByOperator, Set<String>> groupOpToInputTables,
       Map<String, PrunedPartitionList> prunedPartitions,
-      HashMap<TableScanOperator, sampleDesc> opToSamplePruner) {
+      HashMap<TableScanOperator, sampleDesc> opToSamplePruner,
+      GlobalLimitCtx globalLimitCtx,
+      HashMap<String, SplitSample> nameToSplitSample,
+      HashSet<ReadEntity> semanticInputs, List<Task<? extends Serializable>> rootTasks,
+      Map<TableScanOperator, Map<String, ExprNodeDesc>> opToPartToSkewedPruner,
+      Map<String, ReadEntity> viewAliasToInput,
+      List<ReduceSinkOperator> reduceSinkOperatorsAddedByEnforceBucketingSorting,
+      QueryProperties queryProperties) {
     this.conf = conf;
     this.qb = qb;
     this.ast = ast;
     this.opToPartPruner = opToPartPruner;
     this.opToPartList = opToPartList;
-    this.joinContext = joinContext;
-    this.topToTable = topToTable;
+    this.joinOps = joinOps;
+    this.smbMapJoinOps = smbMapJoinOps;
     this.loadFileWork = loadFileWork;
     this.loadTableWork = loadTableWork;
-    this.opParseCtx = opParseCtx;
     this.topOps = topOps;
-    this.topSelOps = topSelOps;
     this.ctx = ctx;
     this.idToTableNameMap = idToTableNameMap;
     this.destTableId = destTableId;
     this.uCtx = uCtx;
     this.listMapJoinOpsNoReducer = listMapJoinOpsNoReducer;
-    hasNonPartCols = false;
-    this.groupOpToInputTables = new HashMap<GroupByOperator, Set<String>>();
     this.groupOpToInputTables = groupOpToInputTables;
     this.prunedPartitions = prunedPartitions;
     this.opToSamplePruner = opToSamplePruner;
+    this.nameToSplitSample = nameToSplitSample;
+    this.globalLimitCtx = globalLimitCtx;
+    this.semanticInputs = semanticInputs;
+    this.rootTasks = rootTasks;
+    this.opToPartToSkewedPruner = opToPartToSkewedPruner;
+    this.viewAliasToInput = viewAliasToInput;
+    this.reduceSinkOperatorsAddedByEnforceBucketingSorting =
+        reduceSinkOperatorsAddedByEnforceBucketingSorting;
+    this.queryProperties = queryProperties;
   }
 
   /**
@@ -248,29 +274,20 @@ public class ParseContext {
     return opToPartList;
   }
 
-  public void setOpToPartList(HashMap<TableScanOperator, PrunedPartitionList> opToPartList) {
-    this.opToPartList = opToPartList;
+  public List<ReduceSinkOperator> getReduceSinkOperatorsAddedByEnforceBucketingSorting() {
+    return reduceSinkOperatorsAddedByEnforceBucketingSorting;
   }
 
-  /**
-   * @return the topToTable
-   */
-  public HashMap<TableScanOperator, Table> getTopToTable() {
-    return topToTable;
-  }
-
-  /**
-   * @param topToTable
-   *          the topToTable to set
-   */
-  public void setTopToTable(HashMap<TableScanOperator, Table> topToTable) {
-    this.topToTable = topToTable;
+  public void setReduceSinkOperatorsAddedByEnforceBucketingSorting(
+      List<ReduceSinkOperator> reduceSinkOperatorsAddedByEnforceBucketingSorting) {
+    this.reduceSinkOperatorsAddedByEnforceBucketingSorting =
+        reduceSinkOperatorsAddedByEnforceBucketingSorting;
   }
 
   /**
    * @return the topOps
    */
-  public HashMap<String, Operator<? extends Serializable>> getTopOps() {
+  public HashMap<String, Operator<? extends OperatorDesc>> getTopOps() {
     return topOps;
   }
 
@@ -278,40 +295,16 @@ public class ParseContext {
    * @param topOps
    *          the topOps to set
    */
-  public void setTopOps(HashMap<String, Operator<? extends Serializable>> topOps) {
+  public void setTopOps(HashMap<String, Operator<? extends OperatorDesc>> topOps) {
     this.topOps = topOps;
   }
 
-  /**
-   * @return the topSelOps
-   */
-  public HashMap<String, Operator<? extends Serializable>> getTopSelOps() {
-    return topSelOps;
+  public HashMap<String, SplitSample> getNameToSplitSample() {
+    return nameToSplitSample;
   }
 
-  /**
-   * @param topSelOps
-   *          the topSelOps to set
-   */
-  public void setTopSelOps(
-      HashMap<String, Operator<? extends Serializable>> topSelOps) {
-    this.topSelOps = topSelOps;
-  }
-
-  /**
-   * @return the opParseCtx
-   */
-  public LinkedHashMap<Operator<? extends Serializable>, OpParseContext> getOpParseCtx() {
-    return opParseCtx;
-  }
-
-  /**
-   * @param opParseCtx
-   *          the opParseCtx to set
-   */
-  public void setOpParseCtx(
-      LinkedHashMap<Operator<? extends Serializable>, OpParseContext> opParseCtx) {
-    this.opParseCtx = opParseCtx;
+  public void setNameToSplitSample(HashMap<String, SplitSample> nameToSplitSample) {
+    this.nameToSplitSample = nameToSplitSample;
   }
 
   /**
@@ -369,18 +362,18 @@ public class ParseContext {
   }
 
   /**
-   * @return the joinContext
+   * @return the joinOps
    */
-  public Map<JoinOperator, QBJoinTree> getJoinContext() {
-    return joinContext;
+  public Set<JoinOperator> getJoinOps() {
+    return joinOps;
   }
 
   /**
-   * @param joinContext
-   *          the joinContext to set
+   * @param joinOps
+   *          the joinOps to set
    */
-  public void setJoinContext(Map<JoinOperator, QBJoinTree> joinContext) {
-    this.joinContext = joinContext;
+  public void setJoinOps(Set<JoinOperator> joinOps) {
+    this.joinOps = joinOps;
   }
 
   /**
@@ -397,22 +390,6 @@ public class ParseContext {
   public void setListMapJoinOpsNoReducer(
       List<AbstractMapJoinOperator<? extends MapJoinDesc>> listMapJoinOpsNoReducer) {
     this.listMapJoinOpsNoReducer = listMapJoinOpsNoReducer;
-  }
-
-  /**
-   * Sets the hasNonPartCols flag.
-   *
-   * @param val
-   */
-  public void setHasNonPartCols(boolean val) {
-    hasNonPartCols = val;
-  }
-
-  /**
-   * Gets the value of the hasNonPartCols flag.
-   */
-  public boolean getHasNonPartCols() {
-    return hasNonPartCols;
   }
 
   /**
@@ -479,11 +456,107 @@ public class ParseContext {
     return lInfo;
   }
 
-  public Map<MapJoinOperator, QBJoinTree> getMapJoinContext() {
-    return mapJoinContext;
+  public Set<MapJoinOperator> getMapJoinOps() {
+    return mapJoinOps;
   }
 
-  public void setMapJoinContext(Map<MapJoinOperator, QBJoinTree> mapJoinContext) {
-    this.mapJoinContext = mapJoinContext;
+  public void setMapJoinOps(Set<MapJoinOperator> mapJoinOps) {
+    this.mapJoinOps = mapJoinOps;
+  }
+
+  public Set<SMBMapJoinOperator> getSmbMapJoinOps() {
+    return smbMapJoinOps;
+  }
+
+  public void setSmbMapJoinOps(Set<SMBMapJoinOperator> smbMapJoinOps) {
+    this.smbMapJoinOps = smbMapJoinOps;
+  }
+
+  public GlobalLimitCtx getGlobalLimitCtx() {
+    return globalLimitCtx;
+  }
+
+  public void setGlobalLimitCtx(GlobalLimitCtx globalLimitCtx) {
+    this.globalLimitCtx = globalLimitCtx;
+  }
+
+  public HashSet<ReadEntity> getSemanticInputs() {
+    return semanticInputs;
+  }
+
+  public void replaceRootTask(Task<? extends Serializable> rootTask,
+                              List<? extends Task<? extends Serializable>> tasks) {
+    this.rootTasks.remove(rootTask);
+    this.rootTasks.addAll(tasks);
+  }
+
+  public FetchTask getFetchTask() {
+    return fetchTask;
+  }
+
+  public void setFetchTask(FetchTask fetchTask) {
+    this.fetchTask = fetchTask;
+  }
+
+  public PrunedPartitionList getPrunedPartitions(String alias, TableScanOperator ts)
+      throws SemanticException {
+    PrunedPartitionList partsList = opToPartList.get(ts);
+    if (partsList == null) {
+      partsList = PartitionPruner.prune(ts, this, alias);
+      opToPartList.put(ts, partsList);
+    }
+    return partsList;
+  }
+
+  /**
+   * @return the opToPartToSkewedPruner
+   */
+  public Map<TableScanOperator, Map<String, ExprNodeDesc>> getOpToPartToSkewedPruner() {
+    return opToPartToSkewedPruner;
+  }
+
+  /**
+   * @param opToPartToSkewedPruner
+   *          the opToSkewedPruner to set
+   */
+  public void setOpPartToSkewedPruner(
+      HashMap<TableScanOperator, Map<String, ExprNodeDesc>> opToPartToSkewedPruner) {
+    this.opToPartToSkewedPruner = opToPartToSkewedPruner;
+  }
+
+  public Map<String, ReadEntity> getViewAliasToInput() {
+    return viewAliasToInput;
+  }
+
+  public QueryProperties getQueryProperties() {
+    return queryProperties;
+  }
+
+  public void setQueryProperties(QueryProperties queryProperties) {
+    this.queryProperties = queryProperties;
+  }
+
+  public TableDesc getFetchTabledesc() {
+    return fetchTabledesc;
+  }
+
+  public void setFetchTabledesc(TableDesc fetchTabledesc) {
+    this.fetchTabledesc = fetchTabledesc;
+  }
+
+  public Operator<?> getFetchSource() {
+    return fetchSource;
+  }
+
+  public void setFetchSource(Operator<?> fetchSource) {
+    this.fetchSource = fetchSource;
+  }
+
+  public ListSinkOperator getFetchSink() {
+    return fetchSink;
+  }
+
+  public void setFetchSink(ListSinkOperator fetchSink) {
+    this.fetchSink = fetchSink;
   }
 }

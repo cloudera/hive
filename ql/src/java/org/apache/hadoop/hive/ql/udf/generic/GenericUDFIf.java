@@ -18,14 +18,44 @@
 
 package org.apache.hadoop.hive.ql.udf.generic;
 
+import org.apache.hadoop.hive.ql.exec.Description;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentException;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentLengthException;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentTypeException;
+import org.apache.hadoop.hive.ql.exec.vector.VectorizedExpressions;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
-import org.apache.hadoop.hive.serde.Constants;
+import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.BooleanObjectInspector;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.IfExprLongColumnLongColumn;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.IfExprDoubleColumnDoubleColumn;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.IfExprLongColumnLongScalar;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.IfExprDoubleColumnDoubleScalar;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.IfExprDoubleColumnLongScalar;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.IfExprLongColumnDoubleScalar;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.IfExprLongScalarLongColumn;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.IfExprDoubleScalarDoubleColumn;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.IfExprDoubleScalarLongColumn;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.IfExprLongScalarDoubleColumn;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.IfExprLongScalarLongScalar;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.IfExprDoubleScalarDoubleScalar;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.IfExprDoubleScalarLongScalar;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.IfExprLongScalarDoubleScalar;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprStringGroupColumnStringGroupColumn;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprStringGroupColumnStringScalar;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprStringGroupColumnCharScalar;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprStringGroupColumnVarCharScalar;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprStringScalarStringGroupColumn;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprCharScalarStringGroupColumn;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprVarCharScalarStringGroupColumn;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprStringScalarStringScalar;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprStringScalarCharScalar;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprStringScalarVarCharScalar;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprCharScalarStringScalar;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.IfExprVarCharScalarStringScalar;
+
+
 
 /**
  * IF(expr1,expr2,expr3) <br>
@@ -33,9 +63,31 @@ import org.apache.hadoop.hive.serde2.objectinspector.primitive.BooleanObjectInsp
  * otherwise it returns expr3. IF() returns a numeric or string value, depending
  * on the context in which it is used.
  */
+@Description(
+    name = "if",
+    value = "IF(expr1,expr2,expr3) - If expr1 is TRUE (expr1 <> 0 and expr1 <> NULL) then"
+    + " IF() returns expr2; otherwise it returns expr3. IF() returns a numeric or string value,"
+    + " depending on the context in which it is used.")
+@VectorizedExpressions({
+  IfExprLongColumnLongColumn.class, IfExprDoubleColumnDoubleColumn.class,
+  IfExprLongColumnLongScalar.class, IfExprDoubleColumnDoubleScalar.class,
+  IfExprLongColumnDoubleScalar.class, IfExprDoubleColumnLongScalar.class,
+  IfExprLongScalarLongColumn.class, IfExprDoubleScalarDoubleColumn.class,
+  IfExprLongScalarDoubleColumn.class, IfExprDoubleScalarLongColumn.class,
+  IfExprLongScalarLongScalar.class, IfExprDoubleScalarDoubleScalar.class,
+  IfExprLongScalarDoubleScalar.class, IfExprDoubleScalarLongScalar.class,
+  IfExprStringGroupColumnStringGroupColumn.class,
+  IfExprStringGroupColumnStringScalar.class,
+  IfExprStringGroupColumnCharScalar.class, IfExprStringGroupColumnVarCharScalar.class,
+  IfExprStringScalarStringGroupColumn.class,
+  IfExprCharScalarStringGroupColumn.class, IfExprVarCharScalarStringGroupColumn.class,
+  IfExprStringScalarStringScalar.class,
+  IfExprStringScalarCharScalar.class, IfExprStringScalarVarCharScalar.class,
+  IfExprCharScalarStringScalar.class, IfExprVarCharScalarStringScalar.class
+})
 public class GenericUDFIf extends GenericUDF {
-  private ObjectInspector[] argumentOIs;
-  private GenericUDFUtils.ReturnObjectInspectorResolver returnOIResolver;
+  private transient ObjectInspector[] argumentOIs;
+  private transient GenericUDFUtils.ReturnObjectInspectorResolver returnOIResolver;
 
   @Override
   public ObjectInspector initialize(ObjectInspector[] arguments) throws UDFArgumentException {
@@ -56,7 +108,7 @@ public class GenericUDFIf extends GenericUDF {
     if (!conditionTypeIsOk) {
       throw new UDFArgumentTypeException(0,
           "The first argument of function IF should be \""
-          + Constants.BOOLEAN_TYPE_NAME + "\", but \""
+          + serdeConstants.BOOLEAN_TYPE_NAME + "\", but \""
           + arguments[0].getTypeName() + "\" is found");
     }
 
@@ -94,5 +146,4 @@ public class GenericUDFIf extends GenericUDF {
     sb.append(children[2]).append(")");
     return sb.toString();
   }
-
 }

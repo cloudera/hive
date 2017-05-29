@@ -18,12 +18,31 @@
 
 package org.apache.hadoop.hive.ql;
 
-import java.io.Serializable;
-import java.util.LinkedList;
-import java.util.Queue;
-
+import org.apache.hadoop.hive.ql.exec.FileSinkOperator;
+import org.apache.hadoop.hive.ql.exec.NodeUtils;
+import org.apache.hadoop.hive.ql.exec.NodeUtils.Function;
+import org.apache.hadoop.hive.ql.exec.Operator;
+import org.apache.hadoop.hive.ql.exec.StatsTask;
 import org.apache.hadoop.hive.ql.exec.Task;
-import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.hive.ql.exec.TaskRunner;
+import org.apache.hadoop.hive.ql.exec.mr.MapRedTask;
+import org.apache.hadoop.hive.ql.metadata.HiveException;
+import org.apache.hadoop.hive.ql.plan.MapWork;
+import org.apache.hadoop.hive.ql.plan.ReduceWork;
+
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Iterator;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hive.ql.session.SessionState;
 
 /**
  * DriverContext.
@@ -31,25 +50,103 @@ import org.apache.hadoop.mapred.JobConf;
  */
 public class DriverContext {
 
-  Queue<Task<? extends Serializable>> runnable = new LinkedList<Task<? extends Serializable>>();
+  private static final Log LOG = LogFactory.getLog(Driver.class.getName());
+  private static final SessionState.LogHelper console = new SessionState.LogHelper(LOG);
+
+  private static final int SLEEP_TIME = 2000;
+
+  private Queue<Task<? extends Serializable>> runnable;
+  private Queue<TaskRunner> running;
 
   // how many jobs have been started
-  int curJobNo;
+  private int curJobNo;
 
-  Context ctx;
+  private Context ctx;
+  private boolean shutdown;
+
+  final Map<String, StatsTask> statsTasks = new HashMap<String, StatsTask>(1);
 
   public DriverContext() {
-    this.runnable = null;
-    this.ctx = null;
   }
 
-  public DriverContext(Queue<Task<? extends Serializable>> runnable, Context ctx) {
-    this.runnable = runnable;
+  public DriverContext(Context ctx) {
+    this.runnable = new ConcurrentLinkedQueue<Task<? extends Serializable>>();
+    this.running = new LinkedBlockingQueue<TaskRunner>();
     this.ctx = ctx;
   }
 
-  public Queue<Task<? extends Serializable>> getRunnable() {
-    return runnable;
+  public synchronized boolean isShutdown() {
+    return shutdown;
+  }
+
+  public synchronized boolean isRunning() {
+    return !shutdown && (!running.isEmpty() || !runnable.isEmpty());
+  }
+
+  public synchronized void remove(Task<? extends Serializable> task) {
+    runnable.remove(task);
+  }
+
+  public synchronized void launching(TaskRunner runner) throws HiveException {
+    checkShutdown();
+    running.add(runner);
+  }
+
+  public synchronized Task<? extends Serializable> getRunnable(int maxthreads) throws HiveException {
+    checkShutdown();
+    if (runnable.peek() != null && running.size() < maxthreads) {
+      return runnable.remove();
+    }
+    return null;
+  }
+
+  /**
+   * Polls running tasks to see if a task has ended.
+   *
+   * @return The result object for any completed/failed task
+   */
+  public synchronized TaskRunner pollFinished() throws InterruptedException {
+    while (!shutdown) {
+      Iterator<TaskRunner> it = running.iterator();
+      while (it.hasNext()) {
+        TaskRunner runner = it.next();
+        if (runner != null && !runner.isRunning()) {
+          it.remove();
+          return runner;
+        }
+      }
+      wait(SLEEP_TIME);
+    }
+    return null;
+  }
+
+  private void checkShutdown() throws HiveException {
+    if (shutdown) {
+      throw new HiveException("FAILED: Operation cancelled");
+    }
+  }
+  /**
+   * Cleans up remaining tasks in case of failure
+   */
+  public synchronized void shutdown() {
+    LOG.debug("Shutting down query " + ctx.getCmd());
+    shutdown = true;
+    for (TaskRunner runner : running) {
+      if (runner.isRunning()) {
+        Task<?> task = runner.getTask();
+        LOG.warn("Shutting down task : " + task);
+        try {
+          task.shutdown();
+        } catch (Exception e) {
+          console.printError("Exception on shutting down task " + task.getId() + ": " + e);
+        }
+        Thread thread = runner.getRunner();
+        if (thread != null) {
+          thread.interrupt();
+        }
+      }
+    }
+    running.clear();
   }
 
   /**
@@ -66,9 +163,14 @@ public class DriverContext {
     return !tsk.getQueued() && !tsk.getInitialized() && tsk.isRunnable();
   }
 
-  public void addToRunnable(Task<? extends Serializable> tsk) {
+  public synchronized boolean addToRunnable(Task<? extends Serializable> tsk) throws HiveException {
+    if (runnable.contains(tsk)) {
+      return false;
+    }
+    checkShutdown();
     runnable.add(tsk);
     tsk.setQueued();
+    return true;
   }
 
   public int getCurJobNo() {
@@ -82,5 +184,42 @@ public class DriverContext {
   public void incCurJobNo(int amount) {
     this.curJobNo = this.curJobNo + amount;
   }
-  
+
+  public void prepare(QueryPlan plan) {
+    // extract stats keys from StatsTask
+    List<Task<?>> rootTasks = plan.getRootTasks();
+    NodeUtils.iterateTask(rootTasks, StatsTask.class, new Function<StatsTask>() {
+      public void apply(StatsTask statsTask) {
+        statsTasks.put(statsTask.getWork().getAggKey(), statsTask);
+      }
+    });
+  }
+
+  public void prepare(TaskRunner runner) {
+  }
+
+  public void finished(TaskRunner runner) {
+    if (statsTasks.isEmpty() || !(runner.getTask() instanceof MapRedTask)) {
+      return;
+    }
+    MapRedTask mapredTask = (MapRedTask) runner.getTask();
+
+    MapWork mapWork = mapredTask.getWork().getMapWork();
+    ReduceWork reduceWork = mapredTask.getWork().getReduceWork();
+    List<Operator> operators = new ArrayList<Operator>(mapWork.getAliasToWork().values());
+    if (reduceWork != null) {
+      operators.add(reduceWork.getReducer());
+    }
+    final List<String> statKeys = new ArrayList<String>(1);
+    NodeUtils.iterate(operators, FileSinkOperator.class, new Function<FileSinkOperator>() {
+      public void apply(FileSinkOperator fsOp) {
+        if (fsOp.getConf().isGatherStats()) {
+          statKeys.add(fsOp.getConf().getStatsAggPrefix());
+        }
+      }
+    });
+    for (String statKey : statKeys) {
+      statsTasks.get(statKey).getWork().setSourceTask(mapredTask);
+    }
+  }
 }

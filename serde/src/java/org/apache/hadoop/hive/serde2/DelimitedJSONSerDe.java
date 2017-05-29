@@ -22,7 +22,9 @@ import java.io.IOException;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe;
+import org.apache.hadoop.hive.serde2.lazy.LazySerDeParameters;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Category;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
@@ -45,17 +47,18 @@ public class DelimitedJSONSerDe extends LazySimpleSerDe {
    * Not implemented.
    */
   @Override
-  public Object deserialize(Writable field) throws SerDeException {
+  public Object doDeserialize(Writable field) throws SerDeException {
     LOG.error("DelimitedJSONSerDe cannot deserialize.");
     throw new SerDeException("DelimitedJSONSerDe cannot deserialize.");
   }
 
   @Override
   protected void serializeField(ByteStream.Output out, Object obj, ObjectInspector objInspector,
-      SerDeParameters serdeParams) throws SerDeException {
-    if (!objInspector.getCategory().equals(Category.PRIMITIVE)) {
+      LazySerDeParameters serdeParams) throws SerDeException {
+    if (!objInspector.getCategory().equals(Category.PRIMITIVE) || (objInspector.getTypeName().equalsIgnoreCase(serdeConstants.BINARY_TYPE_NAME))) {
+      //do this for all complex types and binary
       try {
-        serialize(out, SerDeUtils.getJSONString(obj, objInspector),
+        serialize(out, SerDeUtils.getJSONString(obj, objInspector, serdeParams.getNullSequence().toString()),
             PrimitiveObjectInspectorFactory.javaStringObjectInspector, serdeParams.getSeparators(),
             1, serdeParams.getNullSequence(), serdeParams.isEscaped(), serdeParams.getEscapeChar(),
             serdeParams.getNeedsEscape());
@@ -65,6 +68,7 @@ public class DelimitedJSONSerDe extends LazySimpleSerDe {
       }
 
     } else {
+      //primitives except binary
       super.serializeField(out, obj, objInspector, serdeParams);
     }
   }

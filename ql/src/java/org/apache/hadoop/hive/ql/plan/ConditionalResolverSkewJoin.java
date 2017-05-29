@@ -31,6 +31,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.exec.Task;
+import org.apache.hadoop.hive.ql.exec.Utilities;
 
 /**
  * ConditionalResolverSkewJoin.
@@ -49,7 +50,8 @@ public class ConditionalResolverSkewJoin implements ConditionalResolver, Seriali
     // tables into corresponding different dirs (one dir per table).
     // this map stores mapping from "big key dir" to its corresponding mapjoin
     // task.
-    HashMap<String, Task<? extends Serializable>> dirToTaskMap;
+    private HashMap<Path, Task<? extends Serializable>> dirToTaskMap;
+    private Task<? extends Serializable> noSkewTask;
 
     /**
      * For serialization use only.
@@ -58,18 +60,28 @@ public class ConditionalResolverSkewJoin implements ConditionalResolver, Seriali
     }
 
     public ConditionalResolverSkewJoinCtx(
-        HashMap<String, Task<? extends Serializable>> dirToTaskMap) {
+        HashMap<Path, Task<? extends Serializable>> dirToTaskMap,
+        Task<? extends Serializable> noSkewTask) {
       super();
       this.dirToTaskMap = dirToTaskMap;
+      this.noSkewTask = noSkewTask;
     }
 
-    public HashMap<String, Task<? extends Serializable>> getDirToTaskMap() {
+    public HashMap<Path, Task<? extends Serializable>> getDirToTaskMap() {
       return dirToTaskMap;
     }
 
     public void setDirToTaskMap(
-        HashMap<String, Task<? extends Serializable>> dirToTaskMap) {
+        HashMap<Path, Task<? extends Serializable>> dirToTaskMap) {
       this.dirToTaskMap = dirToTaskMap;
+    }
+
+    public Task<? extends Serializable> getNoSkewTask() {
+      return noSkewTask;
+    }
+
+    public void setNoSkewTask(Task<? extends Serializable> noSkewTask) {
+      this.noSkewTask = noSkewTask;
     }
   }
 
@@ -82,19 +94,17 @@ public class ConditionalResolverSkewJoin implements ConditionalResolver, Seriali
     ConditionalResolverSkewJoinCtx ctx = (ConditionalResolverSkewJoinCtx) objCtx;
     List<Task<? extends Serializable>> resTsks = new ArrayList<Task<? extends Serializable>>();
 
-    Map<String, Task<? extends Serializable>> dirToTaskMap = ctx
+    Map<Path, Task<? extends Serializable>> dirToTaskMap = ctx
         .getDirToTaskMap();
-    Iterator<Entry<String, Task<? extends Serializable>>> bigKeysPathsIter = dirToTaskMap
+    Iterator<Entry<Path, Task<? extends Serializable>>> bigKeysPathsIter = dirToTaskMap
         .entrySet().iterator();
     try {
       while (bigKeysPathsIter.hasNext()) {
-        Entry<String, Task<? extends Serializable>> entry = bigKeysPathsIter
-            .next();
-        String path = entry.getKey();
-        Path dirPath = new Path(path);
+        Entry<Path, Task<? extends Serializable>> entry = bigKeysPathsIter.next();
+        Path dirPath = entry.getKey();
         FileSystem inpFs = dirPath.getFileSystem(conf);
-        FileStatus[] fstatus = inpFs.listStatus(dirPath);
-        if (fstatus.length > 0) {
+        FileStatus[] fstatus = Utilities.listStatusIfExists(dirPath, inpFs);
+        if (fstatus != null && fstatus.length > 0) {
           Task <? extends Serializable> task = entry.getValue();
           List<Task <? extends Serializable>> parentOps = task.getParentTasks();
           if(parentOps!=null){
@@ -109,6 +119,9 @@ public class ConditionalResolverSkewJoin implements ConditionalResolver, Seriali
       }
     } catch (IOException e) {
       e.printStackTrace();
+    }
+    if (resTsks.isEmpty() && ctx.getNoSkewTask() != null) {
+      resTsks.add(ctx.getNoSkewTask());
     }
     return resTsks;
   }

@@ -17,32 +17,41 @@
  */
 package org.apache.hadoop.hive.serde2.binarysortable;
 
+import java.sql.Date;
 import java.util.List;
 
+import org.apache.hadoop.hive.common.type.HiveDecimal;
+
 public class MyTestClass {
-  Byte myByte;
-  Short myShort;
-  Integer myInt;
-  Long myLong;
-  Float myFloat;
-  Double myDouble;
-  String myString;
-  MyTestInnerStruct myStruct;
-  List<Integer> myList;
+    Byte myByte;
+    Short myShort;
+    Integer myInt;
+    Long myLong;
+    Float myFloat;
+    Double myDouble;
+    String myString;
+    HiveDecimal myDecimal;
+    Date myDate;
+    MyTestInnerStruct myStruct;
+    List<Integer> myList;
+    byte[] myBA;
 
-  public MyTestClass() {
-  }
+    public MyTestClass() {
+    }
 
-  public MyTestClass(Byte b, Short s, Integer i, Long l, Float f, Double d,
-      String st, MyTestInnerStruct is, List<Integer> li) {
-    myByte = b;
-    myShort = s;
-    myInt = i;
-    myLong = l;
-    myFloat = f;
-    myDouble = d;
-    myString = st;
-    myStruct = is;
-    myList = li;
-  }
+    public MyTestClass(Byte b, Short s, Integer i, Long l, Float f, Double d,
+		       String st, HiveDecimal bd, Date date, MyTestInnerStruct is, List<Integer> li, byte[] ba) {
+	myByte = b;
+	myShort = s;
+	myInt = i;
+	myLong = l;
+	myFloat = f;
+	myDouble = d;
+	myString = st;
+	myDecimal = bd;
+	myDate = date;
+	myStruct = is;
+	myList = li;
+	myBA = ba;
+    }
 }

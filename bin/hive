@@ -29,6 +29,10 @@ SERVICE=""
 HELP=""
 while [ $# -gt 0 ]; do
   case "$1" in
+    --version)
+      shift
+      SERVICE=version
+      ;;
     --service)
       shift
       SERVICE=$1
@@ -38,8 +42,16 @@ while [ $# -gt 0 ]; do
       SERVICE=rcfilecat
       shift
       ;;
+    --orcfiledump)
+      SERVICE=orcfiledump
+      shift
+      ;;
     --help)
       HELP=_help
+      shift
+      ;;
+    --debug*)
+      DEBUG=$1
       shift
       ;;
     *)
@@ -58,6 +70,17 @@ fi
 
 if [ -f "${HIVE_CONF_DIR}/hive-env.sh" ]; then
   . "${HIVE_CONF_DIR}/hive-env.sh"
+fi
+
+if [[ -z "$SPARK_HOME" ]]
+then
+  bin=`dirname "$0"`
+  # many hadoop installs are in dir/{spark,hive,hadoop,..}
+  sparkHome=$(readlink -f $bin/../../spark)
+  if [[ -d $sparkHome ]]
+  then
+    export SPARK_HOME=$sparkHome
+  fi
 fi
 
 CLASSPATH="${HIVE_CONF_DIR}"
@@ -85,9 +108,17 @@ for f in ${HIVE_LIB}/*.jar; do
   CLASSPATH=${CLASSPATH}:$f;
 done
 
+# add Spark assembly jar to the classpath
+if [[ -n "$SPARK_HOME" ]]
+then
+  sparkAssemblyPath=`ls ${SPARK_HOME}/lib/spark-assembly-*.jar`
+  CLASSPATH="${CLASSPATH}:${sparkAssemblyPath}"
+fi
+
 # add the auxillary jars such as serdes
 if [ -d "${HIVE_AUX_JARS_PATH}" ]; then
-  for f in ${HIVE_AUX_JARS_PATH}/*.jar; do
+  hive_aux_jars_abspath=`cd ${HIVE_AUX_JARS_PATH} && pwd`
+  for f in $hive_aux_jars_abspath/*.jar; do
     if [[ ! -f $f ]]; then
         continue;
     fi
@@ -102,14 +133,13 @@ if [ -d "${HIVE_AUX_JARS_PATH}" ]; then
     fi
   done
 elif [ "${HIVE_AUX_JARS_PATH}" != "" ]; then 
+  HIVE_AUX_JARS_PATH=`echo $HIVE_AUX_JARS_PATH | sed 's/,/:/g'`
   if $cygwin; then
-      HIVE_AUX_JARS_PATH=`echo $HIVE_AUX_JARS_PATH | sed 's/,/:/g'`
       HIVE_AUX_JARS_PATH=`cygpath -p -w "$HIVE_AUX_JARS_PATH"`
       HIVE_AUX_JARS_PATH=`echo $HIVE_AUX_JARS_PATH | sed 's/;/,/g'`
   fi
-  AUX_CLASSPATH=${HIVE_AUX_JARS_PATH}
-  AUX_PARAM=file://${HIVE_AUX_JARS_PATH}
-  AUX_PARAM=`echo $AUX_PARAM | sed 's/,/,file:\/\//g'`
+  AUX_CLASSPATH=${AUX_CLASSPATH}:${HIVE_AUX_JARS_PATH}
+  AUX_PARAM="file://$(echo ${HIVE_AUX_JARS_PATH} | sed 's/:/,file:\/\//g')"
 fi
 
 # adding jars from auxlib directory
@@ -134,8 +164,20 @@ else
     CLASSPATH=${CLASSPATH}:${AUX_CLASSPATH}
 fi
 
+# supress the HADOOP_HOME warnings in 1.x.x
+export HADOOP_HOME_WARN_SUPPRESS=true 
+
 # pass classpath to hadoop
-export HADOOP_CLASSPATH="${HADOOP_CLASSPATH}:${CLASSPATH}"
+if [ "$HADOOP_CLASSPATH" != "" ]; then
+  export HADOOP_CLASSPATH="${HADOOP_CLASSPATH}:${CLASSPATH}"
+else
+  export HADOOP_CLASSPATH="$CLASSPATH"
+fi
+
+# also pass hive classpath to hadoop
+if [ "$HIVE_CLASSPATH" != "" ]; then
+  export HADOOP_CLASSPATH="${HADOOP_CLASSPATH}:${HIVE_CLASSPATH}";
+fi
 
 # check for hadoop in the path
 HADOOP_IN_PATH=`which hadoop 2>/dev/null`
@@ -143,20 +185,82 @@ if [ -f ${HADOOP_IN_PATH} ]; then
   HADOOP_DIR=`dirname "$HADOOP_IN_PATH"`/..
 fi
 # HADOOP_HOME env variable overrides hadoop in the path
-HADOOP_HOME=${HADOOP_HOME:-$HADOOP_DIR}
+HADOOP_HOME=${HADOOP_HOME:-${HADOOP_PREFIX:-$HADOOP_DIR}}
 if [ "$HADOOP_HOME" == "" ]; then
-  echo "Cannot find hadoop installation: \$HADOOP_HOME must be set or hadoop must be in the path";
+  echo "Cannot find hadoop installation: \$HADOOP_HOME or \$HADOOP_PREFIX must be set or hadoop must be in the path";
   exit 4;
 fi
 
 HADOOP=$HADOOP_HOME/bin/hadoop
 if [ ! -f ${HADOOP} ]; then
-  echo "Cannot find hadoop installation: \$HADOOP_HOME must be set or hadoop must be in the path";
+  echo "Cannot find hadoop installation: \$HADOOP_HOME or \$HADOOP_PREFIX must be set or hadoop must be in the path";
   exit 4;
 fi
 
+# Make sure we're using a compatible version of Hadoop
+if [ "x$HADOOP_VERSION" == "x" ]; then
+    HADOOP_VERSION=$($HADOOP version | awk '{if (NR == 1) {print $2;}}');
+fi
+
+# Save the regex to a var to workaround quoting incompatabilities
+# between Bash 3.1 and 3.2
+hadoop_version_re="^([[:digit:]]+)\.([[:digit:]]+)(\.([[:digit:]]+))?.*$"
+
+if [[ "$HADOOP_VERSION" =~ $hadoop_version_re ]]; then
+    hadoop_major_ver=${BASH_REMATCH[1]}
+    hadoop_minor_ver=${BASH_REMATCH[2]}
+    hadoop_patch_ver=${BASH_REMATCH[4]}
+else
+    echo "Unable to determine Hadoop version information."
+    echo "'hadoop version' returned:"
+    echo `$HADOOP version`
+    exit 5
+fi
+
+if [ "$hadoop_major_ver" -lt "1" -a  "$hadoop_minor_ver$hadoop_patch_ver" -lt "201" ]; then
+    echo "Hive requires Hadoop 0.20.x (x >= 1)."
+    echo "'hadoop version' returned:"
+    echo `$HADOOP version`
+    exit 6
+fi
+
+# HBase detection. Need bin/hbase and a conf dir for building classpath entries.
+# Start with BigTop defaults for HBASE_HOME and HBASE_CONF_DIR.
+HBASE_HOME=${HBASE_HOME:-"/usr/lib/hbase"}
+HBASE_CONF_DIR=${HBASE_CONF_DIR:-"/etc/hbase/conf"}
+if [[ ! -d $HBASE_CONF_DIR ]] ; then
+  # not explicitly set, nor in BigTop location. Try looking in HBASE_HOME.
+  HBASE_CONF_DIR="$HBASE_HOME/conf"
+fi
+
+# perhaps we've located the HBase config. if so, include it on classpath.
+if [[ -d $HBASE_CONF_DIR ]] ; then
+  export HADOOP_CLASSPATH="${HADOOP_CLASSPATH}:${HBASE_CONF_DIR}"
+fi
+
+# look for the hbase script. First check HBASE_HOME and then ask PATH.
+if [[ -e $HBASE_HOME/bin/hbase ]] ; then
+  HBASE_BIN="$HBASE_HOME/bin/hbase"
+fi
+HBASE_BIN=${HBASE_BIN:-"$(which hbase 2>/dev/null)"}
+
+# perhaps we've located HBase. If so, include its details on the classpath
+if [[ -n $HBASE_BIN ]] ; then
+  # exclude ZK, PB, and Guava (See HIVE-2055)
+  # depends on HBASE-8438 (hbase-0.94.14+, hbase-0.96.1+) for `hbase mapredcp` command
+  for x in $($HBASE_BIN mapredcp 2>/dev/null | tr ':' '\n') ; do
+    if [[ $x == *zookeeper* || $x == *protobuf-java* || $x == *guava* ]] ; then
+      continue
+    fi
+    # TODO: should these should be added to AUX_PARAM as well?
+    export HADOOP_CLASSPATH="${HADOOP_CLASSPATH}:${x}"
+  done
+fi
+
 if [ "${AUX_PARAM}" != "" ]; then
-  HIVE_OPTS="$HIVE_OPTS -hiveconf hive.aux.jars.path=${AUX_PARAM}"
+  if [[ "$SERVICE" != beeline ]]; then
+    HIVE_OPTS="$HIVE_OPTS --hiveconf hive.aux.jars.path=${AUX_PARAM}"
+  fi
   AUX_JARS_CMD_LINE="-libjars ${AUX_PARAM}"
 fi
 
@@ -170,6 +274,16 @@ for i in "$bin"/ext/util/*.sh ; do
   . $i
 done
 
+if [ "$DEBUG" ]; then
+  if [ "$HELP" ]; then
+    debug_help
+    exit 0
+  else
+    get_debug_params "$DEBUG"
+    export HADOOP_CLIENT_OPTS="$HADOOP_CLIENT_OPTS $HIVE_MAIN_CLIENT_DEBUG_OPTS"
+  fi
+fi
+
 TORUN=""
 for j in $SERVICE_LIST ; do
   if [ "$j" = "$SERVICE" ] ; then
@@ -180,7 +294,7 @@ done
 if [ "$TORUN" = "" ] ; then
   echo "Service $SERVICE not found"
   echo "Available Services: $SERVICE_LIST"
-  exit 5
+  exit 7
 else
   $TORUN "$@"
 fi

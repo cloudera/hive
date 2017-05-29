@@ -19,6 +19,7 @@
 package org.apache.hadoop.hive.serde2.columnar;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
@@ -26,18 +27,18 @@ import java.util.Properties;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hive.serde2.ByteStream;
+import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.ColumnProjectionUtils;
-import org.apache.hadoop.hive.serde2.SerDe;
 import org.apache.hadoop.hive.serde2.SerDeException;
+import org.apache.hadoop.hive.serde2.SerDeSpec;
 import org.apache.hadoop.hive.serde2.SerDeUtils;
 import org.apache.hadoop.hive.serde2.lazy.LazyFactory;
 import org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe;
-import org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe.SerDeParameters;
+import org.apache.hadoop.hive.serde2.lazy.LazySerDeParameters;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Category;
 import org.apache.hadoop.hive.serde2.objectinspector.StructField;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Category;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
 import org.apache.hadoop.hive.serde2.typeinfo.StructTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
@@ -50,10 +51,17 @@ import org.apache.hadoop.io.Writable;
  * (2) ColumnarSerDe initialize ColumnarStruct's field directly. But under the
  * field level, it works like LazySimpleSerDe<br>
  */
-public class ColumnarSerDe implements SerDe {
-
-  // We need some initial values in case user don't call initialize()
-  private ObjectInspector cachedObjectInspector;
+@SerDeSpec(schemaProps = {
+    serdeConstants.LIST_COLUMNS, serdeConstants.LIST_COLUMN_TYPES,
+    serdeConstants.FIELD_DELIM, serdeConstants.COLLECTION_DELIM, serdeConstants.MAPKEY_DELIM,
+    serdeConstants.SERIALIZATION_FORMAT, serdeConstants.SERIALIZATION_NULL_FORMAT,
+    serdeConstants.SERIALIZATION_LAST_COLUMN_TAKES_REST,
+    serdeConstants.ESCAPE_CHAR,
+    serdeConstants.SERIALIZATION_ENCODING,
+    LazySerDeParameters.SERIALIZATION_EXTEND_NESTING_LEVELS,
+    LazySerDeParameters.SERIALIZATION_EXTEND_ADDITIONAL_NESTING_LEVELS
+    })
+public class ColumnarSerDe extends ColumnarSerDeBase {
 
   @Override
   public String toString() {
@@ -62,10 +70,10 @@ public class ColumnarSerDe implements SerDe {
         + Arrays.asList(serdeParams.getSeparators())
         + ":"
         + ((StructTypeInfo) serdeParams.getRowTypeInfo())
-        .getAllStructFieldNames()
+            .getAllStructFieldNames()
         + ":"
         + ((StructTypeInfo) serdeParams.getRowTypeInfo())
-        .getAllStructFieldTypeInfos() + "]";
+            .getAllStructFieldTypeInfos() + "]";
   }
 
   public static final Log LOG = LogFactory
@@ -74,35 +82,38 @@ public class ColumnarSerDe implements SerDe {
   public ColumnarSerDe() throws SerDeException {
   }
 
-  SerDeParameters serdeParams = null;
+  protected LazySerDeParameters serdeParams = null;
 
   /**
    * Initialize the SerDe given the parameters.
-   * 
+   *
    * @see SerDe#initialize(Configuration, Properties)
    */
-  public void initialize(Configuration job, Properties tbl) throws SerDeException {
+  @Override
+  public void initialize(Configuration conf, Properties tbl) throws SerDeException {
 
-    serdeParams = LazySimpleSerDe.initSerdeParams(job, tbl, getClass().getName());
+    serdeParams = new LazySerDeParameters(conf, tbl, getClass().getName());
 
     // Create the ObjectInspectors for the fields. Note: Currently
     // ColumnarObject uses same ObjectInpector as LazyStruct
     cachedObjectInspector = LazyFactory.createColumnarStructInspector(
         serdeParams.getColumnNames(), serdeParams.getColumnTypes(), serdeParams
-        .getSeparators(), serdeParams.getNullSequence(), serdeParams
-        .isEscaped(), serdeParams.getEscapeChar());
-
-    java.util.ArrayList<Integer> notSkipIDs = ColumnProjectionUtils.getReadColumnIDs(job);
-
-    cachedLazyStruct = new ColumnarStruct(cachedObjectInspector, notSkipIDs, serdeParams.getNullSequence());
+            .getSeparators(), serdeParams.getNullSequence(), serdeParams
+            .isEscaped(), serdeParams.getEscapeChar());
 
     int size = serdeParams.getColumnTypes().size();
-    field = new BytesRefWritable[size];
-    for (int i = 0; i < size; i++) {
-      field[i] = new BytesRefWritable();
-      serializeCache.set(i, field[i]);
+    List<Integer> notSkipIDs = new ArrayList<Integer>();
+    if (conf == null || ColumnProjectionUtils.isReadAllColumns(conf)) {
+      for (int i = 0; i < size; i++ ) {
+        notSkipIDs.add(i);
+      }
+    } else {
+      notSkipIDs = ColumnProjectionUtils.getReadColumnIDs(conf);
     }
+    cachedLazyStruct = new ColumnarStruct(
+        cachedObjectInspector, notSkipIDs, serdeParams.getNullSequence());
 
+    super.initialize(size);
     LOG.debug("ColumnarSerDe initialized with: columnNames="
         + serdeParams.getColumnNames() + " columnTypes="
         + serdeParams.getColumnTypes() + " separator="
@@ -110,47 +121,9 @@ public class ColumnarSerDe implements SerDe {
         + serdeParams.getNullString());
   }
 
-  // The object for storing row data
-  ColumnarStruct cachedLazyStruct;
-
-  /**
-   * Deserialize a row from the Writable to a LazyObject.
-   */
-  public Object deserialize(Writable blob) throws SerDeException {
-
-    if (!(blob instanceof BytesRefArrayWritable)) {
-      throw new SerDeException(getClass().toString()
-          + ": expects BytesRefArrayWritable!");
-    }
-
-    BytesRefArrayWritable cols = (BytesRefArrayWritable) blob;
-    cachedLazyStruct.init(cols);
-    return cachedLazyStruct;
-  }
-
-  /**
-   * Returns the ObjectInspector for the row.
-   */
-  public ObjectInspector getObjectInspector() throws SerDeException {
-    return cachedObjectInspector;
-  }
-
-  /**
-   * Returns the Writable Class after serialization.
-   * 
-   * @see SerDe#getSerializedClass()
-   */
-  public Class<? extends Writable> getSerializedClass() {
-    return BytesRefArrayWritable.class;
-  }
-
-  BytesRefArrayWritable serializeCache = new BytesRefArrayWritable();
-  BytesRefWritable field[];
-  ByteStream.Output serializeStream = new ByteStream.Output();
-
   /**
    * Serialize a row of data.
-   * 
+   *
    * @param obj
    *          The row object
    * @param objInspector
@@ -158,6 +131,7 @@ public class ColumnarSerDe implements SerDe {
    * @return The serialized Writable object
    * @see SerDe#serialize(Object, ObjectInspector)
    */
+  @Override
   public Writable serialize(Object obj, ObjectInspector objInspector) throws SerDeException {
 
     if (objInspector.getCategory() != Category.STRUCT) {
@@ -178,6 +152,7 @@ public class ColumnarSerDe implements SerDe {
     try {
       // used for avoid extra byte copy
       serializeStream.reset();
+      serializedSize = 0;
       int count = 0;
       // Serialize each field
       for (int i = 0; i < fields.size(); i++) {
@@ -200,14 +175,14 @@ public class ColumnarSerDe implements SerDe {
         // delimited way.
         if (!foi.getCategory().equals(Category.PRIMITIVE)
             && (declaredFields == null || declaredFields.get(i)
-            .getFieldObjectInspector().getCategory().equals(
-            Category.PRIMITIVE))) {
+                .getFieldObjectInspector().getCategory().equals(
+                    Category.PRIMITIVE))) {
           LazySimpleSerDe.serialize(serializeStream, SerDeUtils.getJSONString(
               f, foi),
               PrimitiveObjectInspectorFactory.javaStringObjectInspector,
               serdeParams.getSeparators(), 1, serdeParams.getNullSequence(),
               serdeParams.isEscaped(), serdeParams.getEscapeChar(), serdeParams
-              .getNeedsEscape());
+                  .getNeedsEscape());
         } else {
           LazySimpleSerDe.serialize(serializeStream, f, foi, serdeParams
               .getSeparators(), 1, serdeParams.getNullSequence(), serdeParams
@@ -216,13 +191,17 @@ public class ColumnarSerDe implements SerDe {
         }
 
         field[i].set(serializeStream.getData(), count, serializeStream
-            .getCount()
+            .getLength()
             - count);
-        count = serializeStream.getCount();
+        count = serializeStream.getLength();
       }
+      serializedSize = serializeStream.getLength();
+      lastOperationSerialize = true;
+      lastOperationDeserialize = false;
     } catch (IOException e) {
       throw new SerDeException(e);
     }
     return serializeCache;
   }
+
 }

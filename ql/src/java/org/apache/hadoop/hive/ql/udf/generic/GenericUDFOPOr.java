@@ -21,6 +21,11 @@ package org.apache.hadoop.hive.ql.udf.generic;
 import org.apache.hadoop.hive.ql.exec.Description;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentException;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentLengthException;
+import org.apache.hadoop.hive.ql.exec.vector.VectorizedExpressions;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.ColOrCol;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.FilterColOrScalar;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.FilterExprOrExpr;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.FilterScalarOrColumn;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.BooleanObjectInspector;
@@ -31,9 +36,11 @@ import org.apache.hadoop.io.BooleanWritable;
  * GenericUDF Class for computing or.
  */
 @Description(name = "or", value = "a _FUNC_ b - Logical or")
+@VectorizedExpressions({ColOrCol.class, FilterExprOrExpr.class, FilterColOrScalar.class,
+    FilterScalarOrColumn.class})
 public class GenericUDFOPOr extends GenericUDF {
   private final BooleanWritable result = new BooleanWritable();
-  BooleanObjectInspector boi0,boi1;
+  private transient BooleanObjectInspector boi0,boi1;
 
   @Override
   public ObjectInspector initialize(ObjectInspector[] arguments)

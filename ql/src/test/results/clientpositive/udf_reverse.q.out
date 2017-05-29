@@ -13,53 +13,54 @@ Example:
   'koobecaF'
 PREHOOK: query: CREATE TABLE dest1(len STRING)
 PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:default
+PREHOOK: Output: default@dest1
 POSTHOOK: query: CREATE TABLE dest1(len STRING)
 POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@dest1
 PREHOOK: query: EXPLAIN FROM src1 INSERT OVERWRITE TABLE dest1 SELECT reverse(src1.value)
 PREHOOK: type: QUERY
 POSTHOOK: query: EXPLAIN FROM src1 INSERT OVERWRITE TABLE dest1 SELECT reverse(src1.value)
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF src1)) (TOK_INSERT (TOK_DESTINATION (TOK_TAB dest1)) (TOK_SELECT (TOK_SELEXPR (TOK_FUNCTION reverse (. (TOK_TABLE_OR_COL src1) value))))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-5 depends on stages: Stage-1 , consists of Stage-4, Stage-3
+  Stage-7 depends on stages: Stage-1 , consists of Stage-4, Stage-3, Stage-5
   Stage-4
-  Stage-0 depends on stages: Stage-4, Stage-3
+  Stage-0 depends on stages: Stage-4, Stage-3, Stage-6
   Stage-2 depends on stages: Stage-0
   Stage-3
+  Stage-5
+  Stage-6 depends on stages: Stage-5
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        src1 
+      Map Operator Tree:
           TableScan
             alias: src1
+            Statistics: Num rows: 25 Data size: 191 Basic stats: COMPLETE Column stats: NONE
             Select Operator
-              expressions:
-                    expr: reverse(value)
-                    type: string
+              expressions: reverse(value) (type: string)
               outputColumnNames: _col0
+              Statistics: Num rows: 25 Data size: 191 Basic stats: COMPLETE Column stats: NONE
               File Output Operator
                 compressed: false
-                GlobalTableId: 1
+                Statistics: Num rows: 25 Data size: 191 Basic stats: COMPLETE Column stats: NONE
                 table:
                     input format: org.apache.hadoop.mapred.TextInputFormat
                     output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
                     serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                    name: dest1
+                    name: default.dest1
 
-  Stage: Stage-5
+  Stage: Stage-7
     Conditional Operator
 
   Stage: Stage-4
     Move Operator
       files:
           hdfs directory: true
-          destination: pfile:/data/users/nzhang/work/784/apache-hive/build/ql/scratchdir/hive_2010-09-14_18-07-56_504_5735007519186185582/-ext-10000
+#### A masked pattern was here ####
 
   Stage: Stage-0
     Move Operator
@@ -69,24 +70,40 @@ STAGE PLANS:
               input format: org.apache.hadoop.mapred.TextInputFormat
               output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              name: dest1
+              name: default.dest1
 
   Stage: Stage-2
     Stats-Aggr Operator
 
   Stage: Stage-3
     Map Reduce
-      Alias -> Map Operator Tree:
-        pfile:/data/users/nzhang/work/784/apache-hive/build/ql/scratchdir/hive_2010-09-14_18-07-56_504_5735007519186185582/-ext-10002 
+      Map Operator Tree:
+          TableScan
             File Output Operator
               compressed: false
-              GlobalTableId: 0
               table:
                   input format: org.apache.hadoop.mapred.TextInputFormat
                   output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
                   serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                  name: dest1
+                  name: default.dest1
 
+  Stage: Stage-5
+    Map Reduce
+      Map Operator Tree:
+          TableScan
+            File Output Operator
+              compressed: false
+              table:
+                  input format: org.apache.hadoop.mapred.TextInputFormat
+                  output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                  serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                  name: default.dest1
+
+  Stage: Stage-6
+    Move Operator
+      files:
+          hdfs directory: true
+#### A masked pattern was here ####
 
 PREHOOK: query: FROM src1 INSERT OVERWRITE TABLE dest1 SELECT reverse(src1.value)
 PREHOOK: type: QUERY
@@ -100,12 +117,11 @@ POSTHOOK: Lineage: dest1.len EXPRESSION [(src1)src1.FieldSchema(name:value, type
 PREHOOK: query: SELECT dest1.* FROM dest1
 PREHOOK: type: QUERY
 PREHOOK: Input: default@dest1
-PREHOOK: Output: file:/tmp/nzhang/hive_2010-09-14_18-08-02_955_1225176762104026693/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: SELECT dest1.* FROM dest1
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@dest1
-POSTHOOK: Output: file:/tmp/nzhang/hive_2010-09-14_18-08-02_955_1225176762104026693/-mr-10000
-POSTHOOK: Lineage: dest1.len EXPRESSION [(src1)src1.FieldSchema(name:value, type:string, comment:default), ]
+#### A masked pattern was here ####
 832_lav
 
 113_lav
@@ -139,32 +155,34 @@ POSTHOOK: query: DROP TABLE dest1
 POSTHOOK: type: DROPTABLE
 POSTHOOK: Input: default@dest1
 POSTHOOK: Output: default@dest1
-POSTHOOK: Lineage: dest1.len EXPRESSION [(src1)src1.FieldSchema(name:value, type:string, comment:default), ]
 PREHOOK: query: -- Test with non-ascii characters
 -- kv4.txt contains the text 0xE982B5E993AE, which should be reversed to
 -- 0xE993AEE982B5
 CREATE TABLE dest1(name STRING) STORED AS TEXTFILE
 PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:default
+PREHOOK: Output: default@dest1
 POSTHOOK: query: -- Test with non-ascii characters
 -- kv4.txt contains the text 0xE982B5E993AE, which should be reversed to
 -- 0xE993AEE982B5
 CREATE TABLE dest1(name STRING) STORED AS TEXTFILE
 POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@dest1
-POSTHOOK: Lineage: dest1.len EXPRESSION [(src1)src1.FieldSchema(name:value, type:string, comment:default), ]
-PREHOOK: query: LOAD DATA LOCAL INPATH '../data/files/kv4.txt' INTO TABLE dest1
+PREHOOK: query: LOAD DATA LOCAL INPATH '../../data/files/kv4.txt' INTO TABLE dest1
 PREHOOK: type: LOAD
-POSTHOOK: query: LOAD DATA LOCAL INPATH '../data/files/kv4.txt' INTO TABLE dest1
+#### A masked pattern was here ####
+PREHOOK: Output: default@dest1
+POSTHOOK: query: LOAD DATA LOCAL INPATH '../../data/files/kv4.txt' INTO TABLE dest1
 POSTHOOK: type: LOAD
+#### A masked pattern was here ####
 POSTHOOK: Output: default@dest1
-POSTHOOK: Lineage: dest1.len EXPRESSION [(src1)src1.FieldSchema(name:value, type:string, comment:default), ]
 PREHOOK: query: SELECT count(1) FROM dest1 WHERE reverse(dest1.name) = _UTF-8 0xE993AEE982B5
 PREHOOK: type: QUERY
 PREHOOK: Input: default@dest1
-PREHOOK: Output: file:/tmp/nzhang/hive_2010-09-14_18-08-04_622_5813029493421295737/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: SELECT count(1) FROM dest1 WHERE reverse(dest1.name) = _UTF-8 0xE993AEE982B5
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@dest1
-POSTHOOK: Output: file:/tmp/nzhang/hive_2010-09-14_18-08-04_622_5813029493421295737/-mr-10000
-POSTHOOK: Lineage: dest1.len EXPRESSION [(src1)src1.FieldSchema(name:value, type:string, comment:default), ]
+#### A masked pattern was here ####
 1

@@ -31,7 +31,7 @@ import org.apache.hadoop.io.WritableFactory;
  * <tt>BytesRefArrayWritable</tt> holds an array reference to BytesRefWritable,
  * and is able to resize without recreating new array if not necessary.
  * <p>
- * 
+ *
  * Each <tt>BytesRefArrayWritable holds</tt> instance has a <i>valid</i> field,
  * which is the desired valid number of <tt>BytesRefWritable</tt> it holds.
  * <tt>resetValid</tt> can reset the valid, but it will not care the underlying
@@ -47,7 +47,7 @@ public class BytesRefArrayWritable implements Writable,
 
   /**
    * Constructs an empty array with the specified capacity.
-   * 
+   *
    * @param capacity
    *          initial capacity
    * @exception IllegalArgumentException
@@ -70,7 +70,7 @@ public class BytesRefArrayWritable implements Writable,
 
   /**
    * Returns the number of valid elements.
-   * 
+   *
    * @return the number of valid elements
    */
   public int size() {
@@ -80,7 +80,7 @@ public class BytesRefArrayWritable implements Writable,
   /**
    * Gets the BytesRefWritable at the specified position. Make sure the position
    * is valid by first call resetValid.
-   * 
+   *
    * @param index
    *          the position index, starting from zero
    * @throws IndexOutOfBoundsException
@@ -95,7 +95,7 @@ public class BytesRefArrayWritable implements Writable,
 
   /**
    * Gets the BytesRefWritable at the specified position without checking.
-   * 
+   *
    * @param index
    *          the position index, starting from zero
    * @throws IndexOutOfBoundsException
@@ -107,7 +107,7 @@ public class BytesRefArrayWritable implements Writable,
   /**
    * Set the BytesRefWritable at the specified position with the specified
    * BytesRefWritable.
-   * 
+   *
    * @param index
    *          index position
    * @param bytesRefWritable
@@ -116,9 +116,6 @@ public class BytesRefArrayWritable implements Writable,
    *           if the specified new element is null
    */
   public void set(int index, BytesRefWritable bytesRefWritable) {
-    if (bytesRefWritable == null) {
-      throw new IllegalArgumentException("Can not assign null.");
-    }
     ensureCapacity(index + 1);
     bytesRefWritables[index] = bytesRefWritable;
     if (valid <= index) {
@@ -142,35 +139,12 @@ public class BytesRefArrayWritable implements Writable,
       return sizeDiff;
     }
     for (int i = 0; i < valid; i++) {
-      if (other.contains(bytesRefWritables[i])) {
-        continue;
-      } else {
-        return 1;
+      int res = bytesRefWritables[i].compareTo(other.bytesRefWritables[i]);
+      if (res != 0) {
+        return res;
       }
     }
     return 0;
-  }
-
-  /**
-   * Returns <tt>true</tt> if this instance contains one or more the specified
-   * BytesRefWritable.
-   * 
-   * @param bytesRefWritable
-   *          BytesRefWritable element to be tested
-   * @return <tt>true</tt> if contains the specified element
-   * @throws IllegalArgumentException
-   *           if the specified element is null
-   */
-  public boolean contains(BytesRefWritable bytesRefWritable) {
-    if (bytesRefWritable == null) {
-      throw new IllegalArgumentException("Argument can not be null.");
-    }
-    for (int i = 0; i < valid; i++) {
-      if (bytesRefWritables[i].equals(bytesRefWritable)) {
-        return true;
-      }
-    }
-    return false;
   }
 
   /**
@@ -196,7 +170,7 @@ public class BytesRefArrayWritable implements Writable,
    * elements specified by newValidCapacity argument. It will also narrow the
    * valid capacity when needed. Notice: it only enlarge or narrow the valid
    * capacity with no care of the already stored invalid BytesRefWritable.
-   * 
+   *
    * @param newValidCapacity
    *          the desired capacity
    */

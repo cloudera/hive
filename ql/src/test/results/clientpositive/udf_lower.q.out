@@ -18,53 +18,44 @@ PREHOOK: type: QUERY
 POSTHOOK: query: EXPLAIN
 SELECT lower('AbC 123'), upper('AbC 123') FROM src WHERE key = 86
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF src)) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_FUNCTION lower 'AbC 123')) (TOK_SELEXPR (TOK_FUNCTION upper 'AbC 123'))) (TOK_WHERE (= (TOK_TABLE_OR_COL key) 86))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        src 
+      Map Operator Tree:
           TableScan
             alias: src
+            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
-              predicate:
-                  expr: (key = 86)
-                  type: boolean
-              Filter Operator
-                predicate:
-                    expr: (key = 86)
-                    type: boolean
-                Select Operator
-                  expressions:
-                        expr: lower('AbC 123')
-                        type: string
-                        expr: upper('AbC 123')
-                        type: string
-                  outputColumnNames: _col0, _col1
-                  File Output Operator
-                    compressed: false
-                    GlobalTableId: 0
-                    table:
-                        input format: org.apache.hadoop.mapred.TextInputFormat
-                        output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+              predicate: (UDFToDouble(key) = 86.0) (type: boolean)
+              Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+              Select Operator
+                expressions: 'abc 123' (type: string), 'ABC 123' (type: string)
+                outputColumnNames: _col0, _col1
+                Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+                File Output Operator
+                  compressed: false
+                  Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+                  table:
+                      input format: org.apache.hadoop.mapred.TextInputFormat
+                      output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                      serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: SELECT lower('AbC 123'), upper('AbC 123') FROM src WHERE key = 86
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src
-PREHOOK: Output: file:/Users/carl/Projects/hd8/hive-trunk/build/ql/tmp/1144815521/10000
+#### A masked pattern was here ####
 POSTHOOK: query: SELECT lower('AbC 123'), upper('AbC 123') FROM src WHERE key = 86
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@src
-POSTHOOK: Output: file:/Users/carl/Projects/hd8/hive-trunk/build/ql/tmp/1144815521/10000
+#### A masked pattern was here ####
 abc 123	ABC 123

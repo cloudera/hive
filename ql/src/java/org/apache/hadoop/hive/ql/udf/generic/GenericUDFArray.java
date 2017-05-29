@@ -26,9 +26,8 @@ import org.apache.hadoop.hive.ql.exec.UDFArgumentTypeException;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorConverters;
-import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
-import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorConverters.Converter;
+import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
 
 /**
@@ -38,8 +37,8 @@ import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectIn
 @Description(name = "array",
     value = "_FUNC_(n0, n1...) - Creates an array with the given elements ")
 public class GenericUDFArray extends GenericUDF {
-  private Converter[] converters;
-  private ArrayList<Object> ret = new ArrayList<Object>();
+  private transient Converter[] converters;
+  private transient ArrayList<Object> ret = new ArrayList<Object>();
 
   @Override
   public ObjectInspector initialize(ObjectInspector[] arguments) throws UDFArgumentException {
@@ -59,11 +58,8 @@ public class GenericUDFArray extends GenericUDF {
 
     converters = new Converter[arguments.length];
 
-    ObjectInspector returnOI = returnOIResolver.get();
-    if (returnOI == null) {
-      returnOI = PrimitiveObjectInspectorFactory
-          .getPrimitiveJavaObjectInspector(PrimitiveObjectInspector.PrimitiveCategory.STRING);
-    }
+    ObjectInspector returnOI =
+        returnOIResolver.get(PrimitiveObjectInspectorFactory.javaStringObjectInspector);
     for (int i = 0; i < arguments.length; i++) {
       converters[i] = ObjectInspectorConverters.getConverter(arguments[i],
           returnOI);

@@ -22,6 +22,7 @@ import java.util.List;
 
 import org.apache.hadoop.hive.ql.lib.NodeProcessorCtx;
 import org.apache.hadoop.hive.ql.metadata.Partition;
+import org.apache.hadoop.hive.ql.metadata.VirtualColumn;
 
 /**
  * The processor context for partition condition remover. This contains
@@ -29,31 +30,33 @@ import org.apache.hadoop.hive.ql.metadata.Partition;
  */
 public class PcrExprProcCtx implements NodeProcessorCtx {
 
-  public PcrExprProcCtx(String tabAlias, List<Partition> partList) {
-    super();
-    this.tabAlias = tabAlias;
-    this.partList = partList;
-  }
-
   /**
    * The table alias that is being currently processed.
    */
-  String tabAlias;
-  List<Partition> partList;
+  private final String tabAlias;
+  private final List<Partition> partList;
+  private final List<VirtualColumn> vcs;
+
+  public PcrExprProcCtx(String tabAlias, List<Partition> partList) {
+    this(tabAlias, partList, null);
+  }
+
+  public PcrExprProcCtx(String tabAlias, List<Partition> partList, List<VirtualColumn> vcs) {
+    super();
+    this.tabAlias = tabAlias;
+    this.partList = partList;
+    this.vcs = vcs;
+  }
 
   public String getTabAlias() {
     return tabAlias;
-  }
-
-  public void setTabAlias(String tabAlias) {
-    this.tabAlias = tabAlias;
   }
 
   public List<Partition> getPartList() {
     return partList;
   }
 
-  public void setPartList(List<Partition> partList) {
-    this.partList = partList;
+  public List<VirtualColumn> getVirtualColumns() {
+    return vcs;
   }
 }

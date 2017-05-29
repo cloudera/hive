@@ -51,8 +51,49 @@ public class PhysicalOptimizer {
     }
     if (hiveConf.getBoolVar(HiveConf.ConfVars.HIVECONVERTJOIN)) {
       resolvers.add(new CommonJoinResolver());
+
+      // The joins have been automatically converted to map-joins.
+      // However, if the joins were converted to sort-merge joins automatically,
+      // they should also be tried as map-joins.
+      if (hiveConf.getBoolVar(HiveConf.ConfVars.HIVE_AUTO_SORTMERGE_JOIN_TOMAPJOIN)) {
+        resolvers.add(new SortMergeJoinResolver());
+      }
+    }
+
+    if (hiveConf.getBoolVar(HiveConf.ConfVars.HIVEOPTINDEXFILTER)) {
+      resolvers.add(new IndexWhereResolver());
     }
     resolvers.add(new MapJoinResolver());
+    if (hiveConf.getBoolVar(HiveConf.ConfVars.HIVEMETADATAONLYQUERIES)) {
+      resolvers.add(new MetadataOnlyOptimizer());
+    }
+    if (hiveConf.getBoolVar(HiveConf.ConfVars.HIVENULLSCANOPTIMIZE)) {
+      resolvers.add(new NullScanOptimizer());
+    }
+    if (hiveConf.getBoolVar(HiveConf.ConfVars.HIVESAMPLINGFORORDERBY)) {
+      resolvers.add(new SamplingOptimizer());
+    }
+
+    // Physical optimizers which follow this need to be careful not to invalidate the inferences
+    // made by this optimizer. Only optimizers which depend on the results of this one should
+    // follow it.
+    if (hiveConf.getBoolVar(HiveConf.ConfVars.HIVE_INFER_BUCKET_SORT)) {
+      resolvers.add(new BucketingSortingInferenceOptimizer());
+    }
+
+    if (hiveConf.getBoolVar(HiveConf.ConfVars.HIVE_CHECK_CROSS_PRODUCT)) {
+      resolvers.add(new CrossProductCheck());
+    }
+
+    // Vectorization should be the last optimization, because it doesn't modify the plan
+    // or any operators. It makes a very low level transformation to the expressions to
+    // run in the vectorized mode.
+    if (hiveConf.getBoolVar(HiveConf.ConfVars.HIVE_VECTORIZATION_ENABLED)) {
+      resolvers.add(new Vectorizer());
+    }
+    if (!"none".equalsIgnoreCase(hiveConf.getVar(HiveConf.ConfVars.HIVESTAGEIDREARRANGE))) {
+      resolvers.add(new StageIDsRearranger());
+    }
   }
 
   /**
@@ -67,5 +108,4 @@ public class PhysicalOptimizer {
     }
     return pctx;
   }
-
 }

@@ -19,14 +19,12 @@
 package org.apache.hadoop.hive.ql.plan;
 
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.Map.Entry;
+
+import org.apache.hadoop.fs.Path;
 
 /**
  * Map Join operator Descriptor implementation.
@@ -40,8 +38,8 @@ public class HashTableSinkDesc extends JoinDesc implements Serializable {
   // used to handle skew join
   private boolean handleSkewJoin = false;
   private int skewKeyDefinition = -1;
-  private Map<Byte, String> bigKeysDirMap;
-  private Map<Byte, Map<Byte, String>> smallKeysDirMap;
+  private Map<Byte, Path> bigKeysDirMap;
+  private Map<Byte, Map<Byte, Path>> smallKeysDirMap;
   private Map<Byte, TableDesc> skewKeysValuesTables;
 
   // alias to key mapping
@@ -49,6 +47,9 @@ public class HashTableSinkDesc extends JoinDesc implements Serializable {
 
   // alias to filter mapping
   private Map<Byte, List<ExprNodeDesc>> filters;
+
+  // outerjoin-pos = other-pos:filter-len, other-pos:filter-len, ...
+  private int[][] filterMap;
 
   // used for create joinOutputObjectInspector
   protected List<String> outputColumnNames;
@@ -75,20 +76,20 @@ public class HashTableSinkDesc extends JoinDesc implements Serializable {
 
   private Map<Byte, List<Integer>> retainList;
 
-  private transient String bigTableAlias;
-
-  private LinkedHashMap<String, LinkedHashMap<String, ArrayList<String>>> aliasBucketFileNameMapping;
-  private LinkedHashMap<String, Integer> bucketFileNameMapping;
+  private transient BucketMapJoinContext bucketMapjoinContext;
   private float hashtableMemoryUsage;
 
+  //map join dump file name
+  private String dumpFilePrefix;
+
   public HashTableSinkDesc() {
-    bucketFileNameMapping = new LinkedHashMap<String, Integer>();
+    bucketMapjoinContext = new BucketMapJoinContext();
   }
 
   public HashTableSinkDesc(MapJoinDesc clone) {
     this.bigKeysDirMap = clone.getBigKeysDirMap();
     this.conds = clone.getConds();
-    this.exprs= clone.getExprs();
+    this.exprs = new HashMap<Byte, List<ExprNodeDesc>>(clone.getExprs());
     this.handleSkewJoin = clone.getHandleSkewJoin();
     this.keyTableDesc = clone.getKeyTableDesc();
     this.noOuterJoin = clone.getNoOuterJoin();
@@ -98,32 +99,18 @@ public class HashTableSinkDesc extends JoinDesc implements Serializable {
     this.skewKeysValuesTables = clone.getSkewKeysValuesTables();
     this.smallKeysDirMap = clone.getSmallKeysDirMap();
     this.tagOrder = clone.getTagOrder();
-    this.filters = clone.getFilters();
+    this.filters = new HashMap<Byte, List<ExprNodeDesc>>(clone.getFilters());
+    this.filterMap = clone.getFilterMap();
 
-    this.keys = clone.getKeys();
+    this.keys = new HashMap<Byte, List<ExprNodeDesc>>(clone.getKeys());
     this.keyTblDesc = clone.getKeyTblDesc();
     this.valueTblDescs = clone.getValueTblDescs();
     this.valueTblFilteredDescs = clone.getValueFilteredTblDescs();
     this.posBigTable = clone.getPosBigTable();
     this.retainList = clone.getRetainList();
-    this.bigTableAlias = clone.getBigTableAlias();
-    this.aliasBucketFileNameMapping = clone.getAliasBucketFileNameMapping();
-    this.bucketFileNameMapping = clone.getBucketFileNameMapping();
-  }
-
-
-  private void initRetainExprList() {
-    retainList = new HashMap<Byte, List<Integer>>();
-    Set<Entry<Byte, List<ExprNodeDesc>>> set = exprs.entrySet();
-    Iterator<Entry<Byte, List<ExprNodeDesc>>> setIter = set.iterator();
-    while (setIter.hasNext()) {
-      Entry<Byte, List<ExprNodeDesc>> current = setIter.next();
-      List<Integer> list = new ArrayList<Integer>();
-      for (int i = 0; i < current.getValue().size(); i++) {
-        list.add(i);
-      }
-      retainList.put(current.getKey(), list);
-    }
+    this.dumpFilePrefix = clone.getDumpFilePrefix();
+    this.bucketMapjoinContext = new BucketMapJoinContext(clone);
+    this.hashtableMemoryUsage = clone.getHashTableMemoryUsage();
   }
 
   public float getHashtableMemoryUsage() {
@@ -132,6 +119,21 @@ public class HashTableSinkDesc extends JoinDesc implements Serializable {
 
   public void setHashtableMemoryUsage(float hashtableMemoryUsage) {
     this.hashtableMemoryUsage = hashtableMemoryUsage;
+  }
+
+  /**
+   * @return the dumpFilePrefix
+   */
+  public String getDumpFilePrefix() {
+    return dumpFilePrefix;
+  }
+
+  /**
+   * @param dumpFilePrefix
+   *          the dumpFilePrefix to set
+   */
+  public void setDumpFilePrefix(String dumpFilePrefix) {
+    this.dumpFilePrefix = dumpFilePrefix;
   }
 
   public boolean isHandleSkewJoin() {
@@ -154,22 +156,22 @@ public class HashTableSinkDesc extends JoinDesc implements Serializable {
   }
 
   @Override
-  public Map<Byte, String> getBigKeysDirMap() {
+  public Map<Byte, Path> getBigKeysDirMap() {
     return bigKeysDirMap;
   }
 
   @Override
-  public void setBigKeysDirMap(Map<Byte, String> bigKeysDirMap) {
+  public void setBigKeysDirMap(Map<Byte, Path> bigKeysDirMap) {
     this.bigKeysDirMap = bigKeysDirMap;
   }
 
   @Override
-  public Map<Byte, Map<Byte, String>> getSmallKeysDirMap() {
+  public Map<Byte, Map<Byte, Path>> getSmallKeysDirMap() {
     return smallKeysDirMap;
   }
 
   @Override
-  public void setSmallKeysDirMap(Map<Byte, Map<Byte, String>> smallKeysDirMap) {
+  public void setSmallKeysDirMap(Map<Byte, Map<Byte, Path>> smallKeysDirMap) {
     this.smallKeysDirMap = smallKeysDirMap;
   }
 
@@ -272,6 +274,21 @@ public class HashTableSinkDesc extends JoinDesc implements Serializable {
     this.keyTableDesc = keyTableDesc;
   }
 
+  @Override
+  public int[][] getFilterMap() {
+    return filterMap;
+  }
+
+  @Override
+  public void setFilterMap(int[][] filterMap) {
+    this.filterMap = filterMap;
+  }
+
+  @Override
+  @Explain(displayName = "filter mappings", normalExplain = false)
+  public Map<Integer, String> getFilterMapString() {
+    return toCompactString(filterMap);
+  }
 
   public Map<Byte, List<Integer>> getRetainList() {
     return retainList;
@@ -282,9 +299,20 @@ public class HashTableSinkDesc extends JoinDesc implements Serializable {
   }
 
   /**
-   * @return the keys
+   * @return the keys in string form
    */
   @Explain(displayName = "keys")
+  public Map<Byte, String> getKeysString() {
+    Map<Byte, String> keyMap = new LinkedHashMap<Byte, String>();
+    for (Map.Entry<Byte, List<ExprNodeDesc>> k: getKeys().entrySet()) {
+      keyMap.put(k.getKey(), PlanUtils.getExprListString(k.getValue()));
+    }
+    return keyMap;
+  }
+
+  /**
+   * @return the keys
+   */
   public Map<Byte, List<ExprNodeDesc>> getKeys() {
     return keys;
   }
@@ -300,7 +328,7 @@ public class HashTableSinkDesc extends JoinDesc implements Serializable {
   /**
    * @return the position of the big table not in memory
    */
-  @Explain(displayName = "Position of Big Table")
+  @Explain(displayName = "Position of Big Table", normalExplain = false)
   public int getPosBigTable() {
     return posBigTable;
   }
@@ -343,34 +371,11 @@ public class HashTableSinkDesc extends JoinDesc implements Serializable {
     this.valueTblDescs = valueTblDescs;
   }
 
-  /**
-   * @return bigTableAlias
-   */
-  public String getBigTableAlias() {
-    return bigTableAlias;
+  public BucketMapJoinContext getBucketMapjoinContext() {
+    return bucketMapjoinContext;
   }
 
-  /**
-   * @param bigTableAlias
-   */
-  public void setBigTableAlias(String bigTableAlias) {
-    this.bigTableAlias = bigTableAlias;
-  }
-
-  public LinkedHashMap<String, LinkedHashMap<String, ArrayList<String>>> getAliasBucketFileNameMapping() {
-    return aliasBucketFileNameMapping;
-  }
-
-  public void setAliasBucketFileNameMapping(
-      LinkedHashMap<String, LinkedHashMap<String, ArrayList<String>>> aliasBucketFileNameMapping) {
-    this.aliasBucketFileNameMapping = aliasBucketFileNameMapping;
-  }
-
-  public LinkedHashMap<String, Integer> getBucketFileNameMapping() {
-    return bucketFileNameMapping;
-  }
-
-  public void setBucketFileNameMapping(LinkedHashMap<String, Integer> bucketFileNameMapping) {
-    this.bucketFileNameMapping = bucketFileNameMapping;
+  public void setBucketMapjoinContext(BucketMapJoinContext bucketMapjoinContext) {
+    this.bucketMapjoinContext = bucketMapjoinContext;
   }
 }

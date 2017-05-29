@@ -18,82 +18,90 @@
 
 package org.apache.hadoop.hive.hbase;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.client.Put;
-import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.hadoop.hive.serde.Constants;
-import org.apache.hadoop.hive.serde2.ByteStream;
+import org.apache.hadoop.hive.hbase.ColumnMappings.ColumnMapping;
+import org.apache.hadoop.hive.ql.plan.TableDesc;
+import org.apache.hadoop.hive.serde.serdeConstants;
+import org.apache.hadoop.hive.serde2.AbstractSerDe;
 import org.apache.hadoop.hive.serde2.SerDe;
 import org.apache.hadoop.hive.serde2.SerDeException;
-import org.apache.hadoop.hive.serde2.SerDeUtils;
-import org.apache.hadoop.hive.serde2.lazy.LazyFactory;
-import org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe;
-import org.apache.hadoop.hive.serde2.lazy.LazyUtils;
-import org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe.SerDeParameters;
+import org.apache.hadoop.hive.serde2.SerDeSpec;
+import org.apache.hadoop.hive.serde2.SerDeStats;
+import org.apache.hadoop.hive.serde2.lazy.LazySerDeParameters;
 import org.apache.hadoop.hive.serde2.lazy.objectinspector.LazySimpleStructObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.ListObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.MapObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.StructField;
-import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Category;
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
-import org.apache.hadoop.hive.serde2.typeinfo.MapTypeInfo;
-import org.apache.hadoop.hive.serde2.typeinfo.StructTypeInfo;
-import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.io.Writable;
+import org.apache.hadoop.mapred.JobConf;
 
 /**
  * HBaseSerDe can be used to serialize object into an HBase table and
  * deserialize objects from an HBase table.
  */
-public class HBaseSerDe implements SerDe {
+@SerDeSpec(schemaProps = {
+    serdeConstants.LIST_COLUMNS, serdeConstants.LIST_COLUMN_TYPES,
+    serdeConstants.FIELD_DELIM, serdeConstants.COLLECTION_DELIM, serdeConstants.MAPKEY_DELIM,
+    serdeConstants.SERIALIZATION_FORMAT, serdeConstants.SERIALIZATION_NULL_FORMAT,
+    serdeConstants.SERIALIZATION_LAST_COLUMN_TAKES_REST,
+    serdeConstants.ESCAPE_CHAR,
+    serdeConstants.SERIALIZATION_ENCODING,
+    LazySerDeParameters.SERIALIZATION_EXTEND_NESTING_LEVELS,
+    LazySerDeParameters.SERIALIZATION_EXTEND_ADDITIONAL_NESTING_LEVELS,
+    HBaseSerDe.HBASE_COLUMNS_MAPPING,
+    HBaseSerDe.HBASE_TABLE_NAME,
+    HBaseSerDe.HBASE_TABLE_DEFAULT_STORAGE_TYPE,
+    HBaseSerDe.HBASE_KEY_COL,
+    HBaseSerDe.HBASE_PUT_TIMESTAMP,
+    HBaseSerDe.HBASE_COMPOSITE_KEY_CLASS,
+    HBaseSerDe.HBASE_COMPOSITE_KEY_TYPES,
+    HBaseSerDe.HBASE_COMPOSITE_KEY_FACTORY,
+    HBaseSerDe.HBASE_STRUCT_SERIALIZER_CLASS,
+    HBaseSerDe.HBASE_SCAN_CACHE,
+    HBaseSerDe.HBASE_SCAN_CACHEBLOCKS,
+    HBaseSerDe.HBASE_SCAN_BATCH,
+    HBaseSerDe.HBASE_AUTOGENERATE_STRUCT})
+public class HBaseSerDe extends AbstractSerDe {
+  public static final Log LOG = LogFactory.getLog(HBaseSerDe.class);
 
   public static final String HBASE_COLUMNS_MAPPING = "hbase.columns.mapping";
   public static final String HBASE_TABLE_NAME = "hbase.table.name";
+  public static final String HBASE_TABLE_DEFAULT_STORAGE_TYPE = "hbase.table.default.storage.type";
   public static final String HBASE_KEY_COL = ":key";
-  public static final Log LOG = LogFactory.getLog(HBaseSerDe.class);
+  public static final String HBASE_TIMESTAMP_COL = ":timestamp";
+  public static final String HBASE_PUT_TIMESTAMP = "hbase.put.timestamp";
+  public static final String HBASE_COMPOSITE_KEY_CLASS = "hbase.composite.key.class";
+  public static final String HBASE_COMPOSITE_KEY_TYPES = "hbase.composite.key.types";
+  public static final String HBASE_COMPOSITE_KEY_FACTORY = "hbase.composite.key.factory";
+  public static final String HBASE_STRUCT_SERIALIZER_CLASS = "hbase.struct.serialization.class";
+  public static final String HBASE_SCAN_CACHE = "hbase.scan.cache";
+  public static final String HBASE_SCAN_CACHEBLOCKS = "hbase.scan.cacheblock";
+  public static final String HBASE_SCAN_BATCH = "hbase.scan.batch";
+  public static final String HBASE_AUTOGENERATE_STRUCT = "hbase.struct.autogenerate";
+  /**
+   * Determines whether a regex matching should be done on the columns or not. Defaults to true.
+   * <strong>WARNING: Note that currently this only supports the suffix wildcard .*</strong>
+   */
+  public static final String HBASE_COLUMNS_REGEX_MATCHING = "hbase.columns.mapping.regex.matching";
+  /**
+   * Defines the type for a column.
+   **/
+  public static final String SERIALIZATION_TYPE = "serialization.type";
 
   private ObjectInspector cachedObjectInspector;
-  private String hbaseColumnsMapping;
-  private List<String> hbaseColumnFamilies;
-  private List<byte []> hbaseColumnFamiliesBytes;
-  private List<String> hbaseColumnQualifiers;
-  private List<byte []> hbaseColumnQualifiersBytes;
-  private SerDeParameters serdeParams;
-  private boolean useJSONSerialize;
   private LazyHBaseRow cachedHBaseRow;
-  private final ByteStream.Output serializeStream = new ByteStream.Output();
-  private int iKey;
 
-  // used for serializing a field
-  private byte [] separators;     // the separators array
-  private boolean escaped;        // whether we need to escape the data when writing out
-  private byte escapeChar;        // which char to use as the escape char, e.g. '\\'
-  private boolean [] needsEscape; // which chars need to be escaped. This array should have size
-                                  // of 128. Negative byte values (or byte values >= 128) are
-                                  // never escaped.
+  private HBaseSerDeParameters serdeParams;
+  private HBaseRowSerializer serializer;
+
   @Override
   public String toString() {
-    return getClass().toString()
-        + "["
-        + hbaseColumnsMapping
-        + ":"
-        + ((StructTypeInfo) serdeParams.getRowTypeInfo())
-            .getAllStructFieldNames()
-        + ":"
-        + ((StructTypeInfo) serdeParams.getRowTypeInfo())
-            .getAllStructFieldTypeInfos() + "]";
+    return getClass() + "[" + serdeParams + "]";
   }
 
   public HBaseSerDe() throws SerDeException {
@@ -106,222 +114,139 @@ public class HBaseSerDe implements SerDe {
   @Override
   public void initialize(Configuration conf, Properties tbl)
       throws SerDeException {
+    serdeParams = new HBaseSerDeParameters(conf, tbl, getClass().getName());
 
-    initHBaseSerDeParameters(conf, tbl,
-        getClass().getName());
-
-    cachedObjectInspector = LazyFactory.createLazyStructInspector(
-        serdeParams.getColumnNames(),
-        serdeParams.getColumnTypes(),
-        serdeParams.getSeparators(),
-        serdeParams.getNullSequence(),
-        serdeParams.isLastColumnTakesRest(),
-        serdeParams.isEscaped(),
-        serdeParams.getEscapeChar());
+    cachedObjectInspector =
+        HBaseLazyObjectFactory
+            .createLazyHBaseStructInspector(serdeParams.getSerdeParams(),
+                serdeParams.getKeyIndex(), serdeParams.getKeyFactory(),
+                serdeParams.getValueFactories());
 
     cachedHBaseRow = new LazyHBaseRow(
-      (LazySimpleStructObjectInspector) cachedObjectInspector);
+        (LazySimpleStructObjectInspector) cachedObjectInspector, serdeParams);
+
+    serializer = new HBaseRowSerializer(serdeParams);
 
     if (LOG.isDebugEnabled()) {
-      LOG.debug("HBaseSerDe initialized with : columnNames = "
-        + serdeParams.getColumnNames()
-        + " columnTypes = "
-        + serdeParams.getColumnTypes()
-        + " hbaseColumnMapping = "
-        + hbaseColumnsMapping);
+      LOG.debug("HBaseSerDe initialized with : " + serdeParams);
     }
   }
 
+  public static ColumnMappings parseColumnsMapping(String columnsMappingSpec)
+      throws SerDeException {
+    return parseColumnsMapping(columnsMappingSpec, true);
+  }
   /**
-   * Parses the HBase columns mapping to identify the column families, qualifiers
+   * Parses the HBase columns mapping specifier to identify the column families, qualifiers
    * and also caches the byte arrays corresponding to them. One of the Hive table
    * columns maps to the HBase row key, by default the first column.
    *
-   * @param columnMapping - the column mapping specification to be parsed
-   * @param colFamilies - the list of HBase column family names
-   * @param colFamiliesBytes - the corresponding byte array
-   * @param colQualifiers - the list of HBase column qualifier names
-   * @param colQualifiersBytes - the corresponding byte array
-   * @return the row key index in the column names list
-   * @throws SerDeException
+   * @param columnsMappingSpec string hbase.columns.mapping specified when creating table
+   * @param doColumnRegexMatching whether to do a regex matching on the columns or not
+   * @return List<ColumnMapping> which contains the column mapping information by position
+   * @throws org.apache.hadoop.hive.serde2.SerDeException
    */
-  public static int parseColumnMapping(
-      String columnMapping,
-      List<String> colFamilies,
-      List<byte []> colFamiliesBytes,
-      List<String> colQualifiers,
-      List<byte []> colQualifiersBytes) throws SerDeException {
+  public static ColumnMappings parseColumnsMapping(
+      String columnsMappingSpec, boolean doColumnRegexMatching) throws SerDeException {
 
-    int rowKeyIndex = -1;
-
-    if (colFamilies == null || colQualifiers == null) {
-      throw new SerDeException("Error: caller must pass in lists for the column families " +
-          "and qualifiers.");
-    }
-
-    colFamilies.clear();
-    colQualifiers.clear();
-
-    if (columnMapping == null) {
+    if (columnsMappingSpec == null) {
       throw new SerDeException("Error: hbase.columns.mapping missing for this HBase table.");
     }
 
-    if (columnMapping.equals("") || columnMapping.equals(HBASE_KEY_COL)) {
+    if (columnsMappingSpec.isEmpty() || columnsMappingSpec.equals(HBASE_KEY_COL)) {
       throw new SerDeException("Error: hbase.columns.mapping specifies only the HBase table"
           + " row key. A valid Hive-HBase table must specify at least one additional column.");
     }
 
-    String [] mapping = columnMapping.split(",");
+    int rowKeyIndex = -1;
+    int timestampIndex = -1;
+    List<ColumnMapping> columnsMapping = new ArrayList<ColumnMapping>();
+    String[] columnSpecs = columnsMappingSpec.split(",");
 
-    for (int i = 0; i < mapping.length; i++) {
-      String elem = mapping[i];
-      int idxFirst = elem.indexOf(":");
-      int idxLast = elem.lastIndexOf(":");
+    for (int i = 0; i < columnSpecs.length; i++) {
+      String mappingSpec = columnSpecs[i].trim();
+      String [] mapInfo = mappingSpec.split("#");
+      String colInfo = mapInfo[0];
+
+      int idxFirst = colInfo.indexOf(":");
+      int idxLast = colInfo.lastIndexOf(":");
 
       if (idxFirst < 0 || !(idxFirst == idxLast)) {
         throw new SerDeException("Error: the HBase columns mapping contains a badly formed " +
             "column family, column qualifier specification.");
       }
 
-      if (elem.equals(HBASE_KEY_COL)) {
+      ColumnMapping columnMapping = new ColumnMapping();
+
+      if (colInfo.equals(HBASE_KEY_COL)) {
         rowKeyIndex = i;
-        colFamilies.add(elem);
-        colQualifiers.add(null);
+        columnMapping.familyName = colInfo;
+        columnMapping.familyNameBytes = Bytes.toBytes(colInfo);
+        columnMapping.qualifierName = null;
+        columnMapping.qualifierNameBytes = null;
+        columnMapping.hbaseRowKey = true;
+      } else if (colInfo.equals(HBASE_TIMESTAMP_COL)) {
+        timestampIndex = i;
+        columnMapping.familyName = colInfo;
+        columnMapping.familyNameBytes = Bytes.toBytes(colInfo);
+        columnMapping.qualifierName = null;
+        columnMapping.qualifierNameBytes = null;
+        columnMapping.hbaseTimestamp = true;
       } else {
-        String [] parts = elem.split(":");
+        String [] parts = colInfo.split(":");
         assert(parts.length > 0 && parts.length <= 2);
-        colFamilies.add(parts[0]);
+        columnMapping.familyName = parts[0];
+        columnMapping.familyNameBytes = Bytes.toBytes(parts[0]);
+        columnMapping.hbaseRowKey = false;
+        columnMapping.hbaseTimestamp = false;
 
         if (parts.length == 2) {
-          colQualifiers.add(parts[1]);
+
+          if (doColumnRegexMatching && parts[1].endsWith(".*")) {
+            // we have a prefix with a wildcard
+            columnMapping.qualifierPrefix = parts[1].substring(0, parts[1].length() - 2);
+            columnMapping.qualifierPrefixBytes = Bytes.toBytes(columnMapping.qualifierPrefix);
+            // we weren't provided any actual qualifier name. Set these to
+            // null.
+            columnMapping.qualifierName = null;
+            columnMapping.qualifierNameBytes = null;
+          } else {
+            // set the regular provided qualifier names
+            columnMapping.qualifierName = parts[1];
+            columnMapping.qualifierNameBytes = Bytes.toBytes(parts[1]);
+          }
         } else {
-          colQualifiers.add(null);
+          columnMapping.qualifierName = null;
+          columnMapping.qualifierNameBytes = null;
         }
       }
+
+      columnMapping.mappingSpec = mappingSpec;
+
+      columnsMapping.add(columnMapping);
     }
 
     if (rowKeyIndex == -1) {
-      colFamilies.add(0, HBASE_KEY_COL);
-      colQualifiers.add(0, null);
       rowKeyIndex = 0;
+      ColumnMapping columnMapping = new ColumnMapping();
+      columnMapping.familyName = HBaseSerDe.HBASE_KEY_COL;
+      columnMapping.familyNameBytes = Bytes.toBytes(HBaseSerDe.HBASE_KEY_COL);
+      columnMapping.qualifierName = null;
+      columnMapping.qualifierNameBytes = null;
+      columnMapping.hbaseRowKey = true;
+      columnMapping.mappingSpec = HBaseSerDe.HBASE_KEY_COL;
+      columnsMapping.add(0, columnMapping);
     }
 
-    if (colFamilies.size() != colQualifiers.size()) {
-      throw new SerDeException("Error in parsing the hbase columns mapping.");
-    }
-
-    // populate the corresponding byte [] if the client has passed in a non-null list
-    if (colFamiliesBytes != null) {
-      colFamiliesBytes.clear();
-
-      for (String fam : colFamilies) {
-        colFamiliesBytes.add(Bytes.toBytes(fam));
-      }
-    }
-
-    if (colQualifiersBytes != null) {
-      colQualifiersBytes.clear();
-
-      for (String qual : colQualifiers) {
-        if (qual == null) {
-          colQualifiersBytes.add(null);
-        } else {
-          colQualifiersBytes.add(Bytes.toBytes(qual));
-        }
-      }
-    }
-
-    if (colFamiliesBytes != null && colQualifiersBytes != null) {
-      if (colFamiliesBytes.size() != colQualifiersBytes.size()) {
-        throw new SerDeException("Error in caching the bytes for the hbase column families " +
-            "and qualifiers.");
-      }
-    }
-
-    return rowKeyIndex;
+    return new ColumnMappings(columnsMapping, rowKeyIndex, timestampIndex);
   }
 
-  public static boolean isSpecialColumn(String hbaseColumnName) {
-    return hbaseColumnName.equals(HBASE_KEY_COL);
+  public LazySerDeParameters getSerdeParams() {
+    return serdeParams.getSerdeParams();
   }
 
-  private void initHBaseSerDeParameters(
-      Configuration job, Properties tbl, String serdeName)
-    throws SerDeException {
-
-    // Read configuration parameters
-    hbaseColumnsMapping = tbl.getProperty(HBaseSerDe.HBASE_COLUMNS_MAPPING);
-    String columnTypeProperty = tbl.getProperty(Constants.LIST_COLUMN_TYPES);
-
-    // Parse the HBase columns mapping and initialize the col family & qualifiers
-    hbaseColumnFamilies = new ArrayList<String>();
-    hbaseColumnFamiliesBytes = new ArrayList<byte []>();
-    hbaseColumnQualifiers = new ArrayList<String>();
-    hbaseColumnQualifiersBytes = new ArrayList<byte []>();
-    iKey = parseColumnMapping(hbaseColumnsMapping, hbaseColumnFamilies,
-        hbaseColumnFamiliesBytes, hbaseColumnQualifiers, hbaseColumnQualifiersBytes);
-
-    // Build the type property string if not supplied
-    if (columnTypeProperty == null) {
-      StringBuilder sb = new StringBuilder();
-
-      for (int i = 0; i < hbaseColumnFamilies.size(); i++) {
-        if (sb.length() > 0) {
-          sb.append(":");
-        }
-        String colFamily = hbaseColumnFamilies.get(i);
-        String colQualifier = hbaseColumnQualifiers.get(i);
-        if (isSpecialColumn(colFamily)) {
-            // the row key column becomes a STRING
-            sb.append(Constants.STRING_TYPE_NAME);
-        } else if (colQualifier == null)  {
-          // a column family become a MAP
-          sb.append(
-            Constants.MAP_TYPE_NAME + "<"
-            + Constants.STRING_TYPE_NAME
-            + "," + Constants.STRING_TYPE_NAME + ">");
-        } else {
-          // an individual column becomes a STRING
-          sb.append(Constants.STRING_TYPE_NAME);
-        }
-      }
-      tbl.setProperty(Constants.LIST_COLUMN_TYPES, sb.toString());
-    }
-
-    serdeParams = LazySimpleSerDe.initSerdeParams(job, tbl, serdeName);
-
-    if (hbaseColumnFamilies.size() != serdeParams.getColumnNames().size()) {
-      throw new SerDeException(serdeName + ": columns has " +
-        serdeParams.getColumnNames().size() +
-        " elements while hbase.columns.mapping has " +
-        hbaseColumnFamilies.size() + " elements" +
-        " (counting the key if implicit)");
-    }
-
-    separators = serdeParams.getSeparators();
-    escaped = serdeParams.isEscaped();
-    escapeChar = serdeParams.getEscapeChar();
-    needsEscape = serdeParams.getNeedsEscape();
-
-    // check that the mapping schema is right;
-    // check that the "column-family:" is mapped to MAP<String,?>
-    for (int i = 0; i < hbaseColumnFamilies.size(); i++) {
-      String colFamily = hbaseColumnFamilies.get(i);
-      String colQualifier = hbaseColumnQualifiers.get(i);
-      if (colQualifier == null && !isSpecialColumn(colFamily)) {
-        TypeInfo typeInfo = serdeParams.getColumnTypes().get(i);
-        if ((typeInfo.getCategory() != Category.MAP) ||
-          (((MapTypeInfo) typeInfo).getMapKeyTypeInfo().getTypeName()
-            !=  Constants.STRING_TYPE_NAME)) {
-
-          throw new SerDeException(
-            serdeName + ": hbase column family '"
-            + colFamily
-            + "' should be mapped to Map<String,?> but is mapped to "
-            + typeInfo.getTypeName());
-        }
-      }
-    }
+  public HBaseSerDeParameters getHBaseSerdeParam() {
+    return serdeParams;
   }
 
   /**
@@ -332,13 +257,11 @@ public class HBaseSerDe implements SerDe {
    */
   @Override
   public Object deserialize(Writable result) throws SerDeException {
-
-    if (!(result instanceof Result)) {
-      throw new SerDeException(getClass().getName() + ": expects Result!");
+    if (!(result instanceof ResultWritable)) {
+      throw new SerDeException(getClass().getName() + ": expects ResultWritable!");
     }
 
-    cachedHBaseRow.init((Result) result, hbaseColumnFamilies, hbaseColumnFamiliesBytes,
-        hbaseColumnQualifiers, hbaseColumnQualifiersBytes);
+    cachedHBaseRow.init(((ResultWritable) result).getResult());
 
     return cachedHBaseRow;
   }
@@ -350,243 +273,33 @@ public class HBaseSerDe implements SerDe {
 
   @Override
   public Class<? extends Writable> getSerializedClass() {
-    return Put.class;
+    return PutWritable.class;
   }
 
   @Override
-  public Writable serialize(Object obj, ObjectInspector objInspector)
-      throws SerDeException {
-    if (objInspector.getCategory() != Category.STRUCT) {
-      throw new SerDeException(getClass().toString()
-          + " can only serialize struct types, but we got: "
-          + objInspector.getTypeName());
-    }
-
-    // Prepare the field ObjectInspectors
-    StructObjectInspector soi = (StructObjectInspector) objInspector;
-    List<? extends StructField> fields = soi.getAllStructFieldRefs();
-    List<Object> list = soi.getStructFieldsDataAsList(obj);
-    List<? extends StructField> declaredFields =
-      (serdeParams.getRowTypeInfo() != null &&
-        ((StructTypeInfo) serdeParams.getRowTypeInfo())
-        .getAllStructFieldNames().size() > 0) ?
-      ((StructObjectInspector)getObjectInspector()).getAllStructFieldRefs()
-      : null;
-
-    Put put = null;
-
+  public Writable serialize(Object obj, ObjectInspector objInspector) throws SerDeException {
     try {
-      byte [] key = serializeField(iKey, null, fields, list, declaredFields);
-
-      if (key == null) {
-        throw new SerDeException("HBase row key cannot be NULL");
-      }
-
-      put = new Put(key);
-
-      // Serialize each field
-      for (int i = 0; i < fields.size(); i++) {
-        if (i == iKey) {
-          // already processed the key above
-          continue;
-        }
-        serializeField(i, put, fields, list, declaredFields);
-      }
-    } catch (IOException e) {
+      return serializer.serialize(obj, objInspector);
+    } catch (SerDeException e) {
+      throw e;
+    } catch (Exception e) {
       throw new SerDeException(e);
     }
-
-    return put;
   }
 
-  private byte [] serializeField(
-    int i,
-    Put put,
-    List<? extends StructField> fields,
-    List<Object> list,
-    List<? extends StructField> declaredFields) throws IOException {
-
-    // column name
-    String hbaseColumnFamily = hbaseColumnFamilies.get(i);
-    String hbaseColumnQualifier = hbaseColumnQualifiers.get(i);
-
-    // Get the field objectInspector and the field object.
-    ObjectInspector foi = fields.get(i).getFieldObjectInspector();
-    Object f = (list == null ? null : list.get(i));
-
-    if (f == null) {
-      // a null object, we do not serialize it
-      return null;
-    }
-
-    // If the field corresponds to a column family in HBase
-    if (hbaseColumnQualifier == null && !isSpecialColumn(hbaseColumnFamily)) {
-      MapObjectInspector moi = (MapObjectInspector)foi;
-      ObjectInspector koi = moi.getMapKeyObjectInspector();
-      ObjectInspector voi = moi.getMapValueObjectInspector();
-
-      Map<?, ?> map = moi.getMap(f);
-      if (map == null) {
-        return null;
-      } else {
-        for (Map.Entry<?, ?> entry: map.entrySet()) {
-          // Get the Key
-          serializeStream.reset();
-          serialize(entry.getKey(), koi, 3);
-
-          // Get the column-qualifier
-          byte [] columnQualifierBytes = new byte[serializeStream.getCount()];
-          System.arraycopy(
-              serializeStream.getData(), 0, columnQualifierBytes, 0, serializeStream.getCount());
-
-          // Get the Value
-          serializeStream.reset();
-          boolean isNotNull = serialize(entry.getValue(), voi, 3);
-          if (!isNotNull) {
-            continue;
-          }
-          byte [] value = new byte[serializeStream.getCount()];
-          System.arraycopy(serializeStream.getData(), 0, value, 0, serializeStream.getCount());
-          put.add(hbaseColumnFamiliesBytes.get(i), columnQualifierBytes, value);
-        }
-      }
-    } else {
-      // If the field that is passed in is NOT a primitive, and either the
-      // field is not declared (no schema was given at initialization), or
-      // the field is declared as a primitive in initialization, serialize
-      // the data to JSON string.  Otherwise serialize the data in the
-      // delimited way.
-      serializeStream.reset();
-      boolean isNotNull;
-      if (!foi.getCategory().equals(Category.PRIMITIVE)
-          && (declaredFields == null ||
-              declaredFields.get(i).getFieldObjectInspector().getCategory()
-              .equals(Category.PRIMITIVE) || useJSONSerialize)) {
-
-        isNotNull = serialize(
-            SerDeUtils.getJSONString(f, foi),
-            PrimitiveObjectInspectorFactory.javaStringObjectInspector,
-            1);
-      } else {
-        isNotNull = serialize(f, foi, 1);
-      }
-      if (!isNotNull) {
-        return null;
-      }
-      byte [] key = new byte[serializeStream.getCount()];
-      System.arraycopy(serializeStream.getData(), 0, key, 0, serializeStream.getCount());
-      if (i == iKey) {
-        return key;
-      }
-      put.add(hbaseColumnFamiliesBytes.get(i), hbaseColumnQualifiersBytes.get(i), key);
-    }
-
+  @Override
+  public SerDeStats getSerDeStats() {
+    // no support for statistics
     return null;
   }
 
-  /**
-   * Serialize the row into a ByteStream.
-   *
-   * @param obj           The object for the current field.
-   * @param objInspector  The ObjectInspector for the current Object.
-   * @param level         The current level of separator.
-   * @throws IOException
-   * @return true, if serialize is a not-null object; otherwise false.
-   */
-  private boolean serialize(Object obj, ObjectInspector objInspector, int level)
-      throws IOException {
-
-    switch (objInspector.getCategory()) {
-      case PRIMITIVE: {
-        LazyUtils.writePrimitiveUTF8(
-          serializeStream, obj,
-          (PrimitiveObjectInspector) objInspector,
-          escaped, escapeChar, needsEscape);
-        return true;
-      }
-      case LIST: {
-        char separator = (char) separators[level];
-        ListObjectInspector loi = (ListObjectInspector)objInspector;
-        List<?> list = loi.getList(obj);
-        ObjectInspector eoi = loi.getListElementObjectInspector();
-        if (list == null) {
-          return false;
-        } else {
-          for (int i = 0; i < list.size(); i++) {
-            if (i > 0) {
-              serializeStream.write(separator);
-            }
-            serialize(list.get(i), eoi, level + 1);
-          }
-        }
-        return true;
-      }
-      case MAP: {
-        char separator = (char) separators[level];
-        char keyValueSeparator = (char) separators[level+1];
-        MapObjectInspector moi = (MapObjectInspector) objInspector;
-        ObjectInspector koi = moi.getMapKeyObjectInspector();
-        ObjectInspector voi = moi.getMapValueObjectInspector();
-
-        Map<?, ?> map = moi.getMap(obj);
-        if (map == null) {
-          return false;
-        } else {
-          boolean first = true;
-          for (Map.Entry<?, ?> entry: map.entrySet()) {
-            if (first) {
-              first = false;
-            } else {
-              serializeStream.write(separator);
-            }
-            serialize(entry.getKey(), koi, level+2);
-            serializeStream.write(keyValueSeparator);
-            serialize(entry.getValue(), voi, level+2);
-          }
-        }
-        return true;
-      }
-      case STRUCT: {
-        char separator = (char)separators[level];
-        StructObjectInspector soi = (StructObjectInspector)objInspector;
-        List<? extends StructField> fields = soi.getAllStructFieldRefs();
-        List<Object> list = soi.getStructFieldsDataAsList(obj);
-        if (list == null) {
-          return false;
-        } else {
-          for (int i = 0; i < list.size(); i++) {
-            if (i > 0) {
-              serializeStream.write(separator);
-            }
-            serialize(list.get(i), fields.get(i).getFieldObjectInspector(), level + 1);
-          }
-        }
-        return true;
-      }
-    }
-
-    throw new RuntimeException("Unknown category type: " + objInspector.getCategory());
+  public HBaseKeyFactory getKeyFactory() {
+    return serdeParams.getKeyFactory();
   }
 
-
-  /**
-   * @return the useJSONSerialize
-   */
-  public boolean isUseJSONSerialize() {
-    return useJSONSerialize;
-  }
-
-  /**
-   * @param useJSONSerialize the useJSONSerialize to set
-   */
-  public void setUseJSONSerialize(boolean useJSONSerialize) {
-    this.useJSONSerialize = useJSONSerialize;
-  }
-
-  /**
-   * @return 0-based offset of the key column within the table
-   */
-  int getKeyColumnOffset() {
-    return iKey;
+  public static void configureJobConf(TableDesc tableDesc, JobConf jobConf) throws Exception {
+    HBaseSerDeParameters serdeParams =
+        new HBaseSerDeParameters(jobConf, tableDesc.getProperties(), HBaseSerDe.class.getName());
+    serdeParams.getKeyFactory().configureJobConf(tableDesc, jobConf);
   }
 }

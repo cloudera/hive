@@ -1,4 +1,7 @@
 set hive.input.format=org.apache.hadoop.hive.ql.io.HiveInputFormat;
+
+-- SORT_QUERY_RESULTS
+
 create table tmp1 (a string, b string) clustered by (a) sorted by (a) into 10 buckets;
 
 create table tmp2 (a string, b string) clustered by (a) sorted by (a) into 10 buckets;
@@ -15,8 +18,6 @@ insert overwrite table tmp2 select * from src where key < 50;
 set hive.optimize.bucketmapjoin = true;
 set hive.optimize.bucketmapjoin.sortedmerge = true;
 set hive.merge.mapfiles=false;
-set hive.input.format=org.apache.hadoop.hive.ql.io.BucketizedHiveInputFormat;
-
 create table tmp3 (a string, b string, c string) clustered by (a) sorted by (a) into 10 buckets;
 
 
@@ -24,4 +25,4 @@ insert overwrite table tmp3
   select /*+ MAPJOIN(l) */ i.a, i.b, l.b
   from tmp1 i join tmp2 l ON i.a = l.a;
 
-select * from tmp3 order by a, b, c;
+select * from tmp3;

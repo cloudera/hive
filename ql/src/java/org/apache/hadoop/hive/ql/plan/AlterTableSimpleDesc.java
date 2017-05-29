@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hive.ql.plan;
 
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -28,8 +29,8 @@ import org.apache.hadoop.hive.ql.plan.AlterTableDesc.AlterTableTypes;
  */
 public class AlterTableSimpleDesc extends DDLDesc {
   private String tableName;
-  private String dbName;
   private LinkedHashMap<String, String> partSpec;
+  private String compactionType;
 
   AlterTableTypes type;
 
@@ -37,17 +38,12 @@ public class AlterTableSimpleDesc extends DDLDesc {
   }
 
   /**
-   * @param dbName
-   *          database that contains the table / partition
    * @param tableName
    *          table containing the partition
    * @param partSpec
-   *          partition specification. Null if touching a table.
    */
-  public AlterTableSimpleDesc(String dbName, String tableName,
-      Map<String, String> partSpec, AlterTableDesc.AlterTableTypes type) {
-    super();
-    this.dbName = dbName;
+  public AlterTableSimpleDesc(String tableName,
+      Map<String, String> partSpec, AlterTableTypes type) {
     this.tableName = tableName;
     if(partSpec == null) {
       this.partSpec = null;
@@ -57,20 +53,26 @@ public class AlterTableSimpleDesc extends DDLDesc {
     this.type = type;
   }
 
+  /**
+   * Constructor for ALTER TABLE ... COMPACT.
+   * @param tableName name of the table to compact
+   * @param partSpec partition to compact
+   * @param compactionType currently supported values: 'major' and 'minor'
+   */
+  public AlterTableSimpleDesc(String tableName,
+      LinkedHashMap<String, String> partSpec, String compactionType) {
+    type = AlterTableTypes.COMPACT;
+    this.compactionType = compactionType;
+    this.tableName = tableName;
+    this.partSpec = partSpec;
+  }
+
   public String getTableName() {
     return tableName;
   }
 
   public void setTableName(String tableName) {
     this.tableName = tableName;
-  }
-
-  public String getDbName() {
-    return dbName;
-  }
-
-  public void setDbName(String dbName) {
-    this.dbName = dbName;
   }
 
   public AlterTableDesc.AlterTableTypes getType() {
@@ -87,6 +89,14 @@ public class AlterTableSimpleDesc extends DDLDesc {
 
   public void setPartSpec(LinkedHashMap<String, String> partSpec) {
     this.partSpec = partSpec;
+  }
+
+  /**
+   * Get what type of compaction is being done by a ALTER TABLE ... COMPACT statement.
+   * @return Compaction type, currently supported values are 'major' and 'minor'.
+   */
+  public String getCompactionType() {
+    return compactionType;
   }
 
 }

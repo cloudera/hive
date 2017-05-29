@@ -19,26 +19,30 @@
 package org.apache.hadoop.hive.hbase;
 
 import java.io.IOException;
-import java.util.Properties;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HBaseConfiguration;
+import org.apache.hadoop.hbase.client.Durability;
 import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Put;
 import org.apache.hadoop.hbase.io.ImmutableBytesWritable;
+import org.apache.hadoop.hbase.mapred.TableMapReduceUtil;
+import org.apache.hadoop.hbase.mapreduce.TableOutputCommitter;
 import org.apache.hadoop.hbase.mapreduce.TableOutputFormat;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.ql.exec.FileSinkOperator.RecordWriter;
-import org.apache.hadoop.hive.ql.io.HiveOutputFormat;
-import org.apache.hadoop.io.Writable;
+import org.apache.hadoop.hive.hbase.PutWritable;
+import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.OutputFormat;
+import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.OutputCommitter;
+import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.util.Progressable;
+import org.apache.hadoop.security.UserGroupInformation;
 
 /**
  * HiveHBaseTableOutputFormat implements HiveOutputFormat for HBase tables.
@@ -47,8 +51,7 @@ import org.apache.hadoop.util.Progressable;
  */
 public class HiveHBaseTableOutputFormat extends
     TableOutputFormat<ImmutableBytesWritable> implements
-    HiveOutputFormat<ImmutableBytesWritable, Put>,
-    OutputFormat<ImmutableBytesWritable, Put> {
+    OutputFormat<ImmutableBytesWritable, Object> {
 
   static final Log LOG = LogFactory.getLog(HiveHBaseTableOutputFormat.class);
   public static final String HBASE_WAL_ENABLED = "hive.hbase.wal.enabled";
@@ -64,48 +67,20 @@ public class HiveHBaseTableOutputFormat extends
    * @param progress progress used for status report
    * @return the RecordWriter for the output file
    */
-  @Override
-  public RecordWriter getHiveRecordWriter(
-      JobConf jc,
-      Path finalOutPath,
-      Class<? extends Writable> valueClass,
-      boolean isCompressed,
-      Properties tableProperties,
-      final Progressable progressable) throws IOException {
 
-    String hbaseTableName = jc.get(HBaseSerDe.HBASE_TABLE_NAME);
-    jc.set(TableOutputFormat.OUTPUT_TABLE, hbaseTableName);
-    final boolean walEnabled = HiveConf.getBoolVar(
-        jc, HiveConf.ConfVars.HIVE_HBASE_WAL_ENABLED);
-    final HTable table = new HTable(new HBaseConfiguration(jc), hbaseTableName);
-    table.setAutoFlush(false);
-
-    return new RecordWriter() {
-
-      @Override
-      public void close(boolean abort) throws IOException {
-        if (!abort) {
-          table.flushCommits();
-        }
-      }
-
-      @Override
-      public void write(Writable w) throws IOException {
-        Put put = (Put) w;
-        put.setWriteToWAL(walEnabled);
-        table.put(put);
-      }
-    };
-  }
 
   @Override
   public void checkOutputSpecs(FileSystem fs, JobConf jc) throws IOException {
 
+    //obtain delegation tokens for the job
+    if (UserGroupInformation.getCurrentUser().hasKerberosCredentials()) {
+      TableMapReduceUtil.initCredentials(jc);
+    }
+
     String hbaseTableName = jc.get(HBaseSerDe.HBASE_TABLE_NAME);
     jc.set(TableOutputFormat.OUTPUT_TABLE, hbaseTableName);
     Job job = new Job(jc);
-    JobContext jobContext =
-      new JobContext(job.getConfiguration(), job.getJobID());
+    JobContext jobContext = ShimLoader.getHadoopShims().newJobContext(job);
 
     try {
       checkOutputSpecs(jobContext);
@@ -116,13 +91,59 @@ public class HiveHBaseTableOutputFormat extends
 
   @Override
   public
-  org.apache.hadoop.mapred.RecordWriter<ImmutableBytesWritable, Put>
+  org.apache.hadoop.mapred.RecordWriter<ImmutableBytesWritable, Object>
   getRecordWriter(
       FileSystem fileSystem,
       JobConf jobConf,
       String name,
       Progressable progressable) throws IOException {
 
-    throw new RuntimeException("Error: Hive should not invoke this method.");
+    String hbaseTableName = jobConf.get(HBaseSerDe.HBASE_TABLE_NAME);
+    jobConf.set(TableOutputFormat.OUTPUT_TABLE, hbaseTableName);
+    final boolean walEnabled = HiveConf.getBoolVar(
+        jobConf, HiveConf.ConfVars.HIVE_HBASE_WAL_ENABLED);
+    final HTable table = new HTable(HBaseConfiguration.create(jobConf), hbaseTableName);
+    table.setAutoFlush(false);
+    return new MyRecordWriter(table,walEnabled);
+  }
+
+  @Override
+  public OutputCommitter getOutputCommitter(TaskAttemptContext context) throws IOException,
+  InterruptedException {
+    return new TableOutputCommitter();
+  }
+
+
+  static private class MyRecordWriter implements org.apache.hadoop.mapred.RecordWriter<ImmutableBytesWritable, Object> {
+    private final HTable m_table;
+    private final boolean m_walEnabled;
+
+    public MyRecordWriter(HTable table, boolean walEnabled) {
+      m_table = table;
+      m_walEnabled = walEnabled;
+    }
+
+    public void close(Reporter reporter)
+      throws IOException {
+      m_table.close();
+    }
+
+    public void write(ImmutableBytesWritable key,
+        Object value) throws IOException {
+      Put put;
+      if (value instanceof Put){
+        put = (Put)value;
+      } else if (value instanceof PutWritable) {
+        put = new Put(((PutWritable)value).getPut());
+      } else {
+        throw new IllegalArgumentException("Illegal Argument " + (value == null ? "null" : value.getClass().getName()));
+      }
+      if(m_walEnabled) {
+        put.setDurability(Durability.SYNC_WAL);
+      } else {
+        put.setDurability(Durability.SKIP_WAL);
+      }
+      m_table.put(put);
+    }
   }
 }

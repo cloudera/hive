@@ -25,20 +25,23 @@ import java.util.Map;
  * StandardMapObjectInspector works on map data that is stored as a Java Map
  * object. Note: the key object of the map must support equals and hashCode by
  * itself.
- * 
+ *
  * We also plan to have a GeneralMapObjectInspector which can work on map with
  * key objects that does not support equals and hashCode. That will require us
  * to store InspectableObject as the key, which will have overridden equals and
  * hashCode methods.
- * 
+ *
  * Always use the ObjectInspectorFactory to create new ObjectInspector objects,
  * instead of directly creating an instance of this class.
  */
 public class StandardMapObjectInspector implements SettableMapObjectInspector {
 
-  ObjectInspector mapKeyObjectInspector;
-  ObjectInspector mapValueObjectInspector;
+  private ObjectInspector mapKeyObjectInspector;
+  private ObjectInspector mapValueObjectInspector;
 
+  protected StandardMapObjectInspector() {
+    super();
+  }
   /**
    * Call ObjectInspectorFactory.getStandardMapObjectInspector instead.
    */
@@ -88,7 +91,7 @@ public class StandardMapObjectInspector implements SettableMapObjectInspector {
   }
 
   public String getTypeName() {
-    return org.apache.hadoop.hive.serde.Constants.MAP_TYPE_NAME + "<"
+    return org.apache.hadoop.hive.serde.serdeConstants.MAP_TYPE_NAME + "<"
         + mapKeyObjectInspector.getTypeName() + ","
         + mapValueObjectInspector.getTypeName() + ">";
   }

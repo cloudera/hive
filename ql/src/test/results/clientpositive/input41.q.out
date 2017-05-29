@@ -1,7 +1,10 @@
 PREHOOK: query: create table dest_sp (cnt int)
 PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:default
+PREHOOK: Output: default@dest_sp
 POSTHOOK: query: create table dest_sp (cnt int)
 POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@dest_sp
 PREHOOK: query: insert overwrite table dest_sp
 select * from 
@@ -11,6 +14,7 @@ select * from
   )x
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src
+PREHOOK: Input: default@srcpart
 PREHOOK: Output: default@dest_sp
 POSTHOOK: query: insert overwrite table dest_sp
 select * from 
@@ -20,16 +24,16 @@ select * from
   )x
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@src
+POSTHOOK: Input: default@srcpart
 POSTHOOK: Output: default@dest_sp
 POSTHOOK: Lineage: dest_sp.cnt EXPRESSION [(src)src.null, (srcpart)srcpart.null, ]
 PREHOOK: query: select * from dest_sp x order by x.cnt limit 2
 PREHOOK: type: QUERY
 PREHOOK: Input: default@dest_sp
-PREHOOK: Output: file:/tmp/jssarma/hive_2010-07-21_11-28-55_506_7975559281496695000/10000
+#### A masked pattern was here ####
 POSTHOOK: query: select * from dest_sp x order by x.cnt limit 2
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@dest_sp
-POSTHOOK: Output: file:/tmp/jssarma/hive_2010-07-21_11-28-55_506_7975559281496695000/10000
-POSTHOOK: Lineage: dest_sp.cnt EXPRESSION [(src)src.null, (srcpart)srcpart.null, ]
+#### A masked pattern was here ####
 0
 500

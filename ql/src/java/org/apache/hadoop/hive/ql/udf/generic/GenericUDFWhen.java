@@ -18,33 +18,51 @@
 
 package org.apache.hadoop.hive.ql.udf.generic;
 
+import org.apache.hadoop.hive.ql.exec.Description;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentTypeException;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
-import org.apache.hadoop.hive.serde.Constants;
+import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.BooleanObjectInspector;
 
 /**
- * GenericUDF Class for SQL construct "CASE a WHEN b THEN c [ELSE f] END".
+ * GenericUDF Class for SQL construct
+ * "CASE WHEN a THEN b WHEN c THEN d [ELSE f] END".
  * 
- * NOTES: 1. a and b should have the same TypeInfo, or an exception will be
- * thrown. 2. c and f should have the same TypeInfo, or an exception will be
- * thrown.
+ * NOTES: 1. a and c should be boolean, or an exception will be thrown. 2. b, d
+ * and f should be common types, or an exception will be thrown.
  */
+@Description(
+    name = "when",
+    value = "CASE WHEN a THEN b [WHEN c THEN d]* [ELSE e] END - "
+        + "When a = true, returns b; when c = true, return d; else return e",
+    extended = "Example:\n "
+    + "SELECT\n"
+    + " CASE\n"
+    + "   WHEN deptno=1 THEN Engineering\n"
+    + "   WHEN deptno=2 THEN Finance\n"
+    + "   ELSE admin\n"
+    + " END,\n"
+    + " CASE\n"
+    + "   WHEN zone=7 THEN Americas\n"
+    + "   ELSE Asia-Pac\n"
+    + " END\n"
+    + " FROM emp_details")
+
 public class GenericUDFWhen extends GenericUDF {
-  private ObjectInspector[] argumentOIs;
-  private GenericUDFUtils.ReturnObjectInspectorResolver returnOIResolver;
+  private transient ObjectInspector[] argumentOIs;
+  private transient GenericUDFUtils.ReturnObjectInspectorResolver returnOIResolver;
 
   @Override
   public ObjectInspector initialize(ObjectInspector[] arguments) throws UDFArgumentTypeException {
 
     argumentOIs = arguments;
-    returnOIResolver = new GenericUDFUtils.ReturnObjectInspectorResolver();
+    returnOIResolver = new GenericUDFUtils.ReturnObjectInspectorResolver(true);
 
     for (int i = 0; i + 1 < arguments.length; i += 2) {
-      if (!arguments[i].getTypeName().equals(Constants.BOOLEAN_TYPE_NAME)) {
+      if (!arguments[i].getTypeName().equals(serdeConstants.BOOLEAN_TYPE_NAME)) {
         throw new UDFArgumentTypeException(i, "\""
-            + Constants.BOOLEAN_TYPE_NAME + "\" is expected after WHEN, "
+            + serdeConstants.BOOLEAN_TYPE_NAME + "\" is expected after WHEN, "
             + "but \"" + arguments[i].getTypeName() + "\" is found");
       }
       if (!returnOIResolver.update(arguments[i + 1])) {

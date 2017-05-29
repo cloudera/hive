@@ -21,33 +21,40 @@ package org.apache.hadoop.hive.serde2.lazy;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
+import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hive.serde.Constants;
+import org.apache.hadoop.hive.conf.HiveConf.ConfVars;
+import org.apache.hadoop.hive.serde.serdeConstants;
+import org.apache.hadoop.hive.serde2.AbstractEncodingAwareSerDe;
 import org.apache.hadoop.hive.serde2.ByteStream;
-import org.apache.hadoop.hive.serde2.SerDe;
 import org.apache.hadoop.hive.serde2.SerDeException;
+import org.apache.hadoop.hive.serde2.SerDeSpec;
+import org.apache.hadoop.hive.serde2.SerDeStats;
+import org.apache.hadoop.hive.serde2.SerDeUtils;
 import org.apache.hadoop.hive.serde2.objectinspector.ListObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.MapObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Category;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StructField;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.UnionObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Category;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
 import org.apache.hadoop.hive.serde2.typeinfo.StructTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
-import org.apache.hadoop.io.BytesWritable;
+import org.apache.hadoop.io.BinaryComparable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
+
 
 /**
  * LazySimpleSerDe can be used to read the same data format as
@@ -59,109 +66,44 @@ import org.apache.hadoop.io.Writable;
  * Also LazySimpleSerDe outputs typed columns instead of treating all columns as
  * String like MetadataTypedColumnsetSerDe.
  */
-public class LazySimpleSerDe implements SerDe {
+@SerDeSpec(schemaProps = {
+    serdeConstants.LIST_COLUMNS, serdeConstants.LIST_COLUMN_TYPES,
+    serdeConstants.FIELD_DELIM, serdeConstants.COLLECTION_DELIM, serdeConstants.MAPKEY_DELIM,
+    serdeConstants.SERIALIZATION_FORMAT, serdeConstants.SERIALIZATION_NULL_FORMAT,
+    serdeConstants.SERIALIZATION_LAST_COLUMN_TAKES_REST,
+    serdeConstants.ESCAPE_CHAR,
+    serdeConstants.SERIALIZATION_ENCODING,
+    LazySerDeParameters.SERIALIZATION_EXTEND_NESTING_LEVELS,
+    LazySerDeParameters.SERIALIZATION_EXTEND_ADDITIONAL_NESTING_LEVELS
+    })
+public class LazySimpleSerDe extends AbstractEncodingAwareSerDe {
 
   public static final Log LOG = LogFactory.getLog(LazySimpleSerDe.class
       .getName());
 
-  public static final byte[] DefaultSeparators = {(byte) 1, (byte) 2, (byte) 3};
+  private LazySerDeParameters serdeParams = null;
 
   private ObjectInspector cachedObjectInspector;
+
+  private long serializedSize;
+  private SerDeStats stats;
+  private boolean lastOperationSerialize;
+  private boolean lastOperationDeserialize;
 
   @Override
   public String toString() {
     return getClass().toString()
         + "["
-        + Arrays.asList(serdeParams.separators)
+        + Arrays.asList(serdeParams.getSeparators())
         + ":"
-        + ((StructTypeInfo) serdeParams.rowTypeInfo).getAllStructFieldNames()
+        + ((StructTypeInfo) serdeParams.getRowTypeInfo()).getAllStructFieldNames()
         + ":"
-        + ((StructTypeInfo) serdeParams.rowTypeInfo)
-        .getAllStructFieldTypeInfos() + "]";
+        + ((StructTypeInfo) serdeParams.getRowTypeInfo())
+            .getAllStructFieldTypeInfos() + "]";
   }
 
   public LazySimpleSerDe() throws SerDeException {
   }
-
-  /**
-   * Return the byte value of the number string.
-   *
-   * @param altValue
-   *          The string containing a number.
-   * @param defaultVal
-   *          If the altValue does not represent a number, return the
-   *          defaultVal.
-   */
-  public static byte getByte(String altValue, byte defaultVal) {
-    if (altValue != null && altValue.length() > 0) {
-      try {
-        return Byte.valueOf(altValue).byteValue();
-      } catch (NumberFormatException e) {
-        return (byte) altValue.charAt(0);
-      }
-    }
-    return defaultVal;
-  }
-
-  /**
-   * SerDeParameters.
-   *
-   */
-  public static class SerDeParameters {
-    byte[] separators = DefaultSeparators;
-    String nullString;
-    Text nullSequence;
-    TypeInfo rowTypeInfo;
-    boolean lastColumnTakesRest;
-    List<String> columnNames;
-    List<TypeInfo> columnTypes;
-
-    boolean escaped;
-    byte escapeChar;
-    boolean[] needsEscape;
-
-    public List<TypeInfo> getColumnTypes() {
-      return columnTypes;
-    }
-
-    public List<String> getColumnNames() {
-      return columnNames;
-    }
-
-    public byte[] getSeparators() {
-      return separators;
-    }
-
-    public String getNullString() {
-      return nullString;
-    }
-
-    public Text getNullSequence() {
-      return nullSequence;
-    }
-
-    public TypeInfo getRowTypeInfo() {
-      return rowTypeInfo;
-    }
-
-    public boolean isLastColumnTakesRest() {
-      return lastColumnTakesRest;
-    }
-
-    public boolean isEscaped() {
-      return escaped;
-    }
-
-    public byte getEscapeChar() {
-      return escapeChar;
-    }
-
-    public boolean[] getNeedsEscape() {
-      return needsEscape;
-    }
-  }
-
-  SerDeParameters serdeParams = null;
 
   /**
    * Initialize the SerDe given the parameters. serialization.format: separator
@@ -171,111 +113,34 @@ public class LazySimpleSerDe implements SerDe {
    *
    * @see SerDe#initialize(Configuration, Properties)
    */
+  @Override
   public void initialize(Configuration job, Properties tbl)
       throws SerDeException {
 
-    serdeParams = LazySimpleSerDe.initSerdeParams(job, tbl, getClass()
-        .getName());
+    super.initialize(job, tbl);
+
+    serdeParams = new LazySerDeParameters(job, tbl, getClass().getName());
 
     // Create the ObjectInspectors for the fields
     cachedObjectInspector = LazyFactory.createLazyStructInspector(serdeParams
         .getColumnNames(), serdeParams.getColumnTypes(), serdeParams
         .getSeparators(), serdeParams.getNullSequence(), serdeParams
         .isLastColumnTakesRest(), serdeParams.isEscaped(), serdeParams
-        .getEscapeChar());
+        .getEscapeChar(), serdeParams.isExtendedBooleanLiteral());
 
     cachedLazyStruct = (LazyStruct) LazyFactory
         .createLazyObject(cachedObjectInspector);
 
     LOG.debug(getClass().getName() + " initialized with: columnNames="
-        + serdeParams.columnNames + " columnTypes=" + serdeParams.columnTypes
-        + " separator=" + Arrays.asList(serdeParams.separators)
-        + " nullstring=" + serdeParams.nullString + " lastColumnTakesRest="
-        + serdeParams.lastColumnTakesRest);
-  }
+        + serdeParams.getColumnNames() + " columnTypes=" + serdeParams.getColumnTypes()
+        + " separator=" + Arrays.asList(serdeParams.getSeparators())
+        + " nullstring=" + serdeParams.getNullString() + " lastColumnTakesRest="
+        + serdeParams.isLastColumnTakesRest() + " timestampFormats=" + serdeParams.getTimestampFormats());
 
-  public static SerDeParameters initSerdeParams(Configuration job,
-      Properties tbl, String serdeName) throws SerDeException {
-    SerDeParameters serdeParams = new SerDeParameters();
-    // Read the separators: We use 8 levels of separators by default, but we
-    // should change this when we allow users to specify more than 10 levels
-    // of separators through DDL.
-    serdeParams.separators = new byte[8];
-    serdeParams.separators[0] = getByte(tbl.getProperty(Constants.FIELD_DELIM,
-        tbl.getProperty(Constants.SERIALIZATION_FORMAT)), DefaultSeparators[0]);
-    serdeParams.separators[1] = getByte(tbl
-        .getProperty(Constants.COLLECTION_DELIM), DefaultSeparators[1]);
-    serdeParams.separators[2] = getByte(
-        tbl.getProperty(Constants.MAPKEY_DELIM), DefaultSeparators[2]);
-    for (int i = 3; i < serdeParams.separators.length; i++) {
-      serdeParams.separators[i] = (byte) (i + 1);
-    }
-
-    serdeParams.nullString = tbl.getProperty(
-        Constants.SERIALIZATION_NULL_FORMAT, "\\N");
-    serdeParams.nullSequence = new Text(serdeParams.nullString);
-
-    String lastColumnTakesRestString = tbl
-        .getProperty(Constants.SERIALIZATION_LAST_COLUMN_TAKES_REST);
-    serdeParams.lastColumnTakesRest = (lastColumnTakesRestString != null && lastColumnTakesRestString
-        .equalsIgnoreCase("true"));
-
-    // Read the configuration parameters
-    String columnNameProperty = tbl.getProperty(Constants.LIST_COLUMNS);
-    // NOTE: if "columns.types" is missing, all columns will be of String type
-    String columnTypeProperty = tbl.getProperty(Constants.LIST_COLUMN_TYPES);
-
-    // Parse the configuration parameters
-
-    if (columnNameProperty != null && columnNameProperty.length() > 0) {
-      serdeParams.columnNames = Arrays.asList(columnNameProperty.split(","));
-    } else {
-      serdeParams.columnNames = new ArrayList<String>();
-    }
-    if (columnTypeProperty == null) {
-      // Default type: all string
-      StringBuilder sb = new StringBuilder();
-      for (int i = 0; i < serdeParams.columnNames.size(); i++) {
-        if (i > 0) {
-          sb.append(":");
-        }
-        sb.append(Constants.STRING_TYPE_NAME);
-      }
-      columnTypeProperty = sb.toString();
-    }
-
-    serdeParams.columnTypes = TypeInfoUtils
-        .getTypeInfosFromTypeString(columnTypeProperty);
-
-    if (serdeParams.columnNames.size() != serdeParams.columnTypes.size()) {
-      throw new SerDeException(serdeName + ": columns has "
-          + serdeParams.columnNames.size()
-          + " elements while columns.types has "
-          + serdeParams.columnTypes.size() + " elements!");
-    }
-
-    // Create the LazyObject for storing the rows
-    serdeParams.rowTypeInfo = TypeInfoFactory.getStructTypeInfo(
-        serdeParams.columnNames, serdeParams.columnTypes);
-
-    // Get the escape information
-    String escapeProperty = tbl.getProperty(Constants.ESCAPE_CHAR);
-    serdeParams.escaped = (escapeProperty != null);
-    if (serdeParams.escaped) {
-      serdeParams.escapeChar = getByte(escapeProperty, (byte) '\\');
-    }
-    if (serdeParams.escaped) {
-      serdeParams.needsEscape = new boolean[128];
-      for (int i = 0; i < 128; i++) {
-        serdeParams.needsEscape[i] = false;
-      }
-      serdeParams.needsEscape[serdeParams.escapeChar] = true;
-      for (int i = 0; i < serdeParams.separators.length; i++) {
-        serdeParams.needsEscape[serdeParams.separators[i]] = true;
-      }
-    }
-
-    return serdeParams;
+    serializedSize = 0;
+    stats = new SerDeStats();
+    lastOperationSerialize = false;
+    lastOperationDeserialize = false;
   }
 
   // The object for storing row data
@@ -292,29 +157,23 @@ public class LazySimpleSerDe implements SerDe {
    * @return The deserialized row Object.
    * @see SerDe#deserialize(Writable)
    */
-  public Object deserialize(Writable field) throws SerDeException {
+  @Override
+  public Object doDeserialize(Writable field) throws SerDeException {
     if (byteArrayRef == null) {
       byteArrayRef = new ByteArrayRef();
     }
-    if (field instanceof BytesWritable) {
-      BytesWritable b = (BytesWritable) field;
-      // For backward-compatibility with hadoop 0.17
-      byteArrayRef.setData(b.get());
-      cachedLazyStruct.init(byteArrayRef, 0, b.getSize());
-    } else if (field instanceof Text) {
-      Text t = (Text) field;
-      byteArrayRef.setData(t.getBytes());
-      cachedLazyStruct.init(byteArrayRef, 0, t.getLength());
-    } else {
-      throw new SerDeException(getClass().toString()
-          + ": expects either BytesWritable or Text object!");
-    }
+    BinaryComparable b = (BinaryComparable) field;
+    byteArrayRef.setData(b.getBytes());
+    cachedLazyStruct.init(byteArrayRef, 0, b.getLength());
+    lastOperationSerialize = false;
+    lastOperationDeserialize = true;
     return cachedLazyStruct;
   }
 
   /**
    * Returns the ObjectInspector for the row.
    */
+  @Override
   public ObjectInspector getObjectInspector() throws SerDeException {
     return cachedObjectInspector;
   }
@@ -324,6 +183,7 @@ public class LazySimpleSerDe implements SerDe {
    *
    * @see SerDe#getSerializedClass()
    */
+  @Override
   public Class<? extends Writable> getSerializedClass() {
     return Text.class;
   }
@@ -342,7 +202,8 @@ public class LazySimpleSerDe implements SerDe {
    * @throws IOException
    * @see SerDe#serialize(Object, ObjectInspector)
    */
-  public Writable serialize(Object obj, ObjectInspector objInspector)
+  @Override
+  public Writable doSerialize(Object obj, ObjectInspector objInspector)
       throws SerDeException {
 
     if (objInspector.getCategory() != Category.STRUCT) {
@@ -355,18 +216,19 @@ public class LazySimpleSerDe implements SerDe {
     StructObjectInspector soi = (StructObjectInspector) objInspector;
     List<? extends StructField> fields = soi.getAllStructFieldRefs();
     List<Object> list = soi.getStructFieldsDataAsList(obj);
-    List<? extends StructField> declaredFields = (serdeParams.rowTypeInfo != null && ((StructTypeInfo) serdeParams.rowTypeInfo)
+    List<? extends StructField> declaredFields = (serdeParams.getRowTypeInfo() != null && ((StructTypeInfo) serdeParams.getRowTypeInfo())
         .getAllStructFieldNames().size() > 0) ? ((StructObjectInspector) getObjectInspector())
         .getAllStructFieldRefs()
         : null;
 
     serializeStream.reset();
+    serializedSize = 0;
 
     // Serialize each field
     for (int i = 0; i < fields.size(); i++) {
       // Append the separator if needed.
       if (i > 0) {
-        serializeStream.write(serdeParams.separators[0]);
+        serializeStream.write(serdeParams.getSeparators()[0]);
       }
       // Get the field objectInspector and the field object.
       ObjectInspector foi = fields.get(i).getFieldObjectInspector();
@@ -375,7 +237,7 @@ public class LazySimpleSerDe implements SerDe {
       if (declaredFields != null && i >= declaredFields.size()) {
         throw new SerDeException("Error: expecting " + declaredFields.size()
             + " but asking for field " + i + "\n" + "data=" + obj + "\n"
-            + "tableType=" + serdeParams.rowTypeInfo.toString() + "\n"
+            + "tableType=" + serdeParams.getRowTypeInfo().toString() + "\n"
             + "dataType="
             + TypeInfoUtils.getTypeInfoFromObjectInspector(objInspector));
       }
@@ -386,15 +248,18 @@ public class LazySimpleSerDe implements SerDe {
     // TODO: The copy of data is unnecessary, but there is no work-around
     // since we cannot directly set the private byte[] field inside Text.
     serializeCache
-        .set(serializeStream.getData(), 0, serializeStream.getCount());
+        .set(serializeStream.getData(), 0, serializeStream.getLength());
+    serializedSize = serializeStream.getLength();
+    lastOperationSerialize = true;
+    lastOperationDeserialize = false;
     return serializeCache;
   }
 
   protected void serializeField(ByteStream.Output out, Object obj, ObjectInspector objInspector,
-      SerDeParameters serdeParams) throws SerDeException {
+      LazySerDeParameters serdeParams) throws SerDeException {
     try {
-      serialize(out, obj, objInspector, serdeParams.separators, 1, serdeParams.nullSequence,
-          serdeParams.escaped, serdeParams.escapeChar, serdeParams.needsEscape);
+      serialize(out, obj, objInspector, serdeParams.getSeparators(), 1, serdeParams.getNullSequence(),
+          serdeParams.isEscaped(), serdeParams.getEscapeChar(), serdeParams.getNeedsEscape());
     } catch (IOException e) {
       throw new SerDeException(e);
     }
@@ -420,15 +285,14 @@ public class LazySimpleSerDe implements SerDe {
    * @param escapeChar
    *          Which char to use as the escape char, e.g. '\\'
    * @param needsEscape
-   *          Which chars needs to be escaped. This array should have size of
-   *          128. Negative byte values (or byte values >= 128) are never
-   *          escaped.
+   *          Which byte needs to be escaped for 256 bytes. 
    * @throws IOException
+   * @throws SerDeException
    */
   public static void serialize(ByteStream.Output out, Object obj,
       ObjectInspector objInspector, byte[] separators, int level,
       Text nullSequence, boolean escaped, byte escapeChar, boolean[] needsEscape)
-      throws IOException {
+      throws IOException, SerDeException {
 
     if (obj == null) {
       out.write(nullSequence.getBytes(), 0, nullSequence.getLength());
@@ -444,7 +308,7 @@ public class LazySimpleSerDe implements SerDe {
           needsEscape);
       return;
     case LIST:
-      separator = (char) separators[level];
+      separator = (char) LazyUtils.getSeparator(separators, level);
       ListObjectInspector loi = (ListObjectInspector) objInspector;
       list = loi.getList(obj);
       ObjectInspector eoi = loi.getListElementObjectInspector();
@@ -461,8 +325,10 @@ public class LazySimpleSerDe implements SerDe {
       }
       return;
     case MAP:
-      separator = (char) separators[level];
-      char keyValueSeparator = (char) separators[level + 1];
+      separator = (char) LazyUtils.getSeparator(separators, level);
+      char keyValueSeparator =
+           (char) LazyUtils.getSeparator(separators, level + 1);
+
       MapObjectInspector moi = (MapObjectInspector) objInspector;
       ObjectInspector koi = moi.getMapKeyObjectInspector();
       ObjectInspector voi = moi.getMapValueObjectInspector();
@@ -486,7 +352,7 @@ public class LazySimpleSerDe implements SerDe {
       }
       return;
     case STRUCT:
-      separator = (char) separators[level];
+      separator = (char) LazyUtils.getSeparator(separators, level);
       StructObjectInspector soi = (StructObjectInspector) objInspector;
       List<? extends StructField> fields = soi.getAllStructFieldRefs();
       list = soi.getStructFieldsDataAsList(obj);
@@ -504,7 +370,7 @@ public class LazySimpleSerDe implements SerDe {
       }
       return;
     case UNION:
-      separator = (char) separators[level];
+      separator = (char) LazyUtils.getSeparator(separators, level);
       UnionObjectInspector uoi = (UnionObjectInspector) objInspector;
       List<? extends ObjectInspector> ois = uoi.getObjectInspectors();
       if (ois == null) {
@@ -525,5 +391,35 @@ public class LazySimpleSerDe implements SerDe {
 
     throw new RuntimeException("Unknown category type: "
         + objInspector.getCategory());
+  }
+
+  /**
+   * Returns the statistics after (de)serialization)
+   */
+
+  @Override
+  public SerDeStats getSerDeStats() {
+    // must be different
+    assert (lastOperationSerialize != lastOperationDeserialize);
+
+    if (lastOperationSerialize) {
+      stats.setRawDataSize(serializedSize);
+    } else {
+      stats.setRawDataSize(cachedLazyStruct.getRawDataSerializedSize());
+    }
+    return stats;
+
+  }
+
+  @Override
+  protected Writable transformFromUTF8(Writable blob) {
+    Text text = (Text)blob;
+    return SerDeUtils.transformTextFromUTF8(text, this.charset);
+  }
+
+  @Override
+  protected Writable transformToUTF8(Writable blob) {
+    Text text = (Text)blob;
+    return SerDeUtils.transformTextToUTF8(text, this.charset);
   }
 }

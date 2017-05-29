@@ -19,15 +19,45 @@
 package org.apache.hadoop.hive.ql.udf.generic;
 
 import org.apache.hadoop.hive.ql.exec.Description;
+import org.apache.hadoop.hive.ql.exec.vector.VectorizedExpressions;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.*;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorUtils;
-import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.io.Text;
 
 /**
  * GenericUDF Class for operation GreaterThan.
  */
 @Description(name = ">", value = "a _FUNC_ b - Returns TRUE if a is greater than b")
+@VectorizedExpressions({LongColGreaterLongColumn.class, LongColGreaterDoubleColumn.class,
+  DoubleColGreaterLongColumn.class, DoubleColGreaterDoubleColumn.class,
+  LongColGreaterLongScalar.class, LongColGreaterDoubleScalar.class,
+  DoubleColGreaterLongScalar.class, DoubleColGreaterDoubleScalar.class,
+  LongScalarGreaterLongColumn.class, LongScalarGreaterDoubleColumn.class,
+  DoubleScalarGreaterLongColumn.class, DoubleScalarGreaterDoubleColumn.class,
+  StringGroupColGreaterStringGroupColumn.class, FilterStringGroupColGreaterStringGroupColumn.class,
+  StringGroupColGreaterStringScalar.class,
+  StringGroupColGreaterVarCharScalar.class, StringGroupColGreaterCharScalar.class,
+  StringScalarGreaterStringGroupColumn.class,
+  VarCharScalarGreaterStringGroupColumn.class, CharScalarGreaterStringGroupColumn.class,
+  FilterStringGroupColGreaterStringScalar.class, FilterStringScalarGreaterStringGroupColumn.class,
+  FilterStringGroupColGreaterVarCharScalar.class, FilterVarCharScalarGreaterStringGroupColumn.class,
+  FilterStringGroupColGreaterCharScalar.class, FilterCharScalarGreaterStringGroupColumn.class,
+  FilterLongColGreaterLongColumn.class, FilterLongColGreaterDoubleColumn.class,
+  FilterDoubleColGreaterLongColumn.class, FilterDoubleColGreaterDoubleColumn.class,
+  FilterLongColGreaterLongScalar.class, FilterLongColGreaterDoubleScalar.class,
+  FilterDoubleColGreaterLongScalar.class, FilterDoubleColGreaterDoubleScalar.class,
+  FilterLongScalarGreaterLongColumn.class, FilterLongScalarGreaterDoubleColumn.class,
+  FilterDoubleScalarGreaterLongColumn.class, FilterDoubleScalarGreaterDoubleColumn.class,
+  FilterDecimalColGreaterDecimalColumn.class, FilterDecimalColGreaterDecimalScalar.class,
+  FilterDecimalScalarGreaterDecimalColumn.class,
+  TimestampColGreaterTimestampScalar.class, TimestampScalarGreaterTimestampColumn.class,
+  FilterTimestampColGreaterTimestampScalar.class, FilterTimestampScalarGreaterTimestampColumn.class,
+  TimestampColGreaterLongScalar.class, LongScalarGreaterTimestampColumn.class,
+  FilterTimestampColGreaterLongScalar.class, FilterLongScalarGreaterTimestampColumn.class,
+  TimestampColGreaterDoubleScalar.class, DoubleScalarGreaterTimestampColumn.class,
+  FilterTimestampColGreaterDoubleScalar.class, FilterDoubleScalarGreaterTimestampColumn.class
+  })
 public class GenericUDFOPGreaterThan extends GenericUDFBaseCompare {
   public GenericUDFOPGreaterThan(){
     this.opName = "GREATER THAN";
@@ -51,7 +81,7 @@ public class GenericUDFOPGreaterThan extends GenericUDFBaseCompare {
       Text t0, t1;
       t0 = soi0.getPrimitiveWritableObject(o0);
       t1 = soi1.getPrimitiveWritableObject(o1);
-      result.set(ShimLoader.getHadoopShims().compareText(t0, t1) > 0);
+      result.set(t0.compareTo(t1) > 0);
       break;
     case COMPARE_INT:
       result.set(ioi0.get(o0) > ioi1.get(o1));
@@ -91,6 +121,11 @@ public class GenericUDFOPGreaterThan extends GenericUDFBaseCompare {
           converted_o1, compareOI) > 0);
     }
     return result;
+  }
+
+  @Override
+  public GenericUDF flip() {
+    return new GenericUDFOPLessThan();
   }
 
 }

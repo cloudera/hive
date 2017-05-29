@@ -1,7 +1,9 @@
 PREHOOK: query: CREATE TEMPORARY FUNCTION example_avg AS 'org.apache.hadoop.hive.contrib.udaf.example.UDAFExampleAvg'
 PREHOOK: type: CREATEFUNCTION
+PREHOOK: Output: example_avg
 POSTHOOK: query: CREATE TEMPORARY FUNCTION example_avg AS 'org.apache.hadoop.hive.contrib.udaf.example.UDAFExampleAvg'
 POSTHOOK: type: CREATEFUNCTION
+POSTHOOK: Output: example_avg
 PREHOOK: query: EXPLAIN
 SELECT example_avg(substr(value,5)),
        example_avg(IF(substr(value,5) > 250, NULL, substr(value,5)))
@@ -12,81 +14,66 @@ SELECT example_avg(substr(value,5)),
        example_avg(IF(substr(value,5) > 250, NULL, substr(value,5)))
 FROM src
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF src)) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_FUNCTION example_avg (TOK_FUNCTION substr (TOK_TABLE_OR_COL value) 5))) (TOK_SELEXPR (TOK_FUNCTION example_avg (TOK_FUNCTION IF (> (TOK_FUNCTION substr (TOK_TABLE_OR_COL value) 5) 250) TOK_NULL (TOK_FUNCTION substr (TOK_TABLE_OR_COL value) 5)))))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        src 
+      Map Operator Tree:
           TableScan
             alias: src
+            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
             Select Operator
-              expressions:
-                    expr: value
-                    type: string
-              outputColumnNames: value
+              expressions: substr(value, 5) (type: string), if((UDFToDouble(substr(value, 5)) > 250.0), null, substr(value, 5)) (type: string)
+              outputColumnNames: _col0, _col1
+              Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
               Group By Operator
-                aggregations:
-                      expr: example_avg(substr(value, 5))
-                      expr: example_avg(if((substr(value, 5) > 250), null, substr(value, 5)))
-                bucketGroup: false
+                aggregations: example_avg(_col0), example_avg(_col1)
                 mode: hash
                 outputColumnNames: _col0, _col1
+                Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
                 Reduce Output Operator
                   sort order: 
-                  tag: -1
-                  value expressions:
-                        expr: _col0
-                        type: struct<mcount:bigint,msum:double>
-                        expr: _col1
-                        type: struct<mcount:bigint,msum:double>
+                  Statistics: Num rows: 1 Data size: 0 Basic stats: PARTIAL Column stats: NONE
+                  value expressions: _col0 (type: struct<mcount:bigint,msum:double>), _col1 (type: struct<mcount:bigint,msum:double>)
       Reduce Operator Tree:
         Group By Operator
-          aggregations:
-                expr: example_avg(VALUE._col0)
-                expr: example_avg(VALUE._col1)
-          bucketGroup: false
+          aggregations: example_avg(VALUE._col0), example_avg(VALUE._col1)
           mode: mergepartial
           outputColumnNames: _col0, _col1
-          Select Operator
-            expressions:
-                  expr: _col0
-                  type: double
-                  expr: _col1
-                  type: double
-            outputColumnNames: _col0, _col1
-            File Output Operator
-              compressed: false
-              GlobalTableId: 0
-              table:
-                  input format: org.apache.hadoop.mapred.TextInputFormat
-                  output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+          Statistics: Num rows: 1 Data size: 16 Basic stats: COMPLETE Column stats: NONE
+          File Output Operator
+            compressed: false
+            Statistics: Num rows: 1 Data size: 16 Basic stats: COMPLETE Column stats: NONE
+            table:
+                input format: org.apache.hadoop.mapred.TextInputFormat
+                output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: SELECT example_avg(substr(value,5)),
        example_avg(IF(substr(value,5) > 250, NULL, substr(value,5)))
 FROM src
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src
-PREHOOK: Output: file:/data/users/heyongqiang/hive-trunk-commit/build/ql/tmp/611794302/10000
+#### A masked pattern was here ####
 POSTHOOK: query: SELECT example_avg(substr(value,5)),
        example_avg(IF(substr(value,5) > 250, NULL, substr(value,5)))
 FROM src
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@src
-POSTHOOK: Output: file:/data/users/heyongqiang/hive-trunk-commit/build/ql/tmp/611794302/10000
+#### A masked pattern was here ####
 260.182	134.82926829268294
 PREHOOK: query: DROP TEMPORARY FUNCTION example_avg
 PREHOOK: type: DROPFUNCTION
+PREHOOK: Output: example_avg
 POSTHOOK: query: DROP TEMPORARY FUNCTION example_avg
 POSTHOOK: type: DROPFUNCTION
+POSTHOOK: Output: example_avg

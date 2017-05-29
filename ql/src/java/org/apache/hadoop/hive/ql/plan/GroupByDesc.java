@@ -18,24 +18,31 @@
 
 package org.apache.hadoop.hive.ql.plan;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.hadoop.hive.ql.udf.UDFType;
+import org.apache.hadoop.hive.ql.udf.generic.GenericUDAFEvaluator;
+import org.apache.hive.common.util.AnnotationUtils;
+
 /**
  * GroupByDesc.
  *
  */
 @Explain(displayName = "Group By Operator")
-public class GroupByDesc implements java.io.Serializable {
+public class GroupByDesc extends AbstractOperatorDesc {
   /**
    * Group-by Mode: COMPLETE: complete 1-phase aggregation: iterate, terminate
    * PARTIAL1: partial aggregation - first phase: iterate, terminatePartial
    * PARTIAL2: partial aggregation - second phase: merge, terminatePartial
    * PARTIALS: For non-distinct the same as PARTIAL2, for distinct the same as
-   *           PARTIAL1
+   * PARTIAL1
    * FINAL: partial aggregation - final phase: merge, terminate
    * HASH: For non-distinct the same as PARTIAL1 but use hash-table-based aggregation
    * MERGEPARTIAL: FINAL for non-distinct aggregations, COMPLETE for distinct
    * aggregations.
    */
-  private static final long serialVersionUID = 1L;
+  private static long serialVersionUID = 1L;
 
   /**
    * Mode.
@@ -47,33 +54,59 @@ public class GroupByDesc implements java.io.Serializable {
 
   private Mode mode;
   private boolean groupKeyNotReductionKey;
+
+  // no hash aggregations for group by
   private boolean bucketGroup;
 
-  private java.util.ArrayList<ExprNodeDesc> keys;
-  private java.util.ArrayList<org.apache.hadoop.hive.ql.plan.AggregationDesc> aggregators;
-  private java.util.ArrayList<java.lang.String> outputColumnNames;
+  private ArrayList<ExprNodeDesc> keys;
+  private List<Integer> listGroupingSets;
+  private boolean groupingSetsPresent;
+  private int groupingSetPosition = -1;
+  private ArrayList<org.apache.hadoop.hive.ql.plan.AggregationDesc> aggregators;
+  private ArrayList<java.lang.String> outputColumnNames;
   private float groupByMemoryUsage;
   private float memoryThreshold;
+  transient private boolean isDistinct;
+  private boolean dontResetAggrsDistinct;
+
+  // Extra parameters only for vectorization.
+  private VectorGroupByDesc vectorDesc;
 
   public GroupByDesc() {
+    vectorDesc = new VectorGroupByDesc();
   }
 
   public GroupByDesc(
       final Mode mode,
-      final java.util.ArrayList<java.lang.String> outputColumnNames,
-      final java.util.ArrayList<ExprNodeDesc> keys,
-      final java.util.ArrayList<org.apache.hadoop.hive.ql.plan.AggregationDesc> aggregators,
-      final boolean groupKeyNotReductionKey,float groupByMemoryUsage, float memoryThreshold) {
+      final ArrayList<java.lang.String> outputColumnNames,
+      final ArrayList<ExprNodeDesc> keys,
+      final ArrayList<org.apache.hadoop.hive.ql.plan.AggregationDesc> aggregators,
+      final boolean groupKeyNotReductionKey,
+      final float groupByMemoryUsage,
+      final float memoryThreshold,
+      final List<Integer> listGroupingSets,
+      final boolean groupingSetsPresent,
+      final int groupingSetsPosition,
+      final boolean isDistinct) {
     this(mode, outputColumnNames, keys, aggregators, groupKeyNotReductionKey,
-        false, groupByMemoryUsage, memoryThreshold);
+        false, groupByMemoryUsage, memoryThreshold, listGroupingSets,
+        groupingSetsPresent, groupingSetsPosition, isDistinct);
   }
 
   public GroupByDesc(
       final Mode mode,
-      final java.util.ArrayList<java.lang.String> outputColumnNames,
-      final java.util.ArrayList<ExprNodeDesc> keys,
-      final java.util.ArrayList<org.apache.hadoop.hive.ql.plan.AggregationDesc> aggregators,
-      final boolean groupKeyNotReductionKey, final boolean bucketGroup,float groupByMemoryUsage, float memoryThreshold) {
+      final ArrayList<java.lang.String> outputColumnNames,
+      final ArrayList<ExprNodeDesc> keys,
+      final ArrayList<org.apache.hadoop.hive.ql.plan.AggregationDesc> aggregators,
+      final boolean groupKeyNotReductionKey,
+      final boolean bucketGroup,
+      final float groupByMemoryUsage,
+      final float memoryThreshold,
+      final List<Integer> listGroupingSets,
+      final boolean groupingSetsPresent,
+      final int groupingSetsPosition,
+      final boolean isDistinct) {
+    vectorDesc = new VectorGroupByDesc();
     this.mode = mode;
     this.outputColumnNames = outputColumnNames;
     this.keys = keys;
@@ -82,6 +115,18 @@ public class GroupByDesc implements java.io.Serializable {
     this.bucketGroup = bucketGroup;
     this.groupByMemoryUsage = groupByMemoryUsage;
     this.memoryThreshold = memoryThreshold;
+    this.listGroupingSets = listGroupingSets;
+    this.groupingSetsPresent = groupingSetsPresent;
+    this.groupingSetPosition = groupingSetsPosition;
+    this.isDistinct = isDistinct;
+  }
+
+  public void setVectorDesc(VectorGroupByDesc vectorDesc) {
+    this.vectorDesc = vectorDesc;
+  }
+
+  public VectorGroupByDesc getVectorDesc() {
+    return vectorDesc;
   }
 
   public Mode getMode() {
@@ -115,21 +160,31 @@ public class GroupByDesc implements java.io.Serializable {
   }
 
   @Explain(displayName = "keys")
-  public java.util.ArrayList<ExprNodeDesc> getKeys() {
+  public String getKeyString() {
+    return PlanUtils.getExprListString(keys);
+  }
+
+  public ArrayList<ExprNodeDesc> getKeys() {
     return keys;
   }
 
-  public void setKeys(final java.util.ArrayList<ExprNodeDesc> keys) {
+  public void setKeys(final ArrayList<ExprNodeDesc> keys) {
     this.keys = keys;
   }
 
   @Explain(displayName = "outputColumnNames")
-  public java.util.ArrayList<java.lang.String> getOutputColumnNames() {
+  public ArrayList<java.lang.String> getOutputColumnNames() {
     return outputColumnNames;
   }
 
+  @Explain(displayName = "pruneGroupingSetId", displayOnlyOnTrue = true)
+  public boolean pruneGroupingSetId() {
+    return groupingSetPosition >= 0 && 
+        outputColumnNames.size() != keys.size() + aggregators.size();
+  }
+
   public void setOutputColumnNames(
-      java.util.ArrayList<java.lang.String> outputColumnNames) {
+      ArrayList<java.lang.String> outputColumnNames) {
     this.outputColumnNames = outputColumnNames;
   }
 
@@ -150,12 +205,20 @@ public class GroupByDesc implements java.io.Serializable {
   }
 
   @Explain(displayName = "aggregations")
-  public java.util.ArrayList<org.apache.hadoop.hive.ql.plan.AggregationDesc> getAggregators() {
+  public List<String> getAggregatorStrings() {
+    List<String> res = new ArrayList<String>();
+    for (AggregationDesc agg: aggregators) {
+      res.add(agg.getExprString());
+    }
+    return res;
+  }
+
+  public ArrayList<org.apache.hadoop.hive.ql.plan.AggregationDesc> getAggregators() {
     return aggregators;
   }
 
   public void setAggregators(
-      final java.util.ArrayList<org.apache.hadoop.hive.ql.plan.AggregationDesc> aggregators) {
+      final ArrayList<org.apache.hadoop.hive.ql.plan.AggregationDesc> aggregators) {
     this.aggregators = aggregators;
   }
 
@@ -167,12 +230,77 @@ public class GroupByDesc implements java.io.Serializable {
     this.groupKeyNotReductionKey = groupKeyNotReductionKey;
   }
 
-  @Explain(displayName = "bucketGroup")
+  @Explain(displayName = "bucketGroup", displayOnlyOnTrue = true)
   public boolean getBucketGroup() {
     return bucketGroup;
   }
 
-  public void setBucketGroup(boolean dataSorted) {
-    bucketGroup = dataSorted;
+  public void setBucketGroup(boolean bucketGroup) {
+    this.bucketGroup = bucketGroup;
   }
+
+  /**
+   * Checks if this grouping is like distinct, which means that all non-distinct grouping
+   * columns behave like they were distinct - for example min and max operators.
+   */
+  public boolean isDistinctLike() {
+    ArrayList<AggregationDesc> aggregators = getAggregators();
+    for (AggregationDesc ad : aggregators) {
+      if (!ad.getDistinct()) {
+        GenericUDAFEvaluator udafEval = ad.getGenericUDAFEvaluator();
+        UDFType annot = AnnotationUtils.getAnnotation(udafEval.getClass(), UDFType.class);
+        if (annot == null || !annot.distinctLike()) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  // Consider a query like:
+  // select a, b, count(distinct c) from T group by a,b with rollup;
+  // Assume that hive.map.aggr is set to true and hive.groupby.skewindata is false,
+  // in which case the group by would execute as a single map-reduce job.
+  // For the group-by, the group by keys should be: a,b,groupingSet(for rollup), c
+  // So, the starting position of grouping set need to be known
+  public List<Integer> getListGroupingSets() {
+    return listGroupingSets;
+  }
+
+  public void setListGroupingSets(final List<Integer> listGroupingSets) {
+    this.listGroupingSets = listGroupingSets;
+  }
+
+  public boolean isGroupingSetsPresent() {
+    return groupingSetsPresent;
+  }
+
+  public void setGroupingSetsPresent(boolean groupingSetsPresent) {
+    this.groupingSetsPresent = groupingSetsPresent;
+  }
+
+  public int getGroupingSetPosition() {
+    return groupingSetPosition;
+  }
+
+  public void setGroupingSetPosition(int groupingSetPosition) {
+    this.groupingSetPosition = groupingSetPosition;
+  }
+
+  public boolean isDontResetAggrsDistinct() {
+    return dontResetAggrsDistinct;
+  }
+
+  public void setDontResetAggrsDistinct(boolean dontResetAggrsDistinct) {
+    this.dontResetAggrsDistinct = dontResetAggrsDistinct;
+  }
+
+  public boolean isDistinct() {
+    return isDistinct;
+  }
+
+  public void setDistinct(boolean isDistinct) {
+    this.isDistinct = isDistinct;
+  }
+
 }

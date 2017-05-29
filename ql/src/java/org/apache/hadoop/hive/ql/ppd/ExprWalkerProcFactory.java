@@ -17,15 +17,19 @@
  */
 package org.apache.hadoop.hive.ql.ppd;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Stack;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.ql.exec.ColumnInfo;
 import org.apache.hadoop.hive.ql.exec.FunctionRegistry;
 import org.apache.hadoop.hive.ql.exec.Operator;
+import org.apache.hadoop.hive.ql.exec.RowSchema;
 import org.apache.hadoop.hive.ql.lib.DefaultGraphWalker;
 import org.apache.hadoop.hive.ql.lib.DefaultRuleDispatcher;
 import org.apache.hadoop.hive.ql.lib.Dispatcher;
@@ -35,12 +39,12 @@ import org.apache.hadoop.hive.ql.lib.NodeProcessor;
 import org.apache.hadoop.hive.ql.lib.NodeProcessorCtx;
 import org.apache.hadoop.hive.ql.lib.Rule;
 import org.apache.hadoop.hive.ql.lib.RuleRegExp;
-import org.apache.hadoop.hive.ql.parse.RowResolver;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeFieldDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
+import org.apache.hadoop.hive.ql.plan.OperatorDesc;
 
 /**
  * Expression factory for predicate pushdown processing. Each processor
@@ -48,6 +52,9 @@ import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
  * pushdown optimization for the given operator
  */
 public final class ExprWalkerProcFactory {
+
+  private static final Log LOG = LogFactory
+      .getLog(ExprWalkerProcFactory.class.getName());
 
   /**
    * ColumnExprProcessor.
@@ -63,10 +70,15 @@ public final class ExprWalkerProcFactory {
         Object... nodeOutputs) throws SemanticException {
       ExprWalkerInfo ctx = (ExprWalkerInfo) procCtx;
       ExprNodeColumnDesc colref = (ExprNodeColumnDesc) nd;
-      RowResolver toRR = ctx.getToRR();
-      Operator<? extends Serializable> op = ctx.getOp();
-      String[] colAlias = toRR.reverseLookup(colref.getColumn());
+      RowSchema toRS = ctx.getOp().getSchema();
+      Operator<? extends OperatorDesc> op = ctx.getOp();
+      ColumnInfo ci = toRS.getColumnInfo(colref.getColumn());
+      String tabAlias = null;
+      if (ci != null) {
+        tabAlias = ci.getTabAlias();
+      }
 
+      boolean isCandidate = true;
       if (op.getColumnExprMap() != null) {
         // replace the output expression with the input expression so that
         // parent op can understand this expression
@@ -76,18 +88,26 @@ public final class ExprWalkerProcFactory {
           // group by
           ctx.setIsCandidate(colref, false);
           return false;
+        } else {
+          if (exp instanceof ExprNodeGenericFuncDesc) {
+            isCandidate = false;
+          }
+          if (exp instanceof ExprNodeColumnDesc && ci == null) {
+            ExprNodeColumnDesc column = (ExprNodeColumnDesc)exp;
+            tabAlias = column.getTabAlias();
+          }
         }
         ctx.addConvertedNode(colref, exp);
-        ctx.setIsCandidate(exp, true);
-        ctx.addAlias(exp, colAlias[0]);
+        ctx.setIsCandidate(exp, isCandidate);
+        ctx.addAlias(exp, tabAlias);
       } else {
-        if (colAlias == null) {
-          assert false;
+        if (ci == null) {
+          return false;
         }
-        ctx.addAlias(colref, colAlias[0]);
+        ctx.addAlias(colref, tabAlias);
       }
-      ctx.setIsCandidate(colref, true);
-      return true;
+      ctx.setIsCandidate(colref, isCandidate);
+      return isCandidate;
     }
 
   }
@@ -160,7 +180,7 @@ public final class ExprWalkerProcFactory {
         ExprNodeDesc ch = (ExprNodeDesc) nd.getChildren().get(i);
         ExprNodeDesc newCh = ctx.getConvertedNode(ch);
         if (newCh != null) {
-          expr.getChildExprs().set(i, newCh);
+          expr.getChildren().set(i, newCh);
           ch = newCh;
         }
         String chAlias = ctx.getAlias(ch);
@@ -219,8 +239,8 @@ public final class ExprWalkerProcFactory {
   }
 
   public static ExprWalkerInfo extractPushdownPreds(OpWalkerInfo opContext,
-      Operator<? extends Serializable> op, ExprNodeDesc pred)
-      throws SemanticException {
+    Operator<? extends OperatorDesc> op, ExprNodeDesc pred)
+    throws SemanticException {
     List<ExprNodeDesc> preds = new ArrayList<ExprNodeDesc>();
     preds.add(pred);
     return extractPushdownPreds(opContext, op, preds);
@@ -228,7 +248,7 @@ public final class ExprWalkerProcFactory {
 
   /**
    * Extracts pushdown predicates from the given list of predicate expression.
-   * 
+   *
    * @param opContext
    *          operator context used for resolving column references
    * @param op
@@ -238,11 +258,10 @@ public final class ExprWalkerProcFactory {
    * @throws SemanticException
    */
   public static ExprWalkerInfo extractPushdownPreds(OpWalkerInfo opContext,
-      Operator<? extends Serializable> op, List<ExprNodeDesc> preds)
-      throws SemanticException {
+    Operator<? extends OperatorDesc> op, List<ExprNodeDesc> preds)
+    throws SemanticException {
     // Create the walker, the rules dispatcher and the context.
-    ExprWalkerInfo exprContext = new ExprWalkerInfo(op, opContext
-        .getRowResolver(op));
+    ExprWalkerInfo exprContext = new ExprWalkerInfo(op);
 
     // create a walker which walks the tree in a DFS manner while maintaining
     // the operator stack. The dispatcher
@@ -266,15 +285,18 @@ public final class ExprWalkerProcFactory {
     List<Node> startNodes = new ArrayList<Node>();
     List<ExprNodeDesc> clonedPreds = new ArrayList<ExprNodeDesc>();
     for (ExprNodeDesc node : preds) {
-      clonedPreds.add(node.clone());
+      ExprNodeDesc clone = node.clone();
+      clonedPreds.add(clone);
+      exprContext.getNewToOldExprMap().put(clone, node);
     }
     startNodes.addAll(clonedPreds);
 
     egw.startWalking(startNodes, null);
 
+    HiveConf conf = opContext.getParseContext().getConf();
     // check the root expression for final candidates
     for (ExprNodeDesc pred : clonedPreds) {
-      extractFinalCandidates(pred, exprContext);
+      extractFinalCandidates(pred, exprContext, conf);
     }
     return exprContext;
   }
@@ -284,18 +306,33 @@ public final class ExprWalkerProcFactory {
    * candidates.
    */
   private static void extractFinalCandidates(ExprNodeDesc expr,
-      ExprWalkerInfo ctx) {
-    if (ctx.isCandidate(expr)) {
-      ctx.addFinalCandidate(expr);
-      return;
-    }
-
+      ExprWalkerInfo ctx, HiveConf conf) {
+    // We decompose an AND expression into its parts before checking if the
+    // entire expression is a candidate because each part may be a candidate
+    // for replicating transitively over an equijoin condition.
     if (FunctionRegistry.isOpAnd(expr)) {
       // If the operator is AND, we need to determine if any of the children are
       // final candidates.
-      for (Node ch : expr.getChildren()) {
-        extractFinalCandidates((ExprNodeDesc) ch, ctx);
+
+      // For the children, we populate the NewToOldExprMap to keep track of
+      // the original condition before rewriting it for this operator
+      assert ctx.getNewToOldExprMap().containsKey(expr);
+      for (int i = 0; i < expr.getChildren().size(); i++) {
+        ctx.getNewToOldExprMap().put(
+            (ExprNodeDesc) expr.getChildren().get(i),
+            ctx.getNewToOldExprMap().get(expr).getChildren().get(i));
+        extractFinalCandidates((ExprNodeDesc) expr.getChildren().get(i),
+            ctx, conf);
       }
+      return;
+    }
+
+    if (ctx.isCandidate(expr)) {
+      ctx.addFinalCandidate(expr);
+      return;
+    } else if (!FunctionRegistry.isOpAnd(expr) &&
+        HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVEPPDREMOVEDUPLICATEFILTERS)) {
+      ctx.addNonFinalCandidate(expr);
     }
   }
 

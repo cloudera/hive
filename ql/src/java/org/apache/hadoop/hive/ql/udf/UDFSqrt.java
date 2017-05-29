@@ -19,32 +19,33 @@
 package org.apache.hadoop.hive.ql.udf;
 
 import org.apache.hadoop.hive.ql.exec.Description;
-import org.apache.hadoop.hive.ql.exec.UDF;
+import org.apache.hadoop.hive.ql.exec.vector.VectorizedExpressions;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.FuncSqrtDoubleToDouble;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.FuncSqrtLongToDouble;
 import org.apache.hadoop.hive.serde2.io.DoubleWritable;
 
 /**
  * Implementation of the SQRT UDF found in many databases.
  */
 @Description(name = "sqrt",
-    value = "_FUNC_(x) - returns the square root of x",
-    extended = "Example:\n "
-    + "  > SELECT _FUNC_(4) FROM src LIMIT 1;\n" + "  2")
-public class UDFSqrt extends UDF {
-  private DoubleWritable result = new DoubleWritable();
+             value = "_FUNC_(x) - returns the square root of x",
+             extended = "Example:\n "
+                        + "  > SELECT _FUNC_(4) FROM src LIMIT 1;\n"
+                        + "  2")
+@VectorizedExpressions({FuncSqrtLongToDouble.class, FuncSqrtDoubleToDouble.class})
+public class UDFSqrt extends UDFMath {
 
-  public UDFSqrt() {
-  }
+  private final DoubleWritable result = new DoubleWritable();
 
   /**
-   * Return NULL for NULL or negative inputs; otherwise, return the square root.
+   * Return NULL for negative inputs; otherwise, return the square root.
    */
-  public DoubleWritable evaluate(DoubleWritable i) {
-    if (i == null) {
-      return null;
-    } else if (i.get() < 0) {
+  @Override
+  protected DoubleWritable doEvaluate(DoubleWritable a) {
+    if (a.get() < 0) {
       return null;
     } else {
-      result.set(Math.sqrt(i.get()));
+      result.set(Math.sqrt(a.get()));
       return result;
     }
   }

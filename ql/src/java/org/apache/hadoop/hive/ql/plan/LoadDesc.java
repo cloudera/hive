@@ -20,28 +20,26 @@ package org.apache.hadoop.hive.ql.plan;
 
 import java.io.Serializable;
 
+import org.apache.hadoop.fs.Path;
+
 /**
  * LoadDesc.
  *
  */
 public class LoadDesc implements Serializable {
   private static final long serialVersionUID = 1L;
-  private String sourceDir;
+  private Path sourcePath;
 
   public LoadDesc() {
   }
 
-  public LoadDesc(final String sourceDir) {
-
-    this.sourceDir = sourceDir;
+  public LoadDesc(final Path sourcePath) {
+    this.sourcePath = sourcePath;
   }
 
-  @Explain(displayName = "source", normalExplain = false)
-  public String getSourceDir() {
-    return sourceDir;
+  @Explain(displayName = "source", normalExplain = false)  
+  public Path getSourcePath() {
+    return sourcePath;
   }
-
-  public void setSourceDir(final String source) {
-    sourceDir = source;
-  }
+  
 }

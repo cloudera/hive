@@ -31,7 +31,7 @@ import java.util.regex.Pattern;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hive.serde.Constants;
+import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.io.Text;
 import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TField;
@@ -219,10 +219,17 @@ public class TCTLSeparatedProtocol extends TProtocol implements
       this.trans = trans;
       this.separator = separator;
       buf = new byte[buffer_length];
+    }
+
+    private void initialize() {
       // do not fill tokenizer until user requests since filling it could read
       // in data
       // not meant for this instantiation.
-      fillTokenizer();
+      try {
+        fillTokenizer();
+      } catch (Exception e) {
+        LOG.warn("Unable to initialize tokenizer", e);
+      }
     }
 
     private boolean fillTokenizer() {
@@ -244,9 +251,8 @@ public class TCTLSeparatedProtocol extends TProtocol implements
           tokenizer = new StringTokenizer("", separator, true);
           return false;
         }
-        e.printStackTrace();
         tokenizer = null;
-        return false;
+        throw new RuntimeException(e);
       }
       return true;
     }
@@ -364,6 +370,7 @@ public class TCTLSeparatedProtocol extends TProtocol implements
     nullText = new Text(nullString);
     transportTokenizer = new SimpleTransportTokenizer(innerTransport,
         rowSeparator, bufferSize);
+    transportTokenizer.initialize();
   }
 
   /**
@@ -436,21 +443,21 @@ public class TCTLSeparatedProtocol extends TProtocol implements
    */
   public void initialize(Configuration conf, Properties tbl) throws TException {
 
-    primarySeparator = getByteValue(tbl.getProperty(Constants.FIELD_DELIM),
+    primarySeparator = getByteValue(tbl.getProperty(serdeConstants.FIELD_DELIM),
         primarySeparator);
     secondarySeparator = getByteValue(tbl
-        .getProperty(Constants.COLLECTION_DELIM), secondarySeparator);
-    rowSeparator = getByteValue(tbl.getProperty(Constants.LINE_DELIM),
+        .getProperty(serdeConstants.COLLECTION_DELIM), secondarySeparator);
+    rowSeparator = getByteValue(tbl.getProperty(serdeConstants.LINE_DELIM),
         rowSeparator);
-    mapSeparator = getByteValue(tbl.getProperty(Constants.MAPKEY_DELIM),
+    mapSeparator = getByteValue(tbl.getProperty(serdeConstants.MAPKEY_DELIM),
         mapSeparator);
     returnNulls = Boolean.valueOf(
         tbl.getProperty(ReturnNullsKey, String.valueOf(returnNulls)))
         .booleanValue();
     bufferSize = Integer.valueOf(
         tbl.getProperty(BufferSizeKey, String.valueOf(bufferSize))).intValue();
-    nullString = tbl.getProperty(Constants.SERIALIZATION_NULL_FORMAT, "\\N");
-    quote = tbl.getProperty(Constants.QUOTE_CHAR, null);
+    nullString = tbl.getProperty(serdeConstants.SERIALIZATION_NULL_FORMAT, "\\N");
+    quote = tbl.getProperty(serdeConstants.QUOTE_CHAR, null);
 
     internalInitialize();
 

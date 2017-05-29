@@ -20,7 +20,13 @@ package org.apache.hadoop.hive.ql.plan;
 
 import java.io.Serializable;
 
-import org.apache.hadoop.hive.serde.Constants;
+import org.apache.commons.lang.builder.HashCodeBuilder;
+import org.apache.hadoop.hive.serde.serdeConstants;
+import org.apache.hadoop.hive.serde2.objectinspector.ConstantObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
+import org.apache.hadoop.hive.serde2.typeinfo.BaseCharTypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
 
@@ -29,7 +35,30 @@ import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
  */
 public class ExprNodeConstantDesc extends ExprNodeDesc implements Serializable {
   private static final long serialVersionUID = 1L;
+  final protected transient static char[] hexArray = "0123456789ABCDEF".toCharArray();
   private Object value;
+  // If this constant was created while doing constant folding, foldedFromCol holds the name of
+  // original column from which it was folded.
+  private transient String foldedFromCol;
+  // string representation of folding constant.
+  private transient String foldedFromVal;
+
+  public ExprNodeConstantDesc setFoldedFromVal(String foldedFromVal) {
+    this.foldedFromVal = foldedFromVal;
+    return this;
+  }
+
+  public String getFoldedFromVal() {
+    return foldedFromVal;
+  }
+
+  public String getFoldedFromCol() {
+    return foldedFromCol;
+  }
+
+  public void setFoldedFromCol(String foldedFromCol) {
+    this.foldedFromCol = foldedFromCol;
+  }
 
   public ExprNodeConstantDesc() {
   }
@@ -53,19 +82,40 @@ public class ExprNodeConstantDesc extends ExprNodeDesc implements Serializable {
   }
 
   @Override
+  public ConstantObjectInspector getWritableObjectInspector() {
+    PrimitiveTypeInfo pti = (PrimitiveTypeInfo) getTypeInfo();
+    PrimitiveCategory pc = pti.getPrimitiveCategory();
+    // Convert from Java to Writable
+    Object writableValue = PrimitiveObjectInspectorFactory
+        .getPrimitiveJavaObjectInspector(pti).getPrimitiveWritableObject(
+          getValue());
+    return PrimitiveObjectInspectorFactory
+        .getPrimitiveWritableConstantObjectInspector((PrimitiveTypeInfo) getTypeInfo(), writableValue);
+  }
+
+
+  @Override
   public String toString() {
     return "Const " + typeInfo.toString() + " " + value;
   }
 
-  @Explain(displayName = "expr")
   @Override
   public String getExprString() {
     if (value == null) {
       return "null";
     }
 
-    if (typeInfo.getTypeName().equals(Constants.STRING_TYPE_NAME)) {
+    if (typeInfo.getTypeName().equals(serdeConstants.STRING_TYPE_NAME) || typeInfo instanceof BaseCharTypeInfo) {
       return "'" + value.toString() + "'";
+    } else if (typeInfo.getTypeName().equals(serdeConstants.BINARY_TYPE_NAME)) {
+      byte[] bytes = (byte[]) value;
+      char[] hexChars = new char[bytes.length * 2];
+      for (int j = 0; j < bytes.length; j++) {
+        int v = bytes[j] & 0xFF;
+        hexChars[j * 2] = hexArray[v >>> 4];
+        hexChars[j * 2 + 1] = hexArray[v & 0x0F];
+      }
+      return new String(hexChars);
     } else {
       return value.toString();
     }
@@ -85,10 +135,23 @@ public class ExprNodeConstantDesc extends ExprNodeDesc implements Serializable {
     if (!typeInfo.equals(dest.getTypeInfo())) {
       return false;
     }
-    if (!value.equals(dest.getValue())) {
+    if (value == null) {
+      if (dest.getValue() != null) {
+        return false;
+      }
+    } else if (!value.equals(dest.getValue())) {
       return false;
     }
 
     return true;
+  }
+
+  @Override
+  public int hashCode() {
+    int superHashCode = super.hashCode();
+    HashCodeBuilder builder = new HashCodeBuilder();
+    builder.appendSuper(superHashCode);
+    builder.append(value);
+    return builder.toHashCode();
   }
 }

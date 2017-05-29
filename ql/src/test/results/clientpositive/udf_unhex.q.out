@@ -2,24 +2,20 @@ PREHOOK: query: DESCRIBE FUNCTION unhex
 PREHOOK: type: DESCFUNCTION
 POSTHOOK: query: DESCRIBE FUNCTION unhex
 POSTHOOK: type: DESCFUNCTION
-unhex(str) - Converts hexadecimal argument to string
+unhex(str) - Converts hexadecimal argument to binary
 PREHOOK: query: DESCRIBE FUNCTION EXTENDED unhex
 PREHOOK: type: DESCFUNCTION
 POSTHOOK: query: DESCRIBE FUNCTION EXTENDED unhex
 POSTHOOK: type: DESCFUNCTION
-unhex(str) - Converts hexadecimal argument to string
+unhex(str) - Converts hexadecimal argument to binary
 Performs the inverse operation of HEX(str). That is, it interprets
 each pair of hexadecimal digits in the argument as a number and
-converts it to the character represented by the number. The
+converts it to the byte representation of the number. The
 resulting characters are returned as a binary string.
 
 Example:
-> SELECT UNHEX('4D7953514C') from src limit 1;
+> SELECT DECODE(UNHEX('4D7953514C'), 'UTF-8') from src limit 1;
 'MySQL'
-> SELECT UNHEX(HEX('string')) from src limit 1;
-'string'
-> SELECT HEX(UNHEX('1267')) from src limit 1;
-'1267'
 
 The characters in the argument string must be legal hexadecimal
 digits: '0' .. '9', 'A' .. 'F', 'a' .. 'f'. If UNHEX() encounters
@@ -33,10 +29,10 @@ SELECT
   unhex('61'),
   unhex('2D34'),
   unhex('')
-FROM src limit 1
+FROM src tablesample (1 rows)
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src
-PREHOOK: Output: file:/Users/carl/Projects/hd9/hive-trunk/build/ql/tmp/1211131149/10000
+#### A masked pattern was here ####
 POSTHOOK: query: -- Good inputs
 
 SELECT
@@ -45,27 +41,27 @@ SELECT
   unhex('61'),
   unhex('2D34'),
   unhex('')
-FROM src limit 1
+FROM src tablesample (1 rows)
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@src
-POSTHOOK: Output: file:/Users/carl/Projects/hd9/hive-trunk/build/ql/tmp/1211131149/10000
+#### A masked pattern was here ####
 MySQL	1267	a	-4	
 PREHOOK: query: -- Bad inputs
 SELECT
   unhex('MySQL'),
   unhex('G123'),
   unhex('\0')
-FROM src limit 1
+FROM src tablesample (1 rows)
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src
-PREHOOK: Output: file:/Users/carl/Projects/hd9/hive-trunk/build/ql/tmp/1374300168/10000
+#### A masked pattern was here ####
 POSTHOOK: query: -- Bad inputs
 SELECT
   unhex('MySQL'),
   unhex('G123'),
   unhex('\0')
-FROM src limit 1
+FROM src tablesample (1 rows)
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@src
-POSTHOOK: Output: file:/Users/carl/Projects/hd9/hive-trunk/build/ql/tmp/1374300168/10000
+#### A masked pattern was here ####
 NULL	NULL	NULL

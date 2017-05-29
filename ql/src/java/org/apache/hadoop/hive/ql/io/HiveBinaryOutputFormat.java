@@ -43,7 +43,7 @@ public class HiveBinaryOutputFormat<K extends WritableComparable, V extends Writ
   /**
    * create the final out file, and output row by row. After one row is
    * appended, a configured row separator is appended
-   * 
+   *
    * @param jc
    *          the job configuration file
    * @param outPath
@@ -64,9 +64,10 @@ public class HiveBinaryOutputFormat<K extends WritableComparable, V extends Writ
       Properties tableProperties, Progressable progress) throws IOException {
 
     FileSystem fs = outPath.getFileSystem(jc);
-    final OutputStream outStream = fs.create(outPath);
+    final OutputStream outStream = fs.create(outPath, progress);
 
     return new RecordWriter() {
+      @Override
       public void write(Writable r) throws IOException {
         if (r instanceof Text) {
           Text tr = (Text) r;
@@ -78,6 +79,7 @@ public class HiveBinaryOutputFormat<K extends WritableComparable, V extends Writ
         }
       }
 
+      @Override
       public void close(boolean abort) throws IOException {
         outStream.close();
       }

@@ -19,7 +19,6 @@ package org.apache.hadoop.hive.ql.udf.generic;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -27,25 +26,20 @@ import org.apache.hadoop.hive.ql.exec.Description;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentTypeException;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
+import org.apache.hadoop.hive.ql.util.JavaDataModel;
 import org.apache.hadoop.hive.serde2.io.DoubleWritable;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.StandardMapObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StandardListObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.StructField;
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.DoubleObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.WritableDoubleObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorUtils;
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
-import org.apache.hadoop.util.StringUtils;
 
 /**
  * Computes an approximate histogram of a numerical column using a user-specified number of bins.
- * 
+ *
  * The output is an array of (x,y) pairs as Hive struct objects that represents the histogram's
  * bin centers and heights.
  */
@@ -72,7 +66,7 @@ public class GenericUDAFHistogramNumeric extends AbstractGenericUDAFResolver {
       throw new UDFArgumentTypeException(parameters.length - 1,
           "Please specify exactly two arguments.");
     }
-    
+
     // validate the first parameter, which is the expression to compute over
     if (parameters[0].getCategory() != ObjectInspector.Category.PRIMITIVE) {
       throw new UDFArgumentTypeException(0,
@@ -86,9 +80,12 @@ public class GenericUDAFHistogramNumeric extends AbstractGenericUDAFResolver {
     case LONG:
     case FLOAT:
     case DOUBLE:
+    case TIMESTAMP:
+    case DECIMAL:
       break;
     case STRING:
     case BOOLEAN:
+    case DATE:
     default:
       throw new UDFArgumentTypeException(0,
           "Only numeric type arguments are accepted but "
@@ -124,10 +121,10 @@ public class GenericUDAFHistogramNumeric extends AbstractGenericUDAFResolver {
 
     // For PARTIAL1 and COMPLETE: ObjectInspectors for original data
     private PrimitiveObjectInspector inputOI;
-    private PrimitiveObjectInspector nbinsOI;
+    private transient PrimitiveObjectInspector nbinsOI;
 
     // For PARTIAL2 and FINAL: ObjectInspectors for partial aggregations (list of doubles)
-    private StandardListObjectInspector loi;
+    private transient StandardListObjectInspector loi;
 
 
     @Override
@@ -169,7 +166,7 @@ public class GenericUDAFHistogramNumeric extends AbstractGenericUDAFResolver {
 
     @Override
     public Object terminatePartial(AggregationBuffer agg) throws HiveException {
-      // Return a single ArrayList where the first element is the number of histogram bins, 
+      // Return a single ArrayList where the first element is the number of histogram bins,
       // and subsequent elements represent histogram (x,y) pairs.
       StdAgg myagg = (StdAgg) agg;
       return myagg.histogram.serialize();
@@ -232,9 +229,14 @@ public class GenericUDAFHistogramNumeric extends AbstractGenericUDAFResolver {
     }
 
 
-    // Aggregation buffer definition and manipulation methods 
-    static class StdAgg implements AggregationBuffer {
+    // Aggregation buffer definition and manipulation methods
+    @AggregationType(estimable = true)
+    static class StdAgg extends AbstractAggregationBuffer {
       NumericHistogram histogram; // the histogram object
+      @Override
+      public int estimate() {
+        return JavaDataModel.get().lengthFor(histogram);
+      }
     };
 
     @Override

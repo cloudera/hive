@@ -23,6 +23,7 @@ import java.util.Map;
 
 import org.apache.hadoop.hive.ql.exec.UnionOperator;
 import org.apache.hadoop.hive.ql.lib.NodeProcessorCtx;
+import org.apache.hadoop.hive.ql.parse.ParseContext;
 
 /**
  * UnionProcContext.
@@ -36,17 +37,16 @@ public class UnionProcContext implements NodeProcessorCtx {
    */
   public static class UnionParseContext {
     private final transient boolean[] mapOnlySubq;
+    private final transient boolean[] mapOnlySubqSet;
     private final transient boolean[] rootTask;
-    private final transient boolean[] mapJoinSubq;
 
-    private transient int numInputs;
-    private transient boolean mapJoinQuery;
+    private final transient int numInputs;
 
     public UnionParseContext(int numInputs) {
       this.numInputs = numInputs;
       mapOnlySubq = new boolean[numInputs];
       rootTask = new boolean[numInputs];
-      mapJoinSubq = new boolean[numInputs];
+      mapOnlySubqSet = new boolean[numInputs];
     }
 
     public boolean getMapOnlySubq(int pos) {
@@ -55,21 +55,7 @@ public class UnionProcContext implements NodeProcessorCtx {
 
     public void setMapOnlySubq(int pos, boolean mapOnlySubq) {
       this.mapOnlySubq[pos] = mapOnlySubq;
-    }
-
-    public boolean getMapJoinSubq(int pos) {
-      return mapJoinSubq[pos];
-    }
-
-    public void setMapJoinSubq(int pos, boolean mapJoinSubq) {
-      this.mapJoinSubq[pos] = mapJoinSubq;
-      if (mapJoinSubq) {
-        mapJoinQuery = true;
-      }
-    }
-
-    public boolean getMapJoinQuery() {
-      return mapJoinQuery;
+      this.mapOnlySubqSet[pos] = true;
     }
 
     public boolean getRootTask(int pos) {
@@ -84,13 +70,33 @@ public class UnionProcContext implements NodeProcessorCtx {
       return numInputs;
     }
 
-    public void setNumInputs(int numInputs) {
-      this.numInputs = numInputs;
+    public boolean allMapOnlySubQ() {
+      return isAllTrue(mapOnlySubq);
+    }
+
+    public boolean allMapOnlySubQSet() {
+      return isAllTrue(mapOnlySubqSet);
+    }
+
+    public boolean allRootTasks() {
+      return isAllTrue(rootTask);
+    }
+
+    public boolean isAllTrue(boolean[] array) {
+      for (boolean value : array) {
+        if (!value) {
+          return false;
+        }
+      }
+      return true;
     }
   }
 
   // the subqueries are map-only jobs
   private boolean mapOnlySubq;
+
+  // ParseContext
+  private ParseContext parseContext;
 
   /**
    * @return the mapOnlySubq
@@ -120,5 +126,13 @@ public class UnionProcContext implements NodeProcessorCtx {
 
   public UnionParseContext getUnionParseContext(UnionOperator u) {
     return uCtxMap.get(u);
+  }
+
+  public ParseContext getParseContext() {
+    return parseContext;
+  }
+
+  public void setParseContext(ParseContext parseContext) {
+    this.parseContext = parseContext;
   }
 }

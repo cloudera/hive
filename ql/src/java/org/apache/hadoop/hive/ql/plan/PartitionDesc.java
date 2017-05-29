@@ -18,19 +18,30 @@
 
 package org.apache.hadoop.hive.ql.plan;
 
-import java.io.File;
+import com.google.common.collect.Interner;
+import com.google.common.collect.Interners;
+
 import java.io.Serializable;
-import java.net.URI;
 import java.util.Enumeration;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Properties;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.io.HiveFileFormatUtils;
 import org.apache.hadoop.hive.ql.io.HiveOutputFormat;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
+import org.apache.hadoop.hive.ql.metadata.Partition;
+import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.Deserializer;
+import org.apache.hadoop.hive.serde2.SerDeUtils;
 import org.apache.hadoop.mapred.InputFormat;
-import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.mapred.OutputFormat;
+import org.apache.hadoop.util.ReflectionUtils;
+import org.apache.hive.common.util.HiveStringUtils;
 
 /**
  * PartitionDesc.
@@ -38,61 +49,49 @@ import org.apache.hadoop.fs.Path;
  */
 @Explain(displayName = "Partition")
 public class PartitionDesc implements Serializable, Cloneable {
-  private static final long serialVersionUID = 2L;
+
+  static {
+    STRING_INTERNER = Interners.newWeakInterner();
+    CLASS_INTERNER = Interners.newWeakInterner();
+  }
+
+  private static final Interner<String> STRING_INTERNER;
+  private static final Interner<Class<?>> CLASS_INTERNER;
+
   private TableDesc tableDesc;
-  private java.util.LinkedHashMap<String, String> partSpec;
-  private java.lang.Class<? extends org.apache.hadoop.hive.serde2.Deserializer> deserializerClass;
+  private LinkedHashMap<String, String> partSpec;
   private Class<? extends InputFormat> inputFileFormatClass;
-  private Class<? extends HiveOutputFormat> outputFileFormatClass;
-  private java.util.Properties properties;
-  private String serdeClassName;
-  
-  private transient String baseFileName;
+  private Class<? extends OutputFormat> outputFileFormatClass;
+  private Properties properties;
+
+  private String baseFileName;
 
   public void setBaseFileName(String baseFileName) {
     this.baseFileName = baseFileName;
   }
 
-  public PartitionDesc() {
+  public PartitionDesc() {    
   }
 
-  public PartitionDesc(final TableDesc table,
-      final java.util.LinkedHashMap<String, String> partSpec) {
-    this(table, partSpec, null, null, null, null, null);
-  }
-
-  public PartitionDesc(final TableDesc table,
-      final java.util.LinkedHashMap<String, String> partSpec,
-      final Class<? extends Deserializer> serdeClass,
-      final Class<? extends InputFormat> inputFileFormatClass,
-      final Class<?> outputFormat, final java.util.Properties properties,
-      final String serdeClassName) {
+  public PartitionDesc(final TableDesc table, final LinkedHashMap<String, String> partSpec) {
     this.tableDesc = table;
     this.partSpec = partSpec;
-    deserializerClass = serdeClass;
-    this.inputFileFormatClass = inputFileFormatClass;
-    if (outputFormat != null) {
-      outputFileFormatClass = HiveFileFormatUtils
-          .getOutputFormatSubstitute(outputFormat);
-    }
-    this.properties = properties;
-    if (properties != null) {
-      this.serdeClassName = properties
-          .getProperty(org.apache.hadoop.hive.serde.Constants.SERIALIZATION_LIB);
-    }
   }
 
-  public PartitionDesc(final org.apache.hadoop.hive.ql.metadata.Partition part)
-      throws HiveException {
-    tableDesc = Utilities.getTableDesc(part.getTable());
+  public PartitionDesc(final Partition part) throws HiveException {
+    this.tableDesc = Utilities.getTableDesc(part.getTable());
+    setProperties(part.getMetadataFromPartitionSchema());
     partSpec = part.getSpec();
-    deserializerClass = part.getDeserializer().getClass();
-    inputFileFormatClass = part.getInputFormatClass();
-    outputFileFormatClass = part.getOutputFormatClass();
-    properties = part.getSchema();
-    serdeClassName = properties
-        .getProperty(org.apache.hadoop.hive.serde.Constants.SERIALIZATION_LIB);
-    ;
+    setInputFileFormatClass(part.getInputFormatClass());
+    setOutputFileFormatClass(part.getOutputFormatClass());
+  }
+
+  public PartitionDesc(final Partition part,final TableDesc tblDesc) throws HiveException {
+    this.tableDesc = tblDesc;
+    setProperties(part.getSchemaFromTableSchema(tblDesc.getProperties())); // each partition maintains a large properties
+    partSpec = part.getSpec();
+    setOutputFileFormatClass(part.getInputFormatClass());
+    setOutputFileFormatClass(part.getOutputFormatClass());
   }
 
   @Explain(displayName = "")
@@ -105,48 +104,54 @@ public class PartitionDesc implements Serializable, Cloneable {
   }
 
   @Explain(displayName = "partition values")
-  public java.util.LinkedHashMap<String, String> getPartSpec() {
+  public LinkedHashMap<String, String> getPartSpec() {
     return partSpec;
   }
 
-  public void setPartSpec(final java.util.LinkedHashMap<String, String> partSpec) {
+  public void setPartSpec(final LinkedHashMap<String, String> partSpec) {
     this.partSpec = partSpec;
   }
 
-  public java.lang.Class<? extends org.apache.hadoop.hive.serde2.Deserializer> getDeserializerClass() {
-    if (deserializerClass == null && tableDesc != null) {
-      setDeserializerClass(tableDesc.getDeserializerClass());
-    }
-    return deserializerClass;
-  }
-
-  public void setDeserializerClass(
-      final java.lang.Class<? extends org.apache.hadoop.hive.serde2.Deserializer> serdeClass) {
-    deserializerClass = serdeClass;
-  }
-
-  public Class<? extends InputFormat> getInputFileFormatClass() {
+    public Class<? extends InputFormat> getInputFileFormatClass() {
     if (inputFileFormatClass == null && tableDesc != null) {
       setInputFileFormatClass(tableDesc.getInputFileFormatClass());
     }
     return inputFileFormatClass;
   }
 
+  public String getDeserializerClassName() {
+    Properties schema = getProperties();
+    String clazzName = schema.getProperty(serdeConstants.SERIALIZATION_LIB);
+    if (clazzName == null) {
+      throw new IllegalStateException("Property " + serdeConstants.SERIALIZATION_LIB +
+          " cannot be null");
+    }
+
+    return clazzName;
+  }
+
   /**
-   * Return a deserializer object corresponding to the tableDesc.
+   * Return a deserializer object corresponding to the partitionDesc.
    */
-  public Deserializer getDeserializer() throws Exception {
-    Deserializer de = deserializerClass.newInstance();
-    de.initialize(null, properties);
-    return de;
+  public Deserializer getDeserializer(Configuration conf) throws Exception {
+    Properties schema = getProperties();
+    String clazzName = getDeserializerClassName();
+    Deserializer deserializer = ReflectionUtils.newInstance(conf.getClassByName(clazzName)
+        .asSubclass(Deserializer.class), conf);
+    SerDeUtils.initializeSerDe(deserializer, conf, getTableDesc().getProperties(), schema);
+    return deserializer;
   }
 
   public void setInputFileFormatClass(
       final Class<? extends InputFormat> inputFileFormatClass) {
-    this.inputFileFormatClass = inputFileFormatClass;
+    if (inputFileFormatClass == null) {
+      this.inputFileFormatClass = null;
+    } else {
+      this.inputFileFormatClass = (Class<? extends InputFormat>) CLASS_INTERNER.intern(inputFileFormatClass);
+    }
   }
 
-  public Class<? extends HiveOutputFormat> getOutputFileFormatClass() {
+  public Class<? extends OutputFormat> getOutputFileFormatClass() {
     if (outputFileFormatClass == null && tableDesc != null) {
       setOutputFileFormatClass(tableDesc.getOutputFileFormatClass());
     }
@@ -154,20 +159,38 @@ public class PartitionDesc implements Serializable, Cloneable {
   }
 
   public void setOutputFileFormatClass(final Class<?> outputFileFormatClass) {
-    this.outputFileFormatClass = HiveFileFormatUtils
-        .getOutputFormatSubstitute(outputFileFormatClass);
+    Class<? extends OutputFormat> outputClass = outputFileFormatClass == null ? null :
+      HiveFileFormatUtils.getOutputFormatSubstitute(outputFileFormatClass);
+    if (outputClass != null) {
+      this.outputFileFormatClass = (Class<? extends HiveOutputFormat>) 
+        CLASS_INTERNER.intern(outputClass);
+    } else {
+      this.outputFileFormatClass = outputClass;
+    }
   }
 
-  @Explain(displayName = "properties", normalExplain = false)
-  public java.util.Properties getProperties() {
+  public Properties getProperties() {
     if (properties == null && tableDesc != null) {
       return tableDesc.getProperties();
     }
     return properties;
   }
 
-  public void setProperties(final java.util.Properties properties) {
+  @Explain(displayName = "properties", normalExplain = false)
+  public Map getPropertiesExplain() {
+    return HiveStringUtils.getPropertiesExplain(getProperties());
+  }
+
+  public void setProperties(final Properties properties) {
     this.properties = properties;
+    for (Enumeration<?> keys =  properties.propertyNames(); keys.hasMoreElements();) {
+      String key = (String) keys.nextElement();
+      String oldValue = properties.getProperty(key);
+      if (oldValue != null) {
+        String value = STRING_INTERNER.intern(oldValue);
+        properties.setProperty(key, value);
+      }
+    }
   }
 
   /**
@@ -175,24 +198,12 @@ public class PartitionDesc implements Serializable, Cloneable {
    */
   @Explain(displayName = "serde")
   public String getSerdeClassName() {
-    if (serdeClassName == null && tableDesc != null) {
-      setSerdeClassName(tableDesc.getSerdeClassName());
-    }
-    return serdeClassName;
-  }
-
-  /**
-   * @param serdeClassName
-   *          the serde Class Name to set
-   */
-  public void setSerdeClassName(String serdeClassName) {
-    this.serdeClassName = serdeClassName;
+    return getProperties().getProperty(serdeConstants.SERIALIZATION_LIB);
   }
 
   @Explain(displayName = "name")
   public String getTableName() {
-    return getProperties().getProperty(
-        org.apache.hadoop.hive.metastore.api.Constants.META_TABLE_NAME);
+    return getProperties().getProperty(hive_metastoreConstants.META_TABLE_NAME);
   }
 
   @Explain(displayName = "input format")
@@ -210,12 +221,14 @@ public class PartitionDesc implements Serializable, Cloneable {
     return baseFileName;
   }
 
+  public boolean isPartitioned() {
+    return partSpec != null && !partSpec.isEmpty();
+  }
+
   @Override
   public PartitionDesc clone() {
     PartitionDesc ret = new PartitionDesc();
 
-    ret.setSerdeClassName(serdeClassName);
-    ret.setDeserializerClass(deserializerClass);
     ret.inputFileFormatClass = inputFileFormatClass;
     ret.outputFileFormatClass = outputFileFormatClass;
     if (properties != null) {
@@ -239,13 +252,13 @@ public class PartitionDesc implements Serializable, Cloneable {
   /**
    * Attempt to derive a virtual <code>base file name</code> property from the
    * path. If path format is unrecognized, just use the full path.
-   * 
+   *
    * @param path
    *          URI to the partition file
    */
-  void deriveBaseFileName(String path) {
-    PlanUtils.configureTableJobPropertiesForStorageHandler(tableDesc);
-    
+  public void deriveBaseFileName(String path) {
+    PlanUtils.configureInputJobPropertiesForStorageHandler(tableDesc);
+
     if (path == null) {
       return;
     }
@@ -257,5 +270,9 @@ public class PartitionDesc implements Serializable, Cloneable {
       // the last component at the minimum - so set to the complete path
       baseFileName = path;
     }
+  }
+
+  public void intern(Interner<TableDesc> interner) {
+    this.tableDesc = interner.intern(tableDesc);
   }
 }

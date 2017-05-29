@@ -28,9 +28,11 @@ import java.util.regex.Pattern;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hive.serde.Constants;
-import org.apache.hadoop.hive.serde2.SerDe;
+import org.apache.hadoop.hive.serde.serdeConstants;
+import org.apache.hadoop.hive.serde2.AbstractSerDe;
 import org.apache.hadoop.hive.serde2.SerDeException;
+import org.apache.hadoop.hive.serde2.SerDeSpec;
+import org.apache.hadoop.hive.serde2.SerDeStats;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
 import org.apache.hadoop.hive.serde2.objectinspector.StructField;
@@ -45,33 +47,41 @@ import org.apache.hadoop.io.Writable;
 
 /**
  * RegexSerDe uses regular expression (regex) to serialize/deserialize.
- * 
+ *
  * It can deserialize the data using regex and extracts groups as columns. It
  * can also serialize the row object using a format string.
- * 
+ *
  * In deserialization stage, if a row does not match the regex, then all columns
  * in the row will be NULL. If a row matches the regex but has less than
  * expected groups, the missing groups will be NULL. If a row matches the regex
  * but has more than expected groups, the additional groups are just ignored.
- * 
+ *
  * In serialization stage, it uses java string formatter to format the columns
  * into a row. If the output type of the column in a query is not a string, it
  * will be automatically converted to String by Hive.
- * 
+ *
  * For the format of the format String, please refer to {@link http
  * ://java.sun.com/j2se/1.5.0/docs/api/java/util/Formatter.html#syntax}
- * 
+ *
  * NOTE: Obviously, all columns have to be strings. Users can use
  * "CAST(a AS INT)" to convert columns to other types.
- * 
+ *
  * NOTE: This implementation is using String, and javaStringObjectInspector. A
  * more efficient implementation should use UTF-8 encoded Text and
  * writableStringObjectInspector. We should switch to that when we have a UTF-8
  * based Regex library.
  */
-public class RegexSerDe implements SerDe {
+@SerDeSpec(schemaProps = {
+    serdeConstants.LIST_COLUMNS, serdeConstants.LIST_COLUMN_TYPES,
+    RegexSerDe.INPUT_REGEX, RegexSerDe.OUTPUT_FORMAT_STRING,
+    RegexSerDe.INPUT_REGEX_CASE_SENSITIVE })
+public class RegexSerDe extends AbstractSerDe {
 
   public static final Log LOG = LogFactory.getLog(RegexSerDe.class.getName());
+
+  public static final String INPUT_REGEX = "input.regex";
+  public static final String OUTPUT_FORMAT_STRING = "output.format.string";
+  public static final String INPUT_REGEX_CASE_SENSITIVE = "input.regex.case.insensitive";
 
   int numColumns;
   String inputRegex;
@@ -89,12 +99,12 @@ public class RegexSerDe implements SerDe {
     // We can get the table definition from tbl.
 
     // Read the configuration parameters
-    inputRegex = tbl.getProperty("input.regex");
-    outputFormatString = tbl.getProperty("output.format.string");
-    String columnNameProperty = tbl.getProperty(Constants.LIST_COLUMNS);
-    String columnTypeProperty = tbl.getProperty(Constants.LIST_COLUMN_TYPES);
+    inputRegex = tbl.getProperty(INPUT_REGEX);
+    outputFormatString = tbl.getProperty(OUTPUT_FORMAT_STRING);
+    String columnNameProperty = tbl.getProperty(serdeConstants.LIST_COLUMNS);
+    String columnTypeProperty = tbl.getProperty(serdeConstants.LIST_COLUMN_TYPES);
     boolean inputRegexIgnoreCase = "true".equalsIgnoreCase(tbl
-        .getProperty("input.regex.case.insensitive"));
+        .getProperty(INPUT_REGEX_CASE_SENSITIVE));
 
     // Parse the configuration parameters
     if (inputRegex != null) {
@@ -255,6 +265,12 @@ public class RegexSerDe implements SerDe {
     }
     outputRowText.set(outputRowString);
     return outputRowText;
+  }
+
+  @Override
+  public SerDeStats getSerDeStats() {
+    // no support for statistics
+    return null;
   }
 
 }

@@ -19,9 +19,15 @@
 package org.apache.hadoop.hive.ql.udf;
 
 import org.apache.hadoop.hive.ql.exec.UDF;
+import org.apache.hadoop.hive.ql.exec.vector.VectorizedExpressions;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.CastDecimalToLong;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.CastDoubleToLong;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.CastTimestampToLongViaLongToLong;
 import org.apache.hadoop.hive.serde2.io.ByteWritable;
 import org.apache.hadoop.hive.serde2.io.DoubleWritable;
+import org.apache.hadoop.hive.serde2.io.HiveDecimalWritable;
 import org.apache.hadoop.hive.serde2.io.ShortWritable;
+import org.apache.hadoop.hive.serde2.io.TimestampWritable;
 import org.apache.hadoop.hive.serde2.lazy.LazyByte;
 import org.apache.hadoop.io.BooleanWritable;
 import org.apache.hadoop.io.FloatWritable;
@@ -34,15 +40,17 @@ import org.apache.hadoop.io.Text;
  * UDFToByte.
  *
  */
+@VectorizedExpressions({CastTimestampToLongViaLongToLong.class, CastDoubleToLong.class,
+    CastDecimalToLong.class})
 public class UDFToByte extends UDF {
-  private ByteWritable byteWritable = new ByteWritable();
+  private final ByteWritable byteWritable = new ByteWritable();
 
   public UDFToByte() {
   }
 
   /**
    * Convert from void to a byte. This is called for CAST(... AS TINYINT)
-   * 
+   *
    * @param i
    *          The void value to convert
    * @return Byte
@@ -53,7 +61,7 @@ public class UDFToByte extends UDF {
 
   /**
    * Convert from boolean to a byte. This is called for CAST(... AS TINYINT)
-   * 
+   *
    * @param i
    *          The boolean value to convert
    * @return Byte
@@ -69,7 +77,7 @@ public class UDFToByte extends UDF {
 
   /**
    * Convert from short to a byte. This is called for CAST(... AS TINYINT)
-   * 
+   *
    * @param i
    *          The short value to convert
    * @return Byte
@@ -85,7 +93,7 @@ public class UDFToByte extends UDF {
 
   /**
    * Convert from integer to a byte. This is called for CAST(... AS TINYINT)
-   * 
+   *
    * @param i
    *          The integer value to convert
    * @return Byte
@@ -101,7 +109,7 @@ public class UDFToByte extends UDF {
 
   /**
    * Convert from long to a byte. This is called for CAST(... AS TINYINT)
-   * 
+   *
    * @param i
    *          The long value to convert
    * @return Byte
@@ -117,7 +125,7 @@ public class UDFToByte extends UDF {
 
   /**
    * Convert from float to a byte. This is called for CAST(... AS TINYINT)
-   * 
+   *
    * @param i
    *          The float value to convert
    * @return Byte
@@ -133,7 +141,7 @@ public class UDFToByte extends UDF {
 
   /**
    * Convert from double to a byte. This is called for CAST(... AS TINYINT)
-   * 
+   *
    * @param i
    *          The double value to convert
    * @return Byte
@@ -149,7 +157,7 @@ public class UDFToByte extends UDF {
 
   /**
    * Convert from string to a byte. This is called for CAST(... AS TINYINT)
-   * 
+   *
    * @param i
    *          The string value to convert
    * @return Byte
@@ -171,4 +179,21 @@ public class UDFToByte extends UDF {
     }
   }
 
+  public ByteWritable evaluate(TimestampWritable i) {
+    if (i == null) {
+      return null;
+    } else {
+      byteWritable.set((byte)i.getSeconds());
+      return byteWritable;
+    }
+  }
+
+  public ByteWritable evaluate(HiveDecimalWritable i) {
+    if (i == null) {
+      return null;
+    } else {
+      byteWritable.set(i.getHiveDecimal().byteValue());
+      return byteWritable;
+    }
+  }
 }

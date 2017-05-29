@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Map;
 
 public class MStorageDescriptor {
-  private List<MFieldSchema> cols;
+  private MColumnDescriptor cd;
   private String location;
   private String inputFormat;
   private String outputFormat;
@@ -32,12 +32,16 @@ public class MStorageDescriptor {
   private List<String> bucketCols;
   private List<MOrder> sortCols;
   private Map<String, String> parameters;
-  
+  private List<String> skewedColNames;
+  private List<MStringList> skewedColValues;
+  private Map<MStringList, String> skewedColValueLocationMaps;
+  private boolean isStoredAsSubDirectories;
+
   public MStorageDescriptor() {}
 
-  
+
   /**
-   * @param cols
+   * @param cd
    * @param location
    * @param inputFormat
    * @param outputFormat
@@ -48,10 +52,12 @@ public class MStorageDescriptor {
    * @param sortOrder
    * @param parameters
    */
-  public MStorageDescriptor(List<MFieldSchema> cols, String location, String inputFormat,
+  public MStorageDescriptor(MColumnDescriptor cd, String location, String inputFormat,
       String outputFormat, boolean isCompressed, int numBuckets, MSerDeInfo serDeInfo,
-      List<String> bucketCols, List<MOrder> sortOrder, Map<String, String> parameters) {
-    this.cols = cols;
+      List<String> bucketCols, List<MOrder> sortOrder, Map<String, String> parameters,
+      List<String> skewedColNames, List<MStringList> skewedColValues,
+      Map<MStringList, String> skewedColValueLocationMaps, boolean storedAsSubDirectories) {
+    this.cd = cd;
     this.location = location;
     this.inputFormat = inputFormat;
     this.outputFormat = outputFormat;
@@ -61,6 +67,10 @@ public class MStorageDescriptor {
     this.bucketCols = bucketCols;
     this.sortCols = sortOrder;
     this.parameters = parameters;
+    this.skewedColNames = skewedColNames;
+    this.skewedColValues = skewedColValues;
+    this.skewedColValueLocationMaps = skewedColValueLocationMaps;
+    this.isStoredAsSubDirectories = storedAsSubDirectories;
   }
 
 
@@ -163,17 +173,17 @@ public class MStorageDescriptor {
   }
 
   /**
-   * @return the cols
+   * @return the column descriptor
    */
-  public List<MFieldSchema> getCols() {
-    return cols;
+  public MColumnDescriptor getCD() {
+    return cd;
   }
 
   /**
-   * @param cols the cols to set
+   * @param cd the Column Descriptor to set
    */
-  public void setCols(List<MFieldSchema> cols) {
-    this.cols = cols;
+  public void setCD(MColumnDescriptor cd) {
+    this.cd = cd;
   }
 
   /**
@@ -205,4 +215,63 @@ public class MStorageDescriptor {
   public List<MOrder> getSortCols() {
     return sortCols;
   }
+
+  /**
+   * @return the skewedColNames
+   */
+  public List<String> getSkewedColNames() {
+    return skewedColNames;
+  }
+
+  /**
+   * @param skewedColNames the skewedColNames to set
+   */
+  public void setSkewedColNames(List<String> skewedColNames) {
+    this.skewedColNames = skewedColNames;
+  }
+
+  /**
+   * @return the skewedColValues
+   */
+  public List<MStringList> getSkewedColValues() {
+    return skewedColValues;
+  }
+
+  /**
+   * @param skewedColValues the skewedColValues to set
+   */
+  public void setSkewedColValues(List<MStringList> skewedColValues) {
+    this.skewedColValues = skewedColValues;
+  }
+
+  /**
+   * @return the skewedColValueLocationMaps
+   */
+  public Map<MStringList, String> getSkewedColValueLocationMaps() {
+    return skewedColValueLocationMaps;
+  }
+
+  /**
+   * @param skewedColValueLocationMaps the skewedColValueLocationMaps to set
+   */
+  public void setSkewedColValueLocationMaps(Map<MStringList, String> listBucketColValuesMapping) {
+    this.skewedColValueLocationMaps = listBucketColValuesMapping;
+  }
+
+
+  /**
+   * @return the storedAsSubDirectories
+   */
+  public boolean isStoredAsSubDirectories() {
+    return isStoredAsSubDirectories;
+  }
+
+
+  /**
+   * @param storedAsSubDirectories the storedAsSubDirectories to set
+   */
+  public void setStoredAsSubDirectories(boolean storedAsSubDirectories) {
+    this.isStoredAsSubDirectories = storedAsSubDirectories;
+  }
+
 }

@@ -17,12 +17,21 @@
  */
 package org.apache.hadoop.hive.ql.udf.generic;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.ql.exec.Description;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentTypeException;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
+import org.apache.hadoop.hive.ql.parse.WindowingSpec.BoundarySpec;
+import org.apache.hadoop.hive.ql.plan.ptf.BoundaryDef;
+import org.apache.hadoop.hive.ql.plan.ptf.WindowFrameDef;
+import org.apache.hadoop.hive.ql.udf.UDFType;
+import org.apache.hadoop.hive.ql.udf.generic.GenericUDAFEvaluator.AggregationBuffer;
+import org.apache.hadoop.hive.ql.util.JavaDataModel;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorUtils;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorUtils.ObjectInspectorCopyOption;
@@ -49,10 +58,11 @@ public class GenericUDAFMax extends AbstractGenericUDAFResolver {
     return new GenericUDAFMaxEvaluator();
   }
 
+  @UDFType(distinctLike=true)
   public static class GenericUDAFMaxEvaluator extends GenericUDAFEvaluator {
 
-    ObjectInspector inputOI;
-    ObjectInspector outputOI;
+    private transient ObjectInspector inputOI;
+    private transient ObjectInspector outputOI;
 
     @Override
     public ObjectInspector init(Mode m, ObjectInspector[] parameters)
@@ -69,7 +79,7 @@ public class GenericUDAFMax extends AbstractGenericUDAFResolver {
     }
 
     /** class for storing the current max value */
-    static class MaxAgg implements AggregationBuffer {
+    static class MaxAgg extends AbstractAggregationBuffer {
       Object o;
     }
 
@@ -116,6 +126,190 @@ public class GenericUDAFMax extends AbstractGenericUDAFResolver {
     public Object terminate(AggregationBuffer agg) throws HiveException {
       MaxAgg myagg = (MaxAgg) agg;
       return myagg.o;
+    }
+
+    @Override
+    public GenericUDAFEvaluator getWindowingEvaluator(WindowFrameDef wFrmDef) {
+      return new MaxStreamingFixedWindow(this, wFrmDef);
+    }
+
+  }
+
+  /*
+   * Based on the Paper by Daniel Lemire: Streaming Max-Min filter using no more
+   * than 3 comparisons per elem.
+   * 
+   * 1. His algorithm works on fixed size windows up to the current row. For row
+   * 'i' and window 'w' it computes the min/max for window (i-w, i). 2. The core
+   * idea is to keep a queue of (max, idx) tuples. A tuple in the queue
+   * represents the max value in the range (prev tuple.idx, idx). Using the
+   * queue data structure and following 2 operations it is easy to see that
+   * maxes can be computed: - on receiving the ith row; drain the queue from the
+   * back of any entries whose value is less than the ith entry; add the ith
+   * value as a tuple in the queue (i-val, i) - on the ith step, check if the
+   * element at the front of the queue has reached its max range of influence;
+   * i.e. frontTuple.idx + w > i. If yes we can remove it from the queue. - on
+   * the ith step o/p the front of the queue as the max for the ith entry.
+   * 
+   * Here we modify the algorithm: 1. to handle window's that are of the form
+   * (i-p, i+f), where p is numPreceding,f = numFollowing - we start outputing
+   * rows only after receiving f rows. - the formula for 'influence range' of an
+   * idx accounts for the following rows. 2. optimize for the case when
+   * numPreceding is Unbounded. In this case only 1 max needs to be tarcked at
+   * any given time.
+   */
+  static class MaxStreamingFixedWindow extends
+      GenericUDAFStreamingEvaluator<Object> {
+
+    class State extends GenericUDAFStreamingEvaluator<Object>.StreamingState {
+      private final Deque<Object[]> maxChain;
+
+      public State(AggregationBuffer buf) {
+        super(buf);
+        maxChain = new ArrayDeque<Object[]>(wFrameDef.isStartUnbounded() ? 1 : wFrameDef.getWindowSize());
+      }
+
+      @Override
+      public int estimate() {
+        if (!(wrappedBuf instanceof AbstractAggregationBuffer)) {
+          return -1;
+        }
+        int underlying = ((AbstractAggregationBuffer) wrappedBuf).estimate();
+        if (underlying == -1) {
+          return -1;
+        }
+        if (wFrameDef.isStartUnbounded()) {
+          return -1;
+        }
+        /*
+         * sz Estimate = sz needed by underlying AggBuffer + sz for results + sz
+         * for maxChain + 3 * JavaDataModel.PRIMITIVES1 sz of results = sz of
+         * underlying * wdwSz sz of maxChain = sz of underlying * wdwSz
+         */
+
+        int wdwSz = wFrameDef.getWindowSize();
+        return underlying + (underlying * wdwSz) + (underlying * wdwSz)
+            + (3 * JavaDataModel.PRIMITIVES1);
+      }
+
+      protected void reset() {
+        maxChain.clear();
+        super.reset();
+      }
+
+    }
+
+    public MaxStreamingFixedWindow(GenericUDAFEvaluator wrappedEval,
+        WindowFrameDef wFrmDef) {
+      super(wrappedEval, wFrmDef);
+    }
+
+    @Override
+    public AggregationBuffer getNewAggregationBuffer() throws HiveException {
+      AggregationBuffer underlying = wrappedEval.getNewAggregationBuffer();
+      return new State(underlying);
+    }
+
+    protected ObjectInspector inputOI() {
+      return ((GenericUDAFMaxEvaluator) wrappedEval).inputOI;
+    }
+
+    protected ObjectInspector outputOI() {
+      return ((GenericUDAFMaxEvaluator) wrappedEval).outputOI;
+    }
+
+    @Override
+    public void iterate(AggregationBuffer agg, Object[] parameters)
+        throws HiveException {
+
+      State s = (State) agg;
+      Object o = parameters[0];
+
+      while (!s.maxChain.isEmpty()) {
+        if (!removeLast(o, s.maxChain.getLast()[0])) {
+          break;
+        } else {
+          s.maxChain.removeLast();
+        }
+      }
+
+      // We need to insert 'null' before processing first row for the case: X preceding and y preceding
+      if (s.numRows == 0) {
+        for (int i = wFrameDef.getEnd().getRelativeOffset(); i < 0; i++) {
+          s.results.add(null);
+        }
+      }
+
+      /*
+       * add row to chain. except in case of UNB preceding: - only 1 max needs
+       * to be tracked. - current max will never become out of range. It can
+       * only be replaced by a larger max.
+       */
+      if (!wFrameDef.isStartUnbounded() || s.maxChain.isEmpty()) {
+        o = o == null ? null : ObjectInspectorUtils.copyToStandardObject(o,
+            inputOI(), ObjectInspectorCopyOption.JAVA);
+        s.maxChain.addLast(new Object[] { o, s.numRows });
+      }
+
+      if (s.numRows >= wFrameDef.getEnd().getRelativeOffset()) {
+        s.results.add(s.maxChain.getFirst()[0]);
+      }
+      s.numRows++;
+
+      int fIdx = (Integer) s.maxChain.getFirst()[1];
+      if (!wFrameDef.isStartUnbounded()
+          && s.numRows >= fIdx +  wFrameDef.getWindowSize()) {
+        s.maxChain.removeFirst();
+      }
+    }
+
+    protected boolean removeLast(Object in, Object last) {
+      return isGreater(in, last);
+    }
+
+    private boolean isGreater(Object in, Object last) {
+      if (in == null) {
+        return false;
+      }
+      if (last == null) {
+        return true;
+      }
+      return ObjectInspectorUtils.compare(in, inputOI(), last, outputOI()) > 0;
+    }
+
+    @Override
+    public Object terminate(AggregationBuffer agg) throws HiveException {
+
+      State s = (State) agg;
+      Object[] r = s.maxChain.isEmpty() ? null : s.maxChain.getFirst();
+
+      // After all the rows are processed, continue to generate results for the rows that results haven't generated.
+      // For the case: X following and Y following, process first Y-X results and then insert X nulls.
+      // For the case X preceding and Y following, process Y results.
+      for (int i = Math.max(0, wFrameDef.getStart().getRelativeOffset()); i < wFrameDef.getEnd().getRelativeOffset(); i++) {
+        s.results.add(r == null ? null : r[0]);
+        s.numRows++;
+        if (r != null) {
+          int fIdx = (Integer) r[1];
+          if (!wFrameDef.isStartUnbounded()
+              && s.numRows + i >= fIdx + wFrameDef.getWindowSize()
+              && !s.maxChain.isEmpty()) {
+            s.maxChain.removeFirst();
+            r = !s.maxChain.isEmpty() ? s.maxChain.getFirst() : r;
+          }
+        }
+      }
+      for (int i = 0; i < wFrameDef.getStart().getRelativeOffset(); i++) {
+        s.results.add(null);
+        s.numRows++;
+      }
+
+      return null;
+    }
+
+    @Override
+    public int getRowsRemainingAfterTerminate() throws HiveException {
+      throw new UnsupportedOperationException();
     }
 
   }

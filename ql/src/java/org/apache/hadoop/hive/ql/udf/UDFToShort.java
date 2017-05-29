@@ -19,9 +19,16 @@
 package org.apache.hadoop.hive.ql.udf;
 
 import org.apache.hadoop.hive.ql.exec.UDF;
+import org.apache.hadoop.hive.ql.exec.vector.VectorizedExpressions;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.CastDecimalToDouble;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.CastDecimalToLong;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.CastDoubleToLong;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.CastTimestampToLongViaLongToLong;
 import org.apache.hadoop.hive.serde2.io.ByteWritable;
 import org.apache.hadoop.hive.serde2.io.DoubleWritable;
+import org.apache.hadoop.hive.serde2.io.HiveDecimalWritable;
 import org.apache.hadoop.hive.serde2.io.ShortWritable;
+import org.apache.hadoop.hive.serde2.io.TimestampWritable;
 import org.apache.hadoop.hive.serde2.lazy.LazyShort;
 import org.apache.hadoop.io.BooleanWritable;
 import org.apache.hadoop.io.FloatWritable;
@@ -34,6 +41,8 @@ import org.apache.hadoop.io.Text;
  * UDFToShort.
  *
  */
+@VectorizedExpressions({CastTimestampToLongViaLongToLong.class, CastDoubleToLong.class,
+    CastDecimalToLong.class})
 public class UDFToShort extends UDF {
   ShortWritable shortWritable = new ShortWritable();
 
@@ -42,7 +51,7 @@ public class UDFToShort extends UDF {
 
   /**
    * Convert from void to a short. This is called for CAST(... AS SMALLINT)
-   * 
+   *
    * @param i
    *          The void value to convert
    * @return ShortWritable
@@ -53,7 +62,7 @@ public class UDFToShort extends UDF {
 
   /**
    * Convert from boolean to a short. This is called for CAST(... AS SMALLINT)
-   * 
+   *
    * @param i
    *          The boolean value to convert
    * @return ShortWritable
@@ -69,7 +78,7 @@ public class UDFToShort extends UDF {
 
   /**
    * Convert from byte to a short. This is called for CAST(... AS SMALLINT)
-   * 
+   *
    * @param i
    *          The byte value to convert
    * @return ShortWritable
@@ -85,7 +94,7 @@ public class UDFToShort extends UDF {
 
   /**
    * Convert from integer to a short. This is called for CAST(... AS SMALLINT)
-   * 
+   *
    * @param i
    *          The integer value to convert
    * @return ShortWritable
@@ -101,7 +110,7 @@ public class UDFToShort extends UDF {
 
   /**
    * Convert from long to a short. This is called for CAST(... AS SMALLINT)
-   * 
+   *
    * @param i
    *          The long value to convert
    * @return ShortWritable
@@ -117,7 +126,7 @@ public class UDFToShort extends UDF {
 
   /**
    * Convert from float to a short. This is called for CAST(... AS SMALLINT)
-   * 
+   *
    * @param i
    *          The float value to convert
    * @return ShortWritable
@@ -133,7 +142,7 @@ public class UDFToShort extends UDF {
 
   /**
    * Convert from double to a short. This is called for CAST(... AS SMALLINT)
-   * 
+   *
    * @param i
    *          The double value to convert
    * @return ShortWritable
@@ -149,7 +158,7 @@ public class UDFToShort extends UDF {
 
   /**
    * Convert from string to a short. This is called for CAST(... AS SMALLINT)
-   * 
+   *
    * @param i
    *          The string value to convert
    * @return ShortWritable
@@ -170,4 +179,23 @@ public class UDFToShort extends UDF {
       }
     }
   }
+
+  public ShortWritable evaluate(TimestampWritable i) {
+    if (i == null) {
+      return null;
+    } else {
+      shortWritable.set((short) i.getSeconds());
+      return shortWritable;
+    }
+  }
+
+  public ShortWritable evaluate(HiveDecimalWritable i) {
+    if (i == null) {
+      return null;
+    } else {
+      shortWritable.set(i.getHiveDecimal().shortValue());
+      return shortWritable;
+    }
+  }
+
 }

@@ -18,14 +18,23 @@
 
 package org.apache.hadoop.hive.ql.parse;
 
+import java.util.Set;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.ql.hooks.ReadEntity;
+import org.apache.hadoop.hive.ql.hooks.WriteEntity;
 import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 
 public class HiveSemanticAnalyzerHookContextImpl implements HiveSemanticAnalyzerHookContext {
 
   Configuration conf;
+  Set<ReadEntity> inputs = null;
+  Set<WriteEntity> outputs = null;
+  private String userName;
+  private String ipAddress;
+  private String command;
 
   @Override
   public Hive getHive() throws HiveException {
@@ -43,4 +52,47 @@ public class HiveSemanticAnalyzerHookContextImpl implements HiveSemanticAnalyzer
     this.conf = conf;
   }
 
+  @Override
+  public void update(BaseSemanticAnalyzer sem) {
+    this.inputs = sem.getInputs();
+    this.outputs = sem.getOutputs();
+  }
+
+  @Override
+  public Set<ReadEntity> getInputs() {
+    return inputs;
+  }
+
+  @Override
+  public Set<WriteEntity> getOutputs() {
+    return outputs;
+  }
+
+  public String getUserName() {
+    return userName;
+  }
+
+  public void setUserName(String userName) {
+    this.userName = userName;
+  }
+
+  @Override
+  public String getIpAddress() {
+    return ipAddress;
+  }
+
+  @Override
+  public void setIpAddress(String ipAddress) {
+    this.ipAddress = ipAddress;
+  }
+
+  @Override
+  public String getCommand() {
+    return command;
+  }
+
+  @Override
+  public void setCommand(String command) {
+    this.command = command;
+  }
 }

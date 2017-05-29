@@ -66,6 +66,8 @@ public class GenericUDAFCovarianceSample extends GenericUDAFCovariance {
     case LONG:
     case FLOAT:
     case DOUBLE:
+    case TIMESTAMP:
+    case DECIMAL:
       switch (((PrimitiveTypeInfo) parameters[1]).getPrimitiveCategory()) {
       case BYTE:
       case SHORT:
@@ -73,9 +75,12 @@ public class GenericUDAFCovarianceSample extends GenericUDAFCovariance {
       case LONG:
       case FLOAT:
       case DOUBLE:
+      case TIMESTAMP:
+      case DECIMAL:
         return new GenericUDAFCovarianceSampleEvaluator();
       case STRING:
       case BOOLEAN:
+      case DATE:
       default:
         throw new UDFArgumentTypeException(1,
             "Only numeric or string type arguments are accepted but "
@@ -83,6 +88,7 @@ public class GenericUDAFCovarianceSample extends GenericUDAFCovariance {
       }
     case STRING:
     case BOOLEAN:
+    case DATE:
     default:
       throw new UDFArgumentTypeException(0,
           "Only numeric or string type arguments are accepted but "

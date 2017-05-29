@@ -19,7 +19,9 @@
 package org.apache.hadoop.hive.ql.exec;
 
 import java.io.Serializable;
+import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -28,9 +30,8 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.plan.UDTFDesc;
 import org.apache.hadoop.hive.ql.plan.api.OperatorType;
+import org.apache.hadoop.hive.ql.udf.generic.GenericUDTF;
 import org.apache.hadoop.hive.ql.udf.generic.UDTFCollector;
-import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.StandardStructObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StructField;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
 
@@ -41,11 +42,14 @@ import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
 public class UDTFOperator extends Operator<UDTFDesc> implements Serializable {
   private static final long serialVersionUID = 1L;
 
-  protected final Log LOG = LogFactory.getLog(this.getClass().getName());
+  protected static final Log LOG = LogFactory.getLog(UDTFOperator.class.getName());
 
-  ObjectInspector[] udtfInputOIs = null;
+  StructObjectInspector udtfInputOI = null;
   Object[] objToSendToUDTF = null;
-  Object[] forwardObj = new Object[1];
+
+  GenericUDTF genericUDTF;
+  UDTFCollector collector;
+  List outerObj;
 
   /**
    * sends periodic reports back to the tracker.
@@ -54,19 +58,24 @@ public class UDTFOperator extends Operator<UDTFDesc> implements Serializable {
 
   @Override
   protected void initializeOp(Configuration hconf) throws HiveException {
-    conf.getGenericUDTF().setCollector(new UDTFCollector(this));
+    genericUDTF = conf.getGenericUDTF();
+    collector = new UDTFCollector(this);
 
-    // Make an object inspector [] of the arguments to the UDTF
-    List<? extends StructField> inputFields =
-        ((StandardStructObjectInspector) inputObjInspectors[0]).getAllStructFieldRefs();
+    genericUDTF.setCollector(collector);
 
-    udtfInputOIs = new ObjectInspector[inputFields.size()];
-    for (int i = 0; i < inputFields.size(); i++) {
-      udtfInputOIs[i] = inputFields.get(i).getFieldObjectInspector();
+    udtfInputOI = (StructObjectInspector) inputObjInspectors[0];
+
+    objToSendToUDTF = new Object[udtfInputOI.getAllStructFieldRefs().size()];
+
+    MapredContext context = MapredContext.get();
+    if (context != null) {
+      context.setup(genericUDTF);
     }
-    objToSendToUDTF = new Object[inputFields.size()];
-    StructObjectInspector udtfOutputOI = conf.getGenericUDTF().initialize(
-        udtfInputOIs);
+    StructObjectInspector udtfOutputOI = genericUDTF.initialize(udtfInputOI);
+
+    if (conf.isOuterLV()) {
+      outerObj = Arrays.asList(new Object[udtfOutputOI.getAllStructFieldRefs().size()]);
+    }
 
     // Since we're passing the object output by the UDTF directly to the next
     // operator, we can use the same OI.
@@ -77,7 +86,8 @@ public class UDTFOperator extends Operator<UDTFDesc> implements Serializable {
     if (HiveConf.getBoolVar(hconf, HiveConf.ConfVars.HIVEUDTFAUTOPROGRESS)) {
       autoProgressor = new AutoProgressor(this.getClass().getName(), reporter,
           Utilities.getDefaultNotificationInterval(hconf),
-          HiveConf.getIntVar(hconf, HiveConf.ConfVars.HIVES_AUTO_PROGRESS_TIMEOUT) * 1000);
+          HiveConf.getTimeVar(
+              hconf, HiveConf.ConfVars.HIVES_AUTO_PROGRESS_TIMEOUT, TimeUnit.MILLISECONDS));
       autoProgressor.go();
     }
 
@@ -88,15 +98,18 @@ public class UDTFOperator extends Operator<UDTFDesc> implements Serializable {
   @Override
   public void processOp(Object row, int tag) throws HiveException {
     // The UDTF expects arguments in an object[]
-    StandardStructObjectInspector soi = (StandardStructObjectInspector) inputObjInspectors[tag];
+    StructObjectInspector soi = (StructObjectInspector) inputObjInspectors[tag];
     List<? extends StructField> fields = soi.getAllStructFieldRefs();
 
     for (int i = 0; i < fields.size(); i++) {
       objToSendToUDTF[i] = soi.getStructFieldData(row, fields.get(i));
     }
 
-    conf.getGenericUDTF().process(objToSendToUDTF);
-
+    genericUDTF.process(objToSendToUDTF);
+    if (conf.isOuterLV() && collector.getCounter() == 0) {
+      collector.collect(outerObj);
+    }
+    collector.reset();
   }
 
   /**
@@ -114,6 +127,10 @@ public class UDTFOperator extends Operator<UDTFDesc> implements Serializable {
 
   @Override
   public String getName() {
+    return getOperatorName();
+  }
+
+  static public String getOperatorName() {
     return "UDTF";
   }
 

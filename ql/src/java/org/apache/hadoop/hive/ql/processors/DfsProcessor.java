@@ -19,12 +19,16 @@
 package org.apache.hadoop.hive.ql.processors;
 
 import java.io.PrintStream;
+import java.util.Arrays;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FsShell;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.metastore.api.Schema;
 import org.apache.hadoop.hive.ql.parse.VariableSubstitution;
+import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveOperationType;
 import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.hive.ql.session.SessionState.LogHelper;
 
@@ -36,16 +40,26 @@ public class DfsProcessor implements CommandProcessor {
 
   public static final Log LOG = LogFactory.getLog(DfsProcessor.class.getName());
   public static final LogHelper console = new LogHelper(LOG);
+  public static final String DFS_RESULT_HEADER = "DFS Output";
 
   private final FsShell dfs;
+  private final Schema dfsSchema;
 
   public DfsProcessor(Configuration conf) {
-    dfs = new FsShell(conf);
+    this(conf, false);
   }
 
+  public DfsProcessor(Configuration conf, boolean addSchema) {
+    dfs = new FsShell(conf);
+    dfsSchema = new Schema();
+    dfsSchema.addToFieldSchemas(new FieldSchema(DFS_RESULT_HEADER, "string", ""));
+  }
+
+  @Override
   public void init() {
   }
 
+  @Override
   public CommandProcessorResponse run(String command) {
 
 
@@ -54,6 +68,13 @@ public class DfsProcessor implements CommandProcessor {
       command = new VariableSubstitution().substitute(ss.getConf(),command);
 
       String[] tokens = command.split("\\s+");
+      CommandProcessorResponse authErrResp =
+          CommandUtil.authorizeCommand(ss, HiveOperationType.DFS, Arrays.asList(tokens));
+      if(authErrResp != null){
+        // there was an authorization issue
+        return authErrResp;
+      }
+
       PrintStream oldOut = System.out;
 
       if (ss != null && ss.out != null) {
@@ -66,7 +87,7 @@ public class DfsProcessor implements CommandProcessor {
       }
 
       System.setOut(oldOut);
-      return new CommandProcessorResponse(ret);
+      return new CommandProcessorResponse(ret, null, null, dfsSchema);
 
     } catch (Exception e) {
       console.printError("Exception raised from DFSShell.run "

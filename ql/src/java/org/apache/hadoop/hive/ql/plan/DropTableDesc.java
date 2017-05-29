@@ -20,41 +20,70 @@ package org.apache.hadoop.hive.ql.plan;
 
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
  * DropTableDesc.
- *
+ * TODO: this is currently used for both drop table and drop partitions.
  */
 @Explain(displayName = "Drop Table")
 public class DropTableDesc extends DDLDesc implements Serializable {
   private static final long serialVersionUID = 1L;
 
+  public static class PartSpec {
+    public PartSpec(ExprNodeGenericFuncDesc partSpec, int prefixLength) {
+      this.partSpec = partSpec;
+      this.prefixLength = prefixLength;
+    }
+    public ExprNodeGenericFuncDesc getPartSpec() {
+      return partSpec;
+    }
+    public int getPrefixLength() {
+      return prefixLength;
+    }
+    private static final long serialVersionUID = 1L;
+    private ExprNodeGenericFuncDesc partSpec;
+    // TODO: see if we can get rid of this... used in one place to distinguish archived parts
+    private int prefixLength;
+  }
+
   String tableName;
-  ArrayList<LinkedHashMap<String, String>> partSpecs;
+  ArrayList<PartSpec> partSpecs;
   boolean expectView;
+  boolean ifExists;
+  boolean ifPurge;
+  boolean ignoreProtection;
 
   public DropTableDesc() {
   }
 
   /**
    * @param tableName
+   * @param ifPurge
    */
-  public DropTableDesc(String tableName, boolean expectView) {
+  public DropTableDesc(String tableName, boolean expectView, boolean ifExists, boolean ifPurge) {
     this.tableName = tableName;
-    partSpecs = null;
+    this.partSpecs = null;
     this.expectView = expectView;
+    this.ifExists = ifExists;
+    this.ifPurge = ifPurge;
+    this.ignoreProtection = false;
   }
 
-  public DropTableDesc(String tableName, List<? extends Map<String, String>> partSpecs) {
+  public DropTableDesc(String tableName, Map<Integer, List<ExprNodeGenericFuncDesc>> partSpecs,
+      boolean expectView, boolean ignoreProtection, boolean ifPurge) {
     this.tableName = tableName;
-    this.partSpecs = new ArrayList<LinkedHashMap<String, String>>(partSpecs.size());
-    for (int i = 0; i < partSpecs.size(); i++) {
-      this.partSpecs.add(new LinkedHashMap<String, String>(partSpecs.get(i)));
+    this.partSpecs = new ArrayList<PartSpec>(partSpecs.size());
+    for (Map.Entry<Integer, List<ExprNodeGenericFuncDesc>> partSpec : partSpecs.entrySet()) {
+      int prefixLength = partSpec.getKey();
+      for (ExprNodeGenericFuncDesc expr : partSpec.getValue()) {
+        this.partSpecs.add(new PartSpec(expr, prefixLength));
+      }
     }
-    expectView = false;
+    this.ignoreProtection = ignoreProtection;
+    this.expectView = expectView;
+    this.ifPurge = ifPurge;
   }
 
   /**
@@ -76,17 +105,24 @@ public class DropTableDesc extends DDLDesc implements Serializable {
   /**
    * @return the partSpecs
    */
-  public ArrayList<LinkedHashMap<String, String>> getPartSpecs() {
+  public ArrayList<PartSpec> getPartSpecs() {
     return partSpecs;
   }
 
   /**
-   * @param partSpecs
-   *          the partSpecs to set
+   * @return whether or not protection will be ignored for the partition
    */
-  public void setPartSpecs(ArrayList<LinkedHashMap<String, String>> partSpecs) {
-    this.partSpecs = partSpecs;
+  public boolean getIgnoreProtection() {
+    return ignoreProtection;
   }
+
+  /**
+   * @param ignoreProtection
+   *          set whether or not protection will be ignored for the partition
+   */
+   public void setIgnoreProtection(boolean ignoreProtection) {
+     this.ignoreProtection = ignoreProtection;
+   }
 
   /**
    * @return whether to expect a view being dropped
@@ -101,5 +137,35 @@ public class DropTableDesc extends DDLDesc implements Serializable {
    */
   public void setExpectView(boolean expectView) {
     this.expectView = expectView;
+  }
+
+  /**
+   * @return whether IF EXISTS was specified
+   */
+  public boolean getIfExists() {
+    return ifExists;
+  }
+
+  /**
+   * @param ifExists
+   *          set whether IF EXISTS was specified
+   */
+  public void setIfExists(boolean ifExists) {
+    this.ifExists = ifExists;
+  }
+
+  /**
+   *  @return whether Purge was specified
+   */
+  public boolean getIfPurge() {
+      return ifPurge;
+  }
+
+  /**
+   * @param ifPurge
+   *          set whether Purge was specified
+   */
+  public void setIfPurge(boolean ifPurge) {
+      this.ifPurge = ifPurge;
   }
 }

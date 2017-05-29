@@ -19,110 +19,50 @@
 package org.apache.hadoop.hive.ql.hooks;
 
 import java.io.Serializable;
-import java.net.URI;
 
-import org.apache.hadoop.hive.ql.metadata.Partition;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.ql.metadata.DummyPartition;
+import org.apache.hadoop.hive.ql.metadata.Partition;
 import org.apache.hadoop.hive.ql.metadata.Table;
+import org.apache.hadoop.hive.ql.plan.AlterTableDesc;
 
 /**
  * This class encapsulates an object that is being written to by the query. This
  * object may be a table, partition, dfs directory or a local directory.
  */
-public class WriteEntity implements Serializable {
-  private static final long serialVersionUID = 1L;
+public class WriteEntity extends Entity implements Serializable {
 
-  /**
-   * The type of the write entity.
-   */
-  public static enum Type {
-    TABLE, PARTITION, DUMMYPARTITION, DFS_DIR, LOCAL_DIR
+  private static final Log LOG = LogFactory.getLog(WriteEntity.class);
+
+  private boolean isTempURI = false;
+
+  public static enum WriteType {
+    DDL_EXCLUSIVE, // for use in DDL statements that require an exclusive lock,
+                   // such as dropping a table or partition
+    DDL_SHARED, // for use in DDL operations that only need a shared lock, such as creating a table
+    DDL_NO_LOCK, // for use in DDL statements that do not require a lock
+    INSERT,
+    INSERT_OVERWRITE,
+    UPDATE,
+    DELETE,
+    PATH_WRITE, // Write to a URI, no locking done for this
   };
 
-  /**
-   * The type.
-   */
-  private Type typ;
-
-  /**
-   * The table. This is null if this is a directory.
-   */
-  private Table t;
-
-  /**
-   * The partition.This is null if this object is not a partition.
-   */
-  private Partition p;
-
-  /**
-   * The directory if this is a directory.
-   */
-  private String d;
-
-  /**
-   * This is derived from t and p, but we need to serialize this field to make sure
-   * WriteEntity.hashCode() does not need to recursively read into t and p.
-   */
-  private String name;
-
-  /**
-   * Whether the output is complete or not. For eg, in case of dynamic partitions, the complete output
-   * may not be known
-   */
-  private boolean complete;
-
-  public boolean isComplete() {
-    return complete;
-  }
-
-  public void setComplete(boolean complete) {
-    this.complete = complete;;
-  }
-
-  public String getName() {
-    return name;
-  }
-
-  public void setName(String name) {
-    this.name = name;
-  }
-
-  public Type getTyp() {
-    return typ;
-  }
-
-  public void setTyp(Type typ) {
-    this.typ = typ;
-  }
-
-  public Table getT() {
-    return t;
-  }
-
-  public void setT(Table t) {
-    this.t = t;
-  }
-
-  public Partition getP() {
-    return p;
-  }
-
-  public void setP(Partition p) {
-    this.p = p;
-  }
-
-  public String getD() {
-    return d;
-  }
-
-  public void setD(String d) {
-    this.d = d;
-  }
+  private WriteType writeType;
 
   /**
    * Only used by serialization.
    */
   public WriteEntity() {
+    super();
+  }
+
+  public WriteEntity(Database database, WriteType type) {
+    super(database, true);
+    writeType = type;
   }
 
   /**
@@ -131,17 +71,27 @@ public class WriteEntity implements Serializable {
    * @param t
    *          Table that is written to.
    */
-  public WriteEntity(Table t) {
-    this(t, true);
+  public WriteEntity(Table t, WriteType type) {
+    super(t, true);
+    writeType = type;
   }
 
-  public WriteEntity(Table t, boolean complete) {
-    d = null;
-    p = null;
-    this.t = t;
-    typ = Type.TABLE;
-    name = computeName();
-    this.complete = complete;
+  public WriteEntity(Table t, WriteType type, boolean complete) {
+    super(t, complete);
+    writeType = type;
+  }
+
+  /**
+   * Constructor for objects represented as String.
+   * Currently applicable only for function names.
+   * @param db
+   * @param objName
+   * @param type
+   * @param writeType
+   */
+  public WriteEntity(Database db, String objName, Type type, WriteType writeType) {
+    super(db, objName, type);
+    this.writeType = writeType;
   }
 
   /**
@@ -150,26 +100,14 @@ public class WriteEntity implements Serializable {
    * @param p
    *          Partition that is written to.
    */
-  public WriteEntity(Partition p) {
-    this(p, true);
+  public WriteEntity(Partition p, WriteType type) {
+    super(p, true);
+    writeType = type;
   }
 
-  public WriteEntity(Partition p, boolean complete) {
-    d = null;
-    this.p = p;
-    t = p.getTable();
-    typ = Type.PARTITION;
-    name = computeName();
-    this.complete = complete;
-  }
-
-  public WriteEntity(DummyPartition p, boolean complete) {
-    d = null;
-    this.p = p;
-    t = p.getTable();
-    typ = Type.DUMMYPARTITION;
-    name = computeName();
-    this.complete = complete;
+  public WriteEntity(DummyPartition p, WriteType type, boolean complete) {
+    super(p, complete);
+    writeType = type;
   }
 
   /**
@@ -180,82 +118,43 @@ public class WriteEntity implements Serializable {
    * @param islocal
    *          Flag to decide whether this directory is local or in dfs.
    */
-  public WriteEntity(String d, boolean islocal) {
-    this(d, islocal, true);
-  }
-
-  public WriteEntity(String d, boolean islocal, boolean complete) {
-    this.d = d;
-    p = null;
-    t = null;
-    if (islocal) {
-      typ = Type.LOCAL_DIR;
-    } else {
-      typ = Type.DFS_DIR;
-    }
-    name = computeName();
-    this.complete = complete;
+  public WriteEntity(Path d, boolean islocal) {
+    this(d, islocal, false);
   }
 
   /**
-   * Get the type of the entity.
+   * Constructor for a file.
+   *
+   * @param d
+   *          The name of the directory that is being written to.
+   * @param islocal
+   *          Flag to decide whether this directory is local or in dfs.
+   * @param isTemp
+   *          True if this is a temporary location such as scratch dir
    */
-  public Type getType() {
-    return typ;
+  public WriteEntity(Path d, boolean islocal, boolean isTemp) {
+    super(d, islocal, true);
+    this.isTempURI = isTemp;
+    this.writeType = WriteType.PATH_WRITE;
   }
 
   /**
-   * Get the location of the entity.
+   * Determine which type of write this is.  This is needed by the lock
+   * manager so it can understand what kind of lock to acquire.
+   * @return write type
    */
-  public URI getLocation() throws Exception {
-    if (typ == Type.TABLE) {
-      return t.getDataLocation();
-    }
-
-    if (typ == Type.PARTITION) {
-      return p.getDataLocation();
-    }
-
-    if (typ == Type.DFS_DIR || typ == Type.LOCAL_DIR) {
-      return new URI(d);
-    }
-
-    return null;
+  public WriteType getWriteType() {
+    return writeType;
   }
 
   /**
-   * Get the partition associated with the entity.
+   * Only use this if you are very sure of what you are doing.  This is used by the
+   * {@link org.apache.hadoop.hive.ql.parse.UpdateDeleteSemanticAnalyzer} to reset the types to
+   * update or delete after rewriting and reparsing the queries.
+   * @param type new operation type
    */
-  public Partition getPartition() {
-    return p;
-  }
-
-  /**
-   * Get the table associated with the entity.
-   */
-  public Table getTable() {
-    return t;
-  }
-
-  /**
-   * toString function.
-   */
-  @Override
-  public String toString() {
-    return name;
-  }
-
-  private String computeName() {
-    switch (typ) {
-    case TABLE:
-      return t.getDbName() + "@" + t.getTableName();
-    case PARTITION:
-      return t.getDbName() + "@" + t.getTableName() + "@" + p.getName();
-    case DUMMYPARTITION:
-      return p.getName();
-    default:
-      return d;
-    }
+  public void setWriteType(WriteType type) {
+    writeType = type;
   }
 
   /**
@@ -275,12 +174,49 @@ public class WriteEntity implements Serializable {
     }
   }
 
+  public boolean isTempURI() {
+    return isTempURI;
+  }
+
   /**
-   * Hashcode function.
+   * Determine the type of lock to request for a given alter table type.
+   * @param op Operation type from the alter table description
+   * @return the write type this should use.
    */
-  @Override
-  public int hashCode() {
-    return toString().hashCode();
+  public static WriteType determineAlterTableWriteType(AlterTableDesc.AlterTableTypes op) {
+    switch (op) {
+      case RENAMECOLUMN:
+      case ADDCLUSTERSORTCOLUMN:
+      case ADDFILEFORMAT:
+      case ADDSERDE:
+      case DROPPROPS:
+      case REPLACECOLS:
+      case ARCHIVE:
+      case UNARCHIVE:
+      case ALTERPROTECTMODE:
+      case ALTERPARTITIONPROTECTMODE:
+      case ALTERLOCATION:
+      case DROPPARTITION:
+      case RENAMEPARTITION:
+      case ADDSKEWEDBY:
+      case ALTERSKEWEDLOCATION:
+      case ALTERBUCKETNUM:
+      case ALTERPARTITION:
+      case ADDCOLS:
+      case RENAME:
+      case TRUNCATE:
+      case MERGEFILES: return WriteType.DDL_EXCLUSIVE;
+
+      case ADDPARTITION:
+      case ADDSERDEPROPS:
+      case ADDPROPS: return WriteType.DDL_SHARED;
+
+      case COMPACT:
+      case TOUCH: return WriteType.DDL_NO_LOCK;
+
+      default:
+        throw new RuntimeException("Unknown operation " + op.toString());
+    }
   }
 
 }

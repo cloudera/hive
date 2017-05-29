@@ -19,9 +19,9 @@
 package org.apache.hadoop.hive.ql.metadata;
 
 import java.io.Serializable;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,7 +32,7 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hive.common.JavaUtils;
+import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.hive.metastore.ProtectMode;
 import org.apache.hadoop.hive.metastore.Warehouse;
@@ -43,9 +43,10 @@ import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.io.HiveFileFormatUtils;
 import org.apache.hadoop.hive.ql.io.HiveOutputFormat;
-import org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat;
+import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.hive.serde2.Deserializer;
 import org.apache.hadoop.mapred.InputFormat;
+import org.apache.hadoop.mapred.OutputFormat;
 import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.transport.TMemoryBuffer;
@@ -70,9 +71,8 @@ public class Partition implements Serializable {
    * These fields are cached. The information comes from tPartition.
    */
   private Deserializer deserializer;
-  private Class<? extends HiveOutputFormat> outputFormatClass;
+  private Class<? extends OutputFormat> outputFormatClass;
   private Class<? extends InputFormat> inputFormatClass;
-  private URI uri;
 
   /**
    * @return The values of the partition
@@ -95,7 +95,9 @@ public class Partition implements Serializable {
   public Partition(Table tbl) throws HiveException {
     org.apache.hadoop.hive.metastore.api.Partition tPart =
         new org.apache.hadoop.hive.metastore.api.Partition();
-    tPart.setSd(tbl.getTTable().getSd()); // TODO: get a copy
+    if (!tbl.isView()) {
+      tPart.setSd(tbl.getTTable().getSd()); // TODO: get a copy
+    }
     initialize(tbl, tPart);
   }
 
@@ -116,45 +118,53 @@ public class Partition implements Serializable {
    * @throws HiveException
    *           Thrown if we could not create the partition.
    */
-  public Partition(Table tbl, Map<String, String> partSpec, Path location)
-      throws HiveException {
+  public Partition(Table tbl, Map<String, String> partSpec, Path location) throws HiveException {
+    initialize(tbl, createMetaPartitionObject(tbl, partSpec, location));
+  }
 
+  public static org.apache.hadoop.hive.metastore.api.Partition createMetaPartitionObject(
+      Table tbl, Map<String, String> partSpec, Path location) throws HiveException {
     List<String> pvals = new ArrayList<String>();
     for (FieldSchema field : tbl.getPartCols()) {
       String val = partSpec.get(field.getName());
-      if (val == null) {
-        throw new HiveException(
-            "partition spec is invalid. field.getName() does not exist in input.");
+      if (val == null || val.isEmpty()) {
+        throw new HiveException("partition spec is invalid; field "
+            + field.getName() + " does not exist or is empty");
       }
       pvals.add(val);
     }
 
-    org.apache.hadoop.hive.metastore.api.Partition tpart = new org.apache.hadoop.hive.metastore.api.Partition();
+    org.apache.hadoop.hive.metastore.api.Partition tpart =
+        new org.apache.hadoop.hive.metastore.api.Partition();
     tpart.setDbName(tbl.getDbName());
     tpart.setTableName(tbl.getTableName());
     tpart.setValues(pvals);
 
+    if (!tbl.isView()) {
+      tpart.setSd(cloneSd(tbl));
+      tpart.getSd().setLocation((location != null) ? location.toString() : null);
+    }
+    return tpart;
+  }
+
+  /**
+   * We already have methods that clone stuff using XML or Kryo.
+   * And now for something completely different - let's clone SD using Thrift!
+   * Refactored into a method.
+   */
+  public static StorageDescriptor cloneSd(Table tbl) throws HiveException {
     StorageDescriptor sd = new StorageDescriptor();
     try {
       // replace with THRIFT-138
       TMemoryBuffer buffer = new TMemoryBuffer(1024);
       TBinaryProtocol prot = new TBinaryProtocol(buffer);
       tbl.getTTable().getSd().write(prot);
-
       sd.read(prot);
     } catch (TException e) {
       LOG.error("Could not create a copy of StorageDescription");
-      throw new HiveException("Could not create a copy of StorageDescription");
+      throw new HiveException("Could not create a copy of StorageDescription",e);
     }
-
-    tpart.setSd(sd);
-    if (location != null) {
-      tpart.getSd().setLocation(location.toString());
-    } else {
-      tpart.getSd().setLocation(null);
-    }
-
-    initialize(tbl, tpart);
+    return sd;
   }
 
   /**
@@ -167,20 +177,32 @@ public class Partition implements Serializable {
    * @throws HiveException
    *           Thrown if we cannot initialize the partition
    */
-  private void initialize(Table table,
+  protected void initialize(Table table,
       org.apache.hadoop.hive.metastore.api.Partition tPartition) throws HiveException {
 
     this.table = table;
     this.tPartition = tPartition;
-    String partName = "";
+
+    if (table.isView()) {
+      return;
+    }
 
     if (table.isPartitioned()) {
       try {
-        partName = Warehouse.makePartName(table.getPartCols(), tPartition.getValues());
+        String partName = Warehouse.makePartName(table.getPartCols(), tPartition.getValues());
         if (tPartition.getSd().getLocation() == null) {
-          // set default if location is not set
-          Path partPath = new Path(table.getDataLocation().toString(), partName);
-          tPartition.getSd().setLocation(partPath.toString());
+          // set default if location is not set and this is a physical
+          // table partition (not a view partition)
+          if (table.getDataLocation() != null) {
+            Path partPath = new Path(table.getDataLocation(), partName);
+            tPartition.getSd().setLocation(partPath.toString());
+          }
+        }
+        // set default if columns are not set
+        if (tPartition.getSd().getCols() == null) {
+          if (table.getCols() != null) {
+            tPartition.getSd().setCols(table.getCols());
+          }
         }
       } catch (MetaException e) {
         throw new HiveException("Invalid partition for table " + table.getTableName(),
@@ -188,11 +210,13 @@ public class Partition implements Serializable {
       }
     }
 
-    // This will set up field: inputFormatClass
-    getInputFormatClass();
-    // This will set up field: outputFormatClass
-    getOutputFormatClass();
-
+    // Note that we do not set up fields like inputFormatClass, outputFormatClass
+    // and deserializer because the Partition needs to be accessed from across
+    // the metastore side as well, which will result in attempting to load
+    // the class associated with them, which might not be available, and
+    // the main reason to instantiate them would be to pre-cache them for
+    // performance. Since those fields are null/cache-check by their accessors
+    // anyway, that's not a concern.
   }
 
   public String getName() {
@@ -204,11 +228,15 @@ public class Partition implements Serializable {
   }
 
   public Path[] getPath() {
-    Path[] ret = new Path[]{getPartitionPath()};
+    Path[] ret = new Path[]{getDataLocation()};
     return ret;
   }
 
   public Path getPartitionPath() {
+    return getDataLocation();
+  }
+
+  public Path getDataLocation() {
     if (table.isPartitioned()) {
       return new Path(tPartition.getSd().getLocation());
     } else {
@@ -216,20 +244,11 @@ public class Partition implements Serializable {
     }
   }
 
-  final public URI getDataLocation() {
-    if (uri == null) {
-      uri = getPartitionPath().toUri();
-    }
-    return uri;
-  }
-
   final public Deserializer getDeserializer() {
     if (deserializer == null) {
       try {
-        deserializer = MetaStoreUtils.getDeserializer(Hive.get().getConf(),
+        deserializer = MetaStoreUtils.getDeserializer(SessionState.getSessionConf(),
             tPartition, table.getTTable());
-      } catch (HiveException e) {
-        throw new RuntimeException(e);
       } catch (MetaException e) {
         throw new RuntimeException(e);
       }
@@ -241,6 +260,16 @@ public class Partition implements Serializable {
     return MetaStoreUtils.getSchema(tPartition, table.getTTable());
   }
 
+  public Properties getMetadataFromPartitionSchema() {
+    return MetaStoreUtils.getPartitionMetadata(tPartition, table.getTTable());
+  }
+
+  public Properties getSchemaFromTableSchema(Properties tblSchema) {
+    return MetaStoreUtils.getPartSchemaFromTableSchema(tPartition.getSd(), table.getTTable().getSd(),
+        tPartition.getParameters(), table.getDbName(), table.getTableName(), table.getPartitionKeys(),
+        tblSchema);
+  }
+
   /**
    * @param inputFormatClass
    */
@@ -250,27 +279,25 @@ public class Partition implements Serializable {
   }
 
   /**
-   * @param class1
+   * @param outputFormatClass
    */
   public void setOutputFormatClass(Class<? extends HiveOutputFormat> outputFormatClass) {
     this.outputFormatClass = outputFormatClass;
     tPartition.getSd().setOutputFormat(HiveFileFormatUtils
-      .getOutputFormatSubstitute(outputFormatClass).toString());
+        .getOutputFormatSubstitute(outputFormatClass).toString());
   }
 
   final public Class<? extends InputFormat> getInputFormatClass()
       throws HiveException {
     if (inputFormatClass == null) {
-      String clsName = null;
-      if (tPartition != null && tPartition.getSd() != null) {
-        clsName = tPartition.getSd().getInputFormat();
-      }
+      // sd can be null for views
+      String clsName = tPartition.getSd() == null ? null : tPartition.getSd().getInputFormat();
       if (clsName == null) {
-        clsName = org.apache.hadoop.mapred.SequenceFileInputFormat.class.getName();
+        return inputFormatClass = table.getInputFormatClass();
       }
       try {
         inputFormatClass = ((Class<? extends InputFormat>) Class.forName(clsName, true,
-            JavaUtils.getClassLoader()));
+            Utilities.getSessionSpecifiedClassLoader()));
       } catch (ClassNotFoundException e) {
         throw new HiveException("Class not found: " + clsName, e);
       }
@@ -278,25 +305,18 @@ public class Partition implements Serializable {
     return inputFormatClass;
   }
 
-  final public Class<? extends HiveOutputFormat> getOutputFormatClass()
+  final public Class<? extends OutputFormat> getOutputFormatClass()
       throws HiveException {
     if (outputFormatClass == null) {
-      String clsName = null;
-      if (tPartition != null && tPartition.getSd() != null) {
-        clsName = tPartition.getSd().getOutputFormat();
-      }
+      // sd can be null for views
+      String clsName = tPartition.getSd() == null ? null : tPartition.getSd().getOutputFormat();
       if (clsName == null) {
-        clsName = HiveSequenceFileOutputFormat.class.getName();
+        return outputFormatClass = table.getOutputFormatClass();
       }
       try {
-        Class<?> c = (Class.forName(clsName, true,
-            JavaUtils.getClassLoader()));
+        Class<?> c = Class.forName(clsName, true, Utilities.getSessionSpecifiedClassLoader());
         // Replace FileOutputFormat for backward compatibility
-        if (!HiveOutputFormat.class.isAssignableFrom(c)) {
-          outputFormatClass = HiveFileFormatUtils.getOutputFormatSubstitute(c);
-        } else {
-          outputFormatClass = (Class<? extends HiveOutputFormat>)c;
-        }
+        outputFormatClass = HiveFileFormatUtils.getOutputFormatSubstitute(c);
       } catch (ClassNotFoundException e) {
         throw new HiveException("Class not found: " + clsName, e);
       }
@@ -304,12 +324,8 @@ public class Partition implements Serializable {
     return outputFormatClass;
   }
 
-  /**
-   * The number of buckets is a property of the partition. However - internally
-   * we are just storing it as a property of the table as a short term measure.
-   */
   public int getBucketCount() {
-    return table.getNumBuckets();
+    return tPartition.getSd().getNumBuckets();
     /*
      * TODO: Keeping this code around for later use when we will support
      * sampling on tables which are not created with CLUSTERED INTO clause
@@ -320,10 +336,14 @@ public class Partition implements Serializable {
      * partition String pathPattern = this.partPath.toString() + "/*"; try {
      * FileSystem fs = FileSystem.get(this.table.getDataLocation(),
      * Hive.get().getConf()); FileStatus srcs[] = fs.globStatus(new
-     * Path(pathPattern)); numBuckets = srcs.length; } catch (Exception e) {
+     * Path(pathPattern), FileUtils.HIDDEN_FILES_PATH_FILTER); numBuckets = srcs.length; } catch (Exception e) {
      * throw new RuntimeException("Cannot get bucket count for table " +
      * this.table.getName(), e); } } return numBuckets;
      */
+  }
+
+  public void setBucketCount(int newBucketNum) {
+    tPartition.getSd().setNumBuckets(newBucketNum);
   }
 
   public List<String> getBucketCols() {
@@ -339,22 +359,20 @@ public class Partition implements Serializable {
   }
 
   /**
-   * mapping from bucket number to bucket path
+   * get all paths for this partition in a sorted manner
    */
-  // TODO: add test case and clean it up
   @SuppressWarnings("nls")
-  public Path getBucketPath(int bucketNum) {
+  public FileStatus[] getSortedPaths() {
     try {
       // Previously, this got the filesystem of the Table, which could be
       // different from the filesystem of the partition.
-      FileSystem fs = FileSystem.get(getPartitionPath().toUri(), Hive.get()
-          .getConf());
-      String pathPattern = getPartitionPath().toString();
+      FileSystem fs = getDataLocation().getFileSystem(SessionState.getSessionConf());
+      String pathPattern = getDataLocation().toString();
       if (getBucketCount() > 0) {
         pathPattern = pathPattern + "/*";
       }
       LOG.info("Path pattern = " + pathPattern);
-      FileStatus srcs[] = fs.globStatus(new Path(pathPattern));
+      FileStatus srcs[] = fs.globStatus(new Path(pathPattern), FileUtils.HIDDEN_FILES_PATH_FILTER);
       Arrays.sort(srcs);
       for (FileStatus src : srcs) {
         LOG.info("Got file: " + src.getPath());
@@ -362,11 +380,23 @@ public class Partition implements Serializable {
       if (srcs.length == 0) {
         return null;
       }
-      return srcs[bucketNum].getPath();
+      return srcs;
     } catch (Exception e) {
-      throw new RuntimeException("Cannot get bucket path for bucket "
-          + bucketNum, e);
+      throw new RuntimeException("Cannot get path ", e);
     }
+  }
+
+  /**
+   * mapping from bucket number to bucket path
+   */
+  // TODO: add test case and clean it up
+  @SuppressWarnings("nls")
+  public Path getBucketPath(int bucketNum) {
+    FileStatus srcs[] = getSortedPaths();
+    if (srcs == null) {
+      return null;
+    }
+    return srcs[bucketNum].getPath();
   }
 
   @SuppressWarnings("nls")
@@ -462,11 +492,26 @@ public class Partition implements Serializable {
   }
 
   public List<FieldSchema> getCols() {
-    return tPartition.getSd().getCols();
+
+    try {
+      if (Table.hasMetastoreBasedSchema(SessionState.getSessionConf(), tPartition.getSd())) {
+        return tPartition.getSd().getCols();
+      }
+      return MetaStoreUtils.getFieldsFromDeserializer(table.getTableName(), getDeserializer());
+    } catch (Exception e) {
+      LOG.error("Unable to get cols from serde: " +
+          tPartition.getSd().getSerdeInfo().getSerializationLib(), e);
+    }
+
+    return new ArrayList<FieldSchema>();
   }
 
   public String getLocation() {
-    return tPartition.getSd().getLocation();
+    if (tPartition.getSd() == null) {
+      return null;
+    } else {
+      return tPartition.getSd().getLocation();
+    }
   }
 
   public void setLocation(String location) {
@@ -474,11 +519,38 @@ public class Partition implements Serializable {
   }
 
   /**
+   * Set Partition's values
+   *
+   * @param partSpec
+   *          Partition specifications.
+   * @throws HiveException
+   *           Thrown if we could not create the partition.
+   */
+  public void setValues(Map<String, String> partSpec)
+      throws HiveException {
+    List<String> pvals = new ArrayList<String>();
+    for (FieldSchema field : table.getPartCols()) {
+      String val = partSpec.get(field.getName());
+      if (val == null) {
+        throw new HiveException(
+            "partition spec is invalid. field.getName() does not exist in input.");
+      }
+      pvals.add(val);
+    }
+    tPartition.setValues(pvals);
+  }
+
+  /**
    * @param protectMode
    */
   public void setProtectMode(ProtectMode protectMode){
     Map<String, String> parameters = tPartition.getParameters();
-    parameters.put(ProtectMode.PARAMETER_NAME, protectMode.toString());
+    String pm = protectMode.toString();
+    if (pm != null) {
+      parameters.put(ProtectMode.PARAMETER_NAME, pm);
+    } else {
+      parameters.remove(ProtectMode.PARAMETER_NAME);
+    }
     tPartition.setParameters(parameters);
   }
 
@@ -486,18 +558,7 @@ public class Partition implements Serializable {
    * @return protect mode
    */
   public ProtectMode getProtectMode(){
-    Map<String, String> parameters = tPartition.getParameters();
-
-    if (parameters == null) {
-      return null;
-    }
-
-    if (!parameters.containsKey(ProtectMode.PARAMETER_NAME)) {
-      return new ProtectMode();
-    } else {
-      return ProtectMode.getProtectModeFromString(
-          parameters.get(ProtectMode.PARAMETER_NAME));
-    }
+    return MetaStoreUtils.getProtectMode(tPartition);
   }
 
   /**
@@ -517,8 +578,7 @@ public class Partition implements Serializable {
    * that it is OK to drop the table
    */
   public boolean canDrop() {
-    ProtectMode mode = getProtectMode();
-    return (!mode.noDrop && !mode.offline && !mode.readOnly);
+    return MetaStoreUtils.canDropPartition(table.getTTable(), tPartition);
   }
 
   /**
@@ -543,5 +603,40 @@ public class Partition implements Serializable {
 
   public void setLastAccessTime(int lastAccessTime) {
     tPartition.setLastAccessTime(lastAccessTime);
+  }
+
+  public boolean isStoredAsSubDirectories() {
+    return tPartition.getSd().isStoredAsSubDirectories();
+  }
+
+  public List<List<String>> getSkewedColValues(){
+    return tPartition.getSd().getSkewedInfo().getSkewedColValues();
+  }
+
+  public List<String> getSkewedColNames() {
+    return tPartition.getSd().getSkewedInfo().getSkewedColNames();
+  }
+
+  public void setSkewedValueLocationMap(List<String> valList, String dirName)
+      throws HiveException {
+    Map<List<String>, String> mappings = tPartition.getSd().getSkewedInfo()
+        .getSkewedColValueLocationMaps();
+    if (null == mappings) {
+      mappings = new HashMap<List<String>, String>();
+      tPartition.getSd().getSkewedInfo().setSkewedColValueLocationMaps(mappings);
+    }
+
+    // Add or update new mapping
+    mappings.put(valList, dirName);
+  }
+
+  public Map<List<String>, String> getSkewedColValueLocationMaps() {
+    return tPartition.getSd().getSkewedInfo().getSkewedColValueLocationMaps();
+  }
+
+  public void checkValidity() throws HiveException {
+    if (!tPartition.getSd().equals(table.getSd())) {
+      Table.validateColumns(getCols(), table.getPartCols());
+    }
   }
 }

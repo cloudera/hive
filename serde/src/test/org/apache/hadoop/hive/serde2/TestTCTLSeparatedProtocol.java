@@ -23,13 +23,15 @@ import java.util.Properties;
 import junit.framework.TestCase;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hive.serde.Constants;
+import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.thrift.TCTLSeparatedProtocol;
 import org.apache.thrift.protocol.TField;
 import org.apache.thrift.protocol.TList;
 import org.apache.thrift.protocol.TMap;
 import org.apache.thrift.protocol.TStruct;
 import org.apache.thrift.transport.TMemoryBuffer;
+import org.apache.thrift.transport.TTransport;
+import org.apache.thrift.transport.TTransportException;
 
 /**
  * TestTCTLSeparatedProtocol.
@@ -238,8 +240,8 @@ public class TestTCTLSeparatedProtocol extends TestCase {
     TMemoryBuffer trans = new TMemoryBuffer(4096);
     TCTLSeparatedProtocol prot = new TCTLSeparatedProtocol(trans, 4096);
     Properties schema = new Properties();
-    schema.setProperty(Constants.QUOTE_CHAR, "\"");
-    schema.setProperty(Constants.FIELD_DELIM, ",");
+    schema.setProperty(serdeConstants.QUOTE_CHAR, "\"");
+    schema.setProperty(serdeConstants.FIELD_DELIM, ",");
     prot.initialize(new Configuration(), schema);
 
     String testStr = "\"hello, world!\"";
@@ -320,10 +322,10 @@ public class TestTCTLSeparatedProtocol extends TestCase {
     // this is a hacky way of doing the quotes since it will match any 2 of
     // these, so
     // "[ hello this is something to split [" would be considered to be quoted.
-    schema.setProperty(Constants.QUOTE_CHAR, "(\"|\\[|\\])");
+    schema.setProperty(serdeConstants.QUOTE_CHAR, "(\"|\\[|\\])");
 
-    schema.setProperty(Constants.FIELD_DELIM, " ");
-    schema.setProperty(Constants.SERIALIZATION_NULL_FORMAT, "-");
+    schema.setProperty(serdeConstants.FIELD_DELIM, " ");
+    schema.setProperty(serdeConstants.SERIALIZATION_NULL_FORMAT, "-");
     prot.initialize(new Configuration(), schema);
 
     prot.readStructBegin();
@@ -474,4 +476,36 @@ public class TestTCTLSeparatedProtocol extends TestCase {
     assertTrue(ret1 == 0);
   }
 
+  public void testShouldThrowRunTimeExceptionIfUnableToInitializeTokenizer() throws Exception {
+    TCTLSeparatedProtocol separatedProtocol = new TCTLSeparatedProtocol(new TTransport() {
+      @Override
+      public void close() {
+      }
+
+      @Override
+      public boolean isOpen() {
+        return false;
+      }
+
+      @Override
+      public void open() throws TTransportException {
+      }
+
+      @Override
+      public int read(byte[] buf, int off, int len) throws TTransportException {
+        throw new TTransportException();
+      }
+
+      @Override
+      public void write(byte[] buf, int off, int len) throws TTransportException {
+      }
+    });
+    separatedProtocol.initialize(null, new Properties());
+    try {
+      separatedProtocol.readStructBegin();
+      fail("Runtime Exception is expected if the intialization of tokenizer failed.");
+    } catch (Exception e) {
+      assertTrue(e.getCause() instanceof TTransportException);
+    }
+  }
 }

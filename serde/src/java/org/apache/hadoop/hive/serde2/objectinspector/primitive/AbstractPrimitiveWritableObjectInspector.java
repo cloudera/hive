@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hive.serde2.objectinspector.primitive;
 
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorUtils.PrimitiveTypeEntry;
+import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 
 /**
  * An AbstractWritablePrimitiveObjectInspector for a Writable object.
@@ -25,9 +25,12 @@ import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectIn
 public abstract class AbstractPrimitiveWritableObjectInspector extends
     AbstractPrimitiveObjectInspector {
 
+  protected AbstractPrimitiveWritableObjectInspector() {
+    super();
+  }
   protected AbstractPrimitiveWritableObjectInspector(
-      PrimitiveTypeEntry typeEntry) {
-    super(typeEntry);
+      PrimitiveTypeInfo typeInfo) {
+    super(typeInfo);
   }
 
   @Override

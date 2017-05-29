@@ -20,7 +20,7 @@ package org.apache.hadoop.hive.ql.exec;
 
 import java.io.IOException;
 import java.io.Serializable;
-import java.util.ArrayList;
+import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.hadoop.conf.Configuration;
@@ -63,7 +63,7 @@ public class JoinOperator extends CommonJoinOperator<JoinDesc> implements
       skewJoinKeyContext.initiliaze(hconf);
       skewJoinKeyContext.setSkewJoinJobCounter(skewjoin_followup_jobs);
     }
-    statsMap.put(SkewkeyTableCounter.SKEWJOINFOLLOWUPJOBS, skewjoin_followup_jobs);
+    statsMap.put(SkewkeyTableCounter.SKEWJOINFOLLOWUPJOBS.toString(), skewjoin_followup_jobs);
   }
 
   @Override
@@ -71,33 +71,29 @@ public class JoinOperator extends CommonJoinOperator<JoinDesc> implements
     try {
       reportProgress();
 
-      // get alias
+      lastAlias = alias;
       alias = (byte) tag;
 
-      if ((lastAlias == null) || (!lastAlias.equals(alias))) {
+      if (!alias.equals(lastAlias)) {
         nextSz = joinEmitInterval;
       }
 
-
-      ArrayList<Object> nr = JoinUtil.computeValues(row, joinValues.get(alias),
-          joinValuesObjectInspectors.get(alias), joinFilters.get(alias),
-          joinFilterObjectInspectors.get(alias), noOuterJoin);
-
+      List<Object> nr = getFilteredValue(alias, row);
 
       if (handleSkewJoin) {
         skewJoinKeyContext.handleSkew(tag);
       }
 
       // number of rows for the key in the given table
-      int sz = storage.get(alias).size();
+      long sz = storage[alias].rowCount();
       StructObjectInspector soi = (StructObjectInspector) inputObjInspectors[tag];
       StructField sf = soi.getStructFieldRef(Utilities.ReduceField.KEY
           .toString());
-      Object keyObject = soi.getStructFieldData(row, sf);
-
+      List keyObject = (List) soi.getStructFieldData(row, sf);
       // Are we consuming too much memory
-      if (alias == numAliases - 1 && !(handleSkewJoin && skewJoinKeyContext.currBigKeyTag >= 0)) {
-        if (sz == joinEmitInterval) {
+      if (alias == numAliases - 1 && !(handleSkewJoin && skewJoinKeyContext.currBigKeyTag >= 0) &&
+          !hasLeftSemiJoin) {
+        if (sz == joinEmitInterval && !hasFilter(alias)) {
           // The input is sorted by alias, so if we are already in the last join
           // operand,
           // we can emit some results now.
@@ -105,27 +101,28 @@ public class JoinOperator extends CommonJoinOperator<JoinDesc> implements
           // storage,
           // to preserve the correctness for outer joins.
           checkAndGenObject();
-          storage.get(alias).clear();
+          storage[alias].clearRows();
         }
       } else {
         if (sz == nextSz) {
-          // Output a warning if we reached at least 1000 rows for a join
-          // operand
-          // We won't output a warning for the last join operand since the size
+          // Print a message if we reached at least 1000 rows for a join operand
+          // We won't print a message for the last join operand since the size
           // will never goes to joinEmitInterval.
-          LOG.warn("table " + alias + " has " + sz + " rows for join key "
+          LOG.info("table " + alias + " has " + sz + " rows for join key "
               + keyObject);
           nextSz = getNextSize(nextSz);
         }
       }
 
       // Add the value to the vector
-      storage.get(alias).add(nr);
       // if join-key is null, process each row in different group.
-      if (SerDeUtils.hasAnyNullObject(keyObject, sf.getFieldObjectInspector())) {
+      StructObjectInspector inspector =
+          (StructObjectInspector) sf.getFieldObjectInspector();
+      if (SerDeUtils.hasAnyNullObject(keyObject, inspector, nullsafes)) {
         endGroup();
         startGroup();
       }
+      storage[alias].addRow(nr);
     } catch (Exception e) {
       e.printStackTrace();
       throw new HiveException(e);
@@ -150,13 +147,13 @@ public class JoinOperator extends CommonJoinOperator<JoinDesc> implements
   }
 
   @Override
-  public void jobClose(Configuration hconf, boolean success, JobCloseFeedBack feedBack)
+  public void jobCloseOp(Configuration hconf, boolean success)
       throws HiveException {
     int numAliases = conf.getExprs().size();
     if (conf.getHandleSkewJoin()) {
       try {
         for (int i = 0; i < numAliases; i++) {
-          String specPath = conf.getBigKeysDirMap().get((byte) i);
+          Path specPath = conf.getBigKeysDirMap().get((byte) i);
           mvFileToFinalPath(specPath, hconf, success, LOG);
           for (int j = 0; j < numAliases; j++) {
             if (j == i) {
@@ -171,7 +168,7 @@ public class JoinOperator extends CommonJoinOperator<JoinDesc> implements
         if (success) {
           // move up files
           for (int i = 0; i < numAliases; i++) {
-            String specPath = conf.getBigKeysDirMap().get((byte) i);
+            Path specPath = conf.getBigKeysDirMap().get((byte) i);
             moveUpFiles(specPath, hconf, LOG);
             for (int j = 0; j < numAliases; j++) {
               if (j == i) {
@@ -187,19 +184,18 @@ public class JoinOperator extends CommonJoinOperator<JoinDesc> implements
         throw new HiveException(e);
       }
     }
-    super.jobClose(hconf, success, feedBack);
+    super.jobCloseOp(hconf, success);
   }
 
-  private void moveUpFiles(String specPath, Configuration hconf, Log log)
+  private void moveUpFiles(Path specPath, Configuration hconf, Log log)
       throws IOException, HiveException {
-    FileSystem fs = (new Path(specPath)).getFileSystem(hconf);
-    Path finalPath = new Path(specPath);
+    FileSystem fs = specPath.getFileSystem(hconf);
 
-    if (fs.exists(finalPath)) {
-      FileStatus[] taskOutputDirs = fs.listStatus(finalPath);
+    if (fs.exists(specPath)) {
+      FileStatus[] taskOutputDirs = fs.listStatus(specPath);
       if (taskOutputDirs != null) {
         for (FileStatus dir : taskOutputDirs) {
-          Utilities.renameOrMoveFiles(fs, dir.getPath(), finalPath);
+          Utilities.renameOrMoveFiles(fs, dir.getPath(), specPath);
           fs.delete(dir.getPath(), true);
         }
       }
@@ -212,19 +208,16 @@ public class JoinOperator extends CommonJoinOperator<JoinDesc> implements
    * @param hconf
    * @param success
    * @param log
-   * @param dpCtx
    * @throws IOException
    * @throws HiveException
    */
-  private void  mvFileToFinalPath(String specPath, Configuration hconf,
+  private void  mvFileToFinalPath(Path specPath, Configuration hconf,
       boolean success, Log log) throws IOException, HiveException {
 
-    FileSystem fs = (new Path(specPath)).getFileSystem(hconf);
+    FileSystem fs = specPath.getFileSystem(hconf);
     Path tmpPath = Utilities.toTempPath(specPath);
     Path intermediatePath = new Path(tmpPath.getParent(), tmpPath.getName()
         + ".intermediate");
-    Path finalPath = new Path(specPath);
-    ArrayList<String> emptyBuckets = null;
     if (success) {
       if (fs.exists(tmpPath)) {
         // Step1: rename tmp output folder to intermediate path. After this
@@ -235,8 +228,8 @@ public class JoinOperator extends CommonJoinOperator<JoinDesc> implements
         // Step2: remove any tmp file or double-committed output files
         Utilities.removeTempOrDuplicateFiles(fs, intermediatePath);
         // Step3: move to the file destination
-        log.info("Moving tmp dir: " + intermediatePath + " to: " + finalPath);
-        Utilities.renameOrMoveFiles(fs, intermediatePath, finalPath);
+        log.info("Moving tmp dir: " + intermediatePath + " to: " + specPath);
+        Utilities.renameOrMoveFiles(fs, intermediatePath, specPath);
       }
     } else {
       fs.delete(tmpPath, true);
@@ -264,4 +257,21 @@ public class JoinOperator extends CommonJoinOperator<JoinDesc> implements
     }
   }
 
+  @Override
+  public boolean supportSkewJoinOptimization() {
+    // Since skew join optimization makes a copy of the tree above joins, and
+    // there is no multi-query optimization in place, let us not use skew join
+    // optimizations for now.
+    return false;
+  }
+
+  @Override
+  public boolean opAllowedBeforeSortMergeJoin() {
+    // If a join occurs before the sort-merge join, it is not useful to convert the the sort-merge
+    // join to a mapjoin. It might be simpler to perform the join and then a sort-merge join
+    // join. By converting the sort-merge join to a map-join, the job will be executed in 2
+    // mapjoins in the best case. The number of inputs for the join is more than 1 so it would
+    // be difficult to figure out the big table for the mapjoin.
+    return false;
+  }
 }

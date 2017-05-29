@@ -22,13 +22,15 @@ import java.util.ArrayList;
 
 import junit.framework.TestCase;
 
+import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.parse.TypeCheckProcFactory;
 import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
-import org.apache.hadoop.hive.serde.Constants;
+import org.apache.hadoop.hive.ql.session.SessionState;
+import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.objectinspector.InspectableObject;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorUtils;
@@ -58,6 +60,10 @@ public class TestExpressionEvaluator extends TestCase {
   TypeInfo dataType;
 
   public TestExpressionEvaluator() {
+    // Arithmetic operations rely on getting conf from SessionState, need to initialize here.
+    SessionState ss = new SessionState(new HiveConf());
+    SessionState.setCurrentSessionState(ss);
+
     col1 = new ArrayList<Text>();
     col1.add(new Text("0"));
     col1.add(new Text("1"));
@@ -116,12 +122,12 @@ public class TestExpressionEvaluator extends TestCase {
     }
   }
 
-  private static ExprNodeDesc getListIndexNode(ExprNodeDesc node, int index) {
+  private static ExprNodeDesc getListIndexNode(ExprNodeDesc node, int index) throws Exception {
     return getListIndexNode(node, new ExprNodeConstantDesc(index));
   }
 
   private static ExprNodeDesc getListIndexNode(ExprNodeDesc node,
-      ExprNodeDesc index) {
+      ExprNodeDesc index) throws Exception {
     ArrayList<ExprNodeDesc> children = new ArrayList<ExprNodeDesc>(2);
     children.add(node);
     children.add(index);
@@ -162,7 +168,7 @@ public class TestExpressionEvaluator extends TestCase {
           false);
       ExprNodeDesc col11desc = getListIndexNode(col1desc, 1);
       ExprNodeDesc func1 = TypeCheckProcFactory.DefaultExprProcessor
-          .getFuncExprNodeDesc(Constants.DOUBLE_TYPE_NAME, col11desc);
+          .getFuncExprNodeDesc(serdeConstants.DOUBLE_TYPE_NAME, col11desc);
       ExprNodeEvaluator eval = ExprNodeEvaluatorFactory.get(func1);
 
       // evaluate on row

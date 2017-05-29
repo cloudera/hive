@@ -23,14 +23,14 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import org.apache.hadoop.hive.serde.Constants;
+import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Category;
 
 /**
  * StructTypeInfo represents the TypeInfo of a struct. A struct contains one or
  * more fields each of which has a unique name and its own TypeInfo. Different
  * fields can have the same or different TypeInfo.
- * 
+ *
  * Always use the TypeInfoFactory to create new TypeInfo objects, instead of
  * directly creating an instance of this class.
  */
@@ -50,7 +50,7 @@ public final class StructTypeInfo extends TypeInfo implements Serializable {
   @Override
   public String getTypeName() {
     StringBuilder sb = new StringBuilder();
-    sb.append(Constants.STRUCT_TYPE_NAME + "<");
+    sb.append(serdeConstants.STRUCT_TYPE_NAME + "<");
     for (int i = 0; i < allStructFieldNames.size(); i++) {
       if (i > 0) {
         sb.append(",");
@@ -82,10 +82,8 @@ public final class StructTypeInfo extends TypeInfo implements Serializable {
    * For TypeInfoFactory use only.
    */
   StructTypeInfo(List<String> names, List<TypeInfo> typeInfos) {
-    allStructFieldNames = new ArrayList<String>();
-    allStructFieldNames.addAll(names);
-    allStructFieldTypeInfos = new ArrayList<TypeInfo>();
-    allStructFieldTypeInfos.addAll(typeInfos);
+    allStructFieldNames = new ArrayList<String>(names);
+    allStructFieldTypeInfos = new ArrayList<TypeInfo>(typeInfos);
   }
 
   @Override
@@ -104,7 +102,7 @@ public final class StructTypeInfo extends TypeInfo implements Serializable {
   public TypeInfo getStructFieldTypeInfo(String field) {
     String fieldLowerCase = field.toLowerCase();
     for (int i = 0; i < allStructFieldNames.size(); i++) {
-      if (fieldLowerCase.equals(allStructFieldNames.get(i))) {
+      if (fieldLowerCase.equalsIgnoreCase(allStructFieldNames.get(i))) {
         return allStructFieldTypeInfos.get(i);
       }
     }

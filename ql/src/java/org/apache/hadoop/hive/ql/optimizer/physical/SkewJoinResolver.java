@@ -24,6 +24,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Stack;
 
+import org.apache.hadoop.hive.ql.exec.CommonJoinOperator;
 import org.apache.hadoop.hive.ql.exec.ConditionalTask;
 import org.apache.hadoop.hive.ql.exec.Task;
 import org.apache.hadoop.hive.ql.lib.DefaultGraphWalker;
@@ -50,7 +51,7 @@ public class SkewJoinResolver implements PhysicalPlanResolver {
     Dispatcher disp = new SkewJoinTaskDispatcher(pctx);
     GraphWalker ogw = new DefaultGraphWalker(disp);
     ArrayList<Node> topNodes = new ArrayList<Node>();
-    topNodes.addAll(pctx.rootTasks);
+    topNodes.addAll(pctx.getRootTasks());
     ogw.startWalking(topNodes, null);
     return pctx;
   }
@@ -73,7 +74,7 @@ public class SkewJoinResolver implements PhysicalPlanResolver {
       Task<? extends Serializable> task = (Task<? extends Serializable>) nd;
 
       if (!task.isMapRedTask() || task instanceof ConditionalTask
-          || ((MapredWork) task.getWork()).getReducer() == null) {
+          || ((MapredWork) task.getWork()).getReduceWork() == null) {
         return null;
       }
 
@@ -81,8 +82,9 @@ public class SkewJoinResolver implements PhysicalPlanResolver {
           physicalContext.getParseContext());
 
       Map<Rule, NodeProcessor> opRules = new LinkedHashMap<Rule, NodeProcessor>();
-      opRules.put(new RuleRegExp("R1", "JOIN%"), SkewJoinProcFactory
-          .getJoinProc());
+      opRules.put(new RuleRegExp("R1",
+        CommonJoinOperator.getOperatorName() + "%"),
+        SkewJoinProcFactory.getJoinProc());
 
       // The dispatcher fires the processor corresponding to the closest
       // matching rule and passes the context along
@@ -92,7 +94,9 @@ public class SkewJoinResolver implements PhysicalPlanResolver {
 
       // iterator the reducer operator tree
       ArrayList<Node> topNodes = new ArrayList<Node>();
-      topNodes.add(((MapredWork) task.getWork()).getReducer());
+      if (((MapredWork)task.getWork()).getReduceWork() != null) {
+        topNodes.add(((MapredWork) task.getWork()).getReduceWork().getReducer());
+      }
       ogw.startWalking(topNodes, null);
       return null;
     }

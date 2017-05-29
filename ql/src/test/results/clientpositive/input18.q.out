@@ -1,13 +1,16 @@
 PREHOOK: query: CREATE TABLE dest1(key INT, value STRING) STORED AS TEXTFILE
 PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:default
+PREHOOK: Output: default@dest1
 POSTHOOK: query: CREATE TABLE dest1(key INT, value STRING) STORED AS TEXTFILE
 POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@dest1
 PREHOOK: query: EXPLAIN
 FROM (
   FROM src
   SELECT TRANSFORM(src.key, src.value, 1+2, 3+4)
-         USING '/bin/cat'
+         USING 'cat'
   CLUSTER BY key
 ) tmap
 INSERT OVERWRITE TABLE dest1 SELECT tmap.key, regexp_replace(tmap.value,'\t','+') WHERE tmap.key < 100
@@ -16,14 +19,11 @@ POSTHOOK: query: EXPLAIN
 FROM (
   FROM src
   SELECT TRANSFORM(src.key, src.value, 1+2, 3+4)
-         USING '/bin/cat'
+         USING 'cat'
   CLUSTER BY key
 ) tmap
 INSERT OVERWRITE TABLE dest1 SELECT tmap.key, regexp_replace(tmap.value,'\t','+') WHERE tmap.key < 100
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_SUBQUERY (TOK_QUERY (TOK_FROM (TOK_TABREF src)) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_TRANSFORM (TOK_EXPLIST (. (TOK_TABLE_OR_COL src) key) (. (TOK_TABLE_OR_COL src) value) (+ 1 2) (+ 3 4)) TOK_SERDE TOK_RECORDWRITER '/bin/cat' TOK_SERDE TOK_RECORDREADER))) (TOK_CLUSTERBY (TOK_TABLE_OR_COL key)))) tmap)) (TOK_INSERT (TOK_DESTINATION (TOK_TAB dest1)) (TOK_SELECT (TOK_SELEXPR (. (TOK_TABLE_OR_COL tmap) key)) (TOK_SELEXPR (TOK_FUNCTION regexp_replace (. (TOK_TABLE_OR_COL tmap) value) '\t' '+'))) (TOK_WHERE (< (. (TOK_TABLE_OR_COL tmap) key) 100))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
   Stage-0 depends on stages: Stage-1
@@ -32,68 +32,43 @@ STAGE DEPENDENCIES:
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        tmap:src 
+      Map Operator Tree:
           TableScan
             alias: src
+            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
             Select Operator
-              expressions:
-                    expr: key
-                    type: string
-                    expr: value
-                    type: string
-                    expr: (1 + 2)
-                    type: int
-                    expr: (3 + 4)
-                    type: int
+              expressions: key (type: string), value (type: string), 3 (type: int), 7 (type: int)
               outputColumnNames: _col0, _col1, _col2, _col3
+              Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
               Transform Operator
-                command: /bin/cat
+                command: cat
                 output info:
                     input format: org.apache.hadoop.mapred.TextInputFormat
                     output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-                Reduce Output Operator
-                  key expressions:
-                        expr: _col0
-                        type: string
-                  sort order: +
-                  Map-reduce partition columns:
-                        expr: _col0
-                        type: string
-                  tag: -1
-                  value expressions:
-                        expr: _col0
-                        type: string
-                        expr: _col1
-                        type: string
+                    serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+                Filter Operator
+                  predicate: (_col0 < 100) (type: boolean)
+                  Statistics: Num rows: 166 Data size: 1763 Basic stats: COMPLETE Column stats: NONE
+                  Reduce Output Operator
+                    key expressions: _col0 (type: string)
+                    sort order: +
+                    Map-reduce partition columns: _col0 (type: string)
+                    Statistics: Num rows: 166 Data size: 1763 Basic stats: COMPLETE Column stats: NONE
+                    value expressions: _col0 (type: string), _col1 (type: string)
       Reduce Operator Tree:
-        Extract
-          Filter Operator
-            predicate:
-                expr: (_col0 < 100)
-                type: boolean
-            Select Operator
-              expressions:
-                    expr: _col0
-                    type: string
-                    expr: regexp_replace(_col1, '	', '+')
-                    type: string
-              outputColumnNames: _col0, _col1
-              Select Operator
-                expressions:
-                      expr: UDFToInteger(_col0)
-                      type: int
-                      expr: _col1
-                      type: string
-                outputColumnNames: _col0, _col1
-                File Output Operator
-                  compressed: false
-                  GlobalTableId: 1
-                  table:
-                      input format: org.apache.hadoop.mapred.TextInputFormat
-                      output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-                      serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                      name: dest1
+        Select Operator
+          expressions: UDFToInteger(VALUE._col0) (type: int), regexp_replace(VALUE._col1, '	', '+') (type: string)
+          outputColumnNames: _col0, _col1
+          Statistics: Num rows: 166 Data size: 1763 Basic stats: COMPLETE Column stats: NONE
+          File Output Operator
+            compressed: false
+            Statistics: Num rows: 166 Data size: 1763 Basic stats: COMPLETE Column stats: NONE
+            table:
+                input format: org.apache.hadoop.mapred.TextInputFormat
+                output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                name: default.dest1
 
   Stage: Stage-0
     Move Operator
@@ -103,16 +78,15 @@ STAGE PLANS:
               input format: org.apache.hadoop.mapred.TextInputFormat
               output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              name: dest1
+              name: default.dest1
 
   Stage: Stage-2
     Stats-Aggr Operator
 
-
 PREHOOK: query: FROM (
   FROM src
   SELECT TRANSFORM(src.key, src.value, 1+2, 3+4)
-         USING '/bin/cat'
+         USING 'cat'
   CLUSTER BY key
 ) tmap
 INSERT OVERWRITE TABLE dest1 SELECT tmap.key, regexp_replace(tmap.value,'\t','+') WHERE tmap.key < 100
@@ -122,7 +96,7 @@ PREHOOK: Output: default@dest1
 POSTHOOK: query: FROM (
   FROM src
   SELECT TRANSFORM(src.key, src.value, 1+2, 3+4)
-         USING '/bin/cat'
+         USING 'cat'
   CLUSTER BY key
 ) tmap
 INSERT OVERWRITE TABLE dest1 SELECT tmap.key, regexp_replace(tmap.value,'\t','+') WHERE tmap.key < 100
@@ -131,16 +105,18 @@ POSTHOOK: Input: default@src
 POSTHOOK: Output: default@dest1
 POSTHOOK: Lineage: dest1.key SCRIPT [(src)src.FieldSchema(name:key, type:string, comment:default), (src)src.FieldSchema(name:value, type:string, comment:default), ]
 POSTHOOK: Lineage: dest1.value SCRIPT [(src)src.FieldSchema(name:key, type:string, comment:default), (src)src.FieldSchema(name:value, type:string, comment:default), ]
-PREHOOK: query: SELECT dest1.* FROM dest1
+PREHOOK: query: -- SORT_QUERY_RESULTS
+
+SELECT dest1.* FROM dest1
 PREHOOK: type: QUERY
 PREHOOK: Input: default@dest1
-PREHOOK: Output: file:/tmp/nzhang/hive_2010-09-14_16-27-40_009_4704505583726381922/-mr-10000
-POSTHOOK: query: SELECT dest1.* FROM dest1
+#### A masked pattern was here ####
+POSTHOOK: query: -- SORT_QUERY_RESULTS
+
+SELECT dest1.* FROM dest1
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@dest1
-POSTHOOK: Output: file:/tmp/nzhang/hive_2010-09-14_16-27-40_009_4704505583726381922/-mr-10000
-POSTHOOK: Lineage: dest1.key SCRIPT [(src)src.FieldSchema(name:key, type:string, comment:default), (src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: dest1.value SCRIPT [(src)src.FieldSchema(name:key, type:string, comment:default), (src)src.FieldSchema(name:value, type:string, comment:default), ]
+#### A masked pattern was here ####
 0	val_0+3+7
 0	val_0+3+7
 0	val_0+3+7

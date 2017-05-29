@@ -19,6 +19,8 @@
 package org.apache.hadoop.hive.ql.udf.generic;
 
 import org.apache.hadoop.hive.ql.exec.Description;
+import org.apache.hadoop.hive.ql.exec.vector.VectorizedExpressions;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.*;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorUtils;
 
@@ -26,6 +28,35 @@ import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorUtils;
  * GenericUDF Class for operation Not EQUAL.
  */
 @Description(name = "<>", value = "a _FUNC_ b - Returns TRUE if a is not equal to b")
+@VectorizedExpressions({LongColNotEqualLongColumn.class, LongColNotEqualDoubleColumn.class,
+  DoubleColNotEqualLongColumn.class, DoubleColNotEqualDoubleColumn.class,
+  LongColNotEqualLongScalar.class, LongColNotEqualDoubleScalar.class,
+  DoubleColNotEqualLongScalar.class, DoubleColNotEqualDoubleScalar.class,
+  LongScalarNotEqualLongColumn.class, LongScalarNotEqualDoubleColumn.class,
+  DoubleScalarNotEqualLongColumn.class, DoubleScalarNotEqualDoubleColumn.class,
+  StringGroupColNotEqualStringGroupColumn.class, FilterStringGroupColNotEqualStringGroupColumn.class,
+  StringGroupColNotEqualStringScalar.class,
+  StringGroupColNotEqualVarCharScalar.class, StringGroupColNotEqualCharScalar.class,
+  StringScalarNotEqualStringGroupColumn.class,
+  VarCharScalarNotEqualStringGroupColumn.class, CharScalarNotEqualStringGroupColumn.class, 
+  FilterStringGroupColNotEqualStringScalar.class, FilterStringScalarNotEqualStringGroupColumn.class,
+  FilterStringGroupColNotEqualVarCharScalar.class, FilterVarCharScalarNotEqualStringGroupColumn.class,
+  FilterStringGroupColNotEqualCharScalar.class, FilterCharScalarNotEqualStringGroupColumn.class,
+  FilterLongColNotEqualLongColumn.class, FilterLongColNotEqualDoubleColumn.class,
+  FilterDoubleColNotEqualLongColumn.class, FilterDoubleColNotEqualDoubleColumn.class,
+  FilterLongColNotEqualLongScalar.class, FilterLongColNotEqualDoubleScalar.class,
+  FilterDoubleColNotEqualLongScalar.class, FilterDoubleColNotEqualDoubleScalar.class,
+  FilterLongScalarNotEqualLongColumn.class, FilterLongScalarNotEqualDoubleColumn.class,
+  FilterDoubleScalarNotEqualLongColumn.class, FilterDoubleScalarNotEqualDoubleColumn.class,
+  FilterDecimalColNotEqualDecimalColumn.class, FilterDecimalColNotEqualDecimalScalar.class,
+  FilterDecimalScalarNotEqualDecimalColumn.class,
+  TimestampColNotEqualTimestampScalar.class, TimestampScalarNotEqualTimestampColumn.class,
+  FilterTimestampColNotEqualTimestampScalar.class, FilterTimestampScalarNotEqualTimestampColumn.class,
+  TimestampColNotEqualLongScalar.class, LongScalarNotEqualTimestampColumn.class,
+  FilterTimestampColNotEqualLongScalar.class, FilterLongScalarNotEqualTimestampColumn.class,
+  TimestampColNotEqualDoubleScalar.class, DoubleScalarNotEqualTimestampColumn.class,
+  FilterTimestampColNotEqualDoubleScalar.class, FilterDoubleScalarNotEqualTimestampColumn.class
+  })
 public class GenericUDFOPNotEqual extends GenericUDFBaseCompare {
   public GenericUDFOPNotEqual(){
     this.opName = "NOT EQUAL";

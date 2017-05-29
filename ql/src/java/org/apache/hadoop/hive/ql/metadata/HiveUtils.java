@@ -18,23 +18,30 @@
 
 package org.apache.hadoop.hive.ql.metadata;
 
+import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.common.JavaUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.index.HiveIndexHandler;
-import org.apache.hadoop.hive.ql.parse.AbstractSemanticAnalyzerHook;
 import org.apache.hadoop.hive.ql.security.HadoopDefaultAuthenticator;
 import org.apache.hadoop.hive.ql.security.HiveAuthenticationProvider;
 import org.apache.hadoop.hive.ql.security.authorization.DefaultHiveAuthorizationProvider;
 import org.apache.hadoop.hive.ql.security.authorization.HiveAuthorizationProvider;
+import org.apache.hadoop.hive.ql.security.authorization.HiveMetastoreAuthorizationProvider;
+import org.apache.hadoop.hive.ql.security.authorization.plugin.HiveAuthorizerFactory;
+import org.apache.hadoop.hive.ql.security.authorization.plugin.sqlstd.SQLStdHiveAuthorizerFactory;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.util.ReflectionUtils;
-import org.apache.hadoop.hive.metastore.api.FieldSchema;
 
 /**
  * General collection of helper functions.
- * 
+ *
  */
 public final class HiveUtils {
 
@@ -97,6 +104,153 @@ public final class HiveUtils {
     return (escape.toString());
   }
 
+  static final byte[] escapeEscapeBytes = "\\\\".getBytes();;
+  static final byte[] escapeUnescapeBytes = "\\".getBytes();
+  static final byte[] newLineEscapeBytes = "\\n".getBytes();;
+  static final byte[] newLineUnescapeBytes = "\n".getBytes();
+  static final byte[] carriageReturnEscapeBytes = "\\r".getBytes();;
+  static final byte[] carriageReturnUnescapeBytes = "\r".getBytes();
+  static final byte[] tabEscapeBytes = "\\t".getBytes();;
+  static final byte[] tabUnescapeBytes = "\t".getBytes();
+  static final byte[] ctrlABytes = "\u0001".getBytes();
+
+
+  public static final Log LOG = LogFactory.getLog(HiveUtils.class);
+
+
+  public static Text escapeText(Text text) {
+    int length = text.getLength();
+    byte[] textBytes = text.getBytes();
+
+    Text escape = new Text(text);
+    escape.clear();
+
+    for (int i = 0; i < length; ++i) {
+      int c = text.charAt(i);
+      byte[] escaped;
+      int start;
+      int len;
+
+      switch (c) {
+
+      case '\\':
+        escaped = escapeEscapeBytes;
+        start = 0;
+        len = escaped.length;
+        break;
+
+      case '\n':
+        escaped = newLineEscapeBytes;
+        start = 0;
+        len = escaped.length;
+        break;
+
+      case '\r':
+        escaped = carriageReturnEscapeBytes;
+        start = 0;
+        len = escaped.length;
+        break;
+
+      case '\t':
+        escaped = tabEscapeBytes;
+        start = 0;
+        len = escaped.length;
+        break;
+
+      case '\u0001':
+        escaped = tabUnescapeBytes;
+        start = 0;
+        len = escaped.length;
+        break;
+
+      default:
+        escaped = textBytes;
+        start = i;
+        len = 1;
+        break;
+      }
+
+      escape.append(escaped, start, len);
+
+    }
+    return escape;
+  }
+
+  public static int unescapeText(Text text) {
+    Text escape = new Text(text);
+    text.clear();
+
+    int length = escape.getLength();
+    byte[] textBytes = escape.getBytes();
+
+    boolean hadSlash = false;
+    for (int i = 0; i < length; ++i) {
+      int c = escape.charAt(i);
+      switch (c) {
+      case '\\':
+        if (hadSlash) {
+          text.append(textBytes, i, 1);
+          hadSlash = false;
+        }
+        else {
+          hadSlash = true;
+        }
+        break;
+      case 'n':
+        if (hadSlash) {
+          byte[] newLine = newLineUnescapeBytes;
+          text.append(newLine, 0, newLine.length);
+        }
+        else {
+          text.append(textBytes, i, 1);
+        }
+        hadSlash = false;
+        break;
+      case 'r':
+        if (hadSlash) {
+          byte[] carriageReturn = carriageReturnUnescapeBytes;
+          text.append(carriageReturn, 0, carriageReturn.length);
+        }
+        else {
+          text.append(textBytes, i, 1);
+        }
+        hadSlash = false;
+        break;
+
+      case 't':
+        if (hadSlash) {
+          byte[] tab = tabUnescapeBytes;
+          text.append(tab, 0, tab.length);
+        }
+        else {
+          text.append(textBytes, i, 1);
+        }
+        hadSlash = false;
+        break;
+
+      case '\t':
+        if (hadSlash) {
+          text.append(textBytes, i-1, 1);
+          hadSlash = false;
+        }
+
+        byte[] ctrlA = ctrlABytes;
+        text.append(ctrlA, 0, ctrlA.length);
+        break;
+
+      default:
+        if (hadSlash) {
+          text.append(textBytes, i-1, 1);
+          hadSlash = false;
+        }
+
+        text.append(textBytes, i, 1);
+        break;
+      }
+    }
+    return text.getLength();
+  }
+
   public static String lightEscapeString(String str) {
     int length = str.length();
     StringBuilder escape = new StringBuilder(length + 16);
@@ -128,24 +282,34 @@ public final class HiveUtils {
    * Regenerate an identifier as part of unparsing it back to SQL text.
    */
   public static String unparseIdentifier(String identifier) {
+    return unparseIdentifier(identifier, null);
+  }
+
+  public static String unparseIdentifier(String identifier, Configuration conf) {
     // In the future, if we support arbitrary characters in
     // identifiers, then we'll need to escape any backticks
     // in identifier by doubling them up.
+
+    // the time has come
+    String qIdSupport = conf == null ? null :
+      HiveConf.getVar(conf, HiveConf.ConfVars.HIVE_QUOTEDID_SUPPORT);
+    if ( qIdSupport != null && !"none".equals(qIdSupport) ) {
+      identifier = identifier.replaceAll("`", "``");
+    }
     return "`" + identifier + "`";
   }
 
   public static HiveStorageHandler getStorageHandler(
     Configuration conf, String className) throws HiveException {
-    
+
     if (className == null) {
       return null;
     }
     try {
       Class<? extends HiveStorageHandler> handlerClass =
         (Class<? extends HiveStorageHandler>)
-        Class.forName(className, true, JavaUtils.getClassLoader());
-      HiveStorageHandler storageHandler = (HiveStorageHandler)
-        ReflectionUtils.newInstance(handlerClass, conf);
+        Class.forName(className, true, Utilities.getSessionSpecifiedClassLoader());
+      HiveStorageHandler storageHandler = ReflectionUtils.newInstance(handlerClass, conf);
       return storageHandler;
     } catch (ClassNotFoundException e) {
       throw new HiveException("Error in loading storage handler."
@@ -166,31 +330,59 @@ public final class HiveUtils {
     try {
       Class<? extends HiveIndexHandler> handlerClass =
         (Class<? extends HiveIndexHandler>)
-        Class.forName(indexHandlerClass, true, JavaUtils.getClassLoader());
-      HiveIndexHandler indexHandler = (HiveIndexHandler)
-        ReflectionUtils.newInstance(handlerClass, conf);
+        Class.forName(indexHandlerClass, true, Utilities.getSessionSpecifiedClassLoader());
+      HiveIndexHandler indexHandler = ReflectionUtils.newInstance(handlerClass, conf);
       return indexHandler;
     } catch (ClassNotFoundException e) {
       throw new HiveException("Error in loading index handler."
           + e.getMessage(), e);
     }
   }
-  
+
+  @SuppressWarnings("unchecked")
+  public static List<HiveMetastoreAuthorizationProvider> getMetaStoreAuthorizeProviderManagers(
+      Configuration conf, HiveConf.ConfVars authorizationProviderConfKey,
+      HiveAuthenticationProvider authenticator) throws HiveException {
+
+    String clsStrs = HiveConf.getVar(conf, authorizationProviderConfKey);
+    if(clsStrs == null){
+      return null;
+    }
+    List<HiveMetastoreAuthorizationProvider> authProviders = new ArrayList<HiveMetastoreAuthorizationProvider>();
+    for (String clsStr : clsStrs.trim().split(",")) {
+      LOG.info("Adding metastore authorization provider: " + clsStr);
+      authProviders.add((HiveMetastoreAuthorizationProvider) getAuthorizeProviderManager(conf,
+          clsStr, authenticator, false));
+    }
+    return authProviders;
+  }
+
+  /**
+   * Create a new instance of HiveAuthorizationProvider
+   * @param conf
+   * @param authzClassName - authorization provider class name
+   * @param authenticator
+   * @param nullIfOtherClass - return null if configuration
+   *  does not point to a HiveAuthorizationProvider subclass
+   * @return new instance of HiveAuthorizationProvider
+   * @throws HiveException
+   */
   @SuppressWarnings("unchecked")
   public static HiveAuthorizationProvider getAuthorizeProviderManager(
-      Configuration conf, HiveAuthenticationProvider authenticator) throws HiveException {
-
-    String clsStr = HiveConf.getVar(conf,
-        HiveConf.ConfVars.HIVE_AUTHORIZATION_MANAGER);
+      Configuration conf, String authzClassName,
+      HiveAuthenticationProvider authenticator, boolean nullIfOtherClass) throws HiveException {
 
     HiveAuthorizationProvider ret = null;
     try {
       Class<? extends HiveAuthorizationProvider> cls = null;
-      if (clsStr == null || clsStr.trim().equals("")) {
+      if (authzClassName == null || authzClassName.trim().equals("")) {
         cls = DefaultHiveAuthorizationProvider.class;
       } else {
-        cls = (Class<? extends HiveAuthorizationProvider>) Class.forName(
-            clsStr, true, JavaUtils.getClassLoader());
+        Class<?> configClass = Class.forName(authzClassName, true, JavaUtils.getClassLoader());
+        if(nullIfOtherClass && !HiveAuthorizationProvider.class.isAssignableFrom(configClass) ){
+          return null;
+        }
+        cls = (Class<? extends HiveAuthorizationProvider>)configClass;
       }
       if (cls != null) {
         ret = ReflectionUtils.newInstance(cls, conf);
@@ -202,12 +394,37 @@ public final class HiveUtils {
     return ret;
   }
 
-  @SuppressWarnings("unchecked")
-  public static HiveAuthenticationProvider getAuthenticator(Configuration conf)
-      throws HiveException {
 
-    String clsStr = HiveConf.getVar(conf,
-        HiveConf.ConfVars.HIVE_AUTHENTICATOR_MANAGER);
+  /**
+   * Return HiveAuthorizerFactory used by new authorization plugin interface.
+   * @param conf
+   * @param authorizationProviderConfKey
+   * @return
+   * @throws HiveException if HiveAuthorizerFactory specified in configuration could not
+   */
+  public static HiveAuthorizerFactory getAuthorizerFactory(
+      Configuration conf, HiveConf.ConfVars authorizationProviderConfKey)
+          throws HiveException {
+
+    Class<? extends HiveAuthorizerFactory> cls = conf.getClass(authorizationProviderConfKey.varname,
+        SQLStdHiveAuthorizerFactory.class, HiveAuthorizerFactory.class);
+
+    if(cls == null){
+      //should not happen as default value is set
+      throw new HiveException("Configuration value " + authorizationProviderConfKey.varname
+          + " is not set to valid HiveAuthorizerFactory subclass" );
+    }
+
+    HiveAuthorizerFactory authFactory = ReflectionUtils.newInstance(cls, conf);
+    return authFactory;
+  }
+
+  @SuppressWarnings("unchecked")
+  public static HiveAuthenticationProvider getAuthenticator(
+      Configuration conf, HiveConf.ConfVars authenticatorConfKey
+      ) throws HiveException {
+
+    String clsStr = HiveConf.getVar(conf, authenticatorConfKey);
 
     HiveAuthenticationProvider ret = null;
     try {
@@ -227,34 +444,19 @@ public final class HiveUtils {
     return ret;
   }
 
-  public static AbstractSemanticAnalyzerHook getSemanticAnalyzerHook(
-      HiveConf conf, String hookName) throws HiveException{
-    try {
-      Class<? extends AbstractSemanticAnalyzerHook> hookClass =
-        (Class<? extends AbstractSemanticAnalyzerHook>)
-        Class.forName(hookName, true, JavaUtils.getClassLoader());
-      return (AbstractSemanticAnalyzerHook) ReflectionUtils.newInstance(
-          hookClass, conf);
-    } catch (ClassNotFoundException e) {
-      throw new HiveException("Error in loading semantic analyzer hook: "+
-          hookName +e.getMessage(),e);
-    }
 
-  }
-
-
-    /**
-     * Convert FieldSchemas to columnNames with backticks around them.
-     */
-    public static String getUnparsedColumnNamesFromFieldSchema(
-        List<FieldSchema> fieldSchemas) {
-      StringBuilder sb = new StringBuilder();
-      for (int i = 0; i < fieldSchemas.size(); i++) {
-        if (i > 0) {
-          sb.append(",");
-        }
-        sb.append(HiveUtils.unparseIdentifier(fieldSchemas.get(i).getName()));
+  /**
+   * Convert FieldSchemas to columnNames with backticks around them.
+   */
+  public static String getUnparsedColumnNamesFromFieldSchema(
+      List<FieldSchema> fieldSchemas) {
+    StringBuilder sb = new StringBuilder();
+    for (int i = 0; i < fieldSchemas.size(); i++) {
+      if (i > 0) {
+        sb.append(",");
       }
-      return sb.toString();
+      sb.append(HiveUtils.unparseIdentifier(fieldSchemas.get(i).getName()));
     }
+    return sb.toString();
+  }
 }

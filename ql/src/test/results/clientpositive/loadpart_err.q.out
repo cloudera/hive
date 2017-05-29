@@ -4,12 +4,12 @@ POSTHOOK: query: CREATE TABLE loadpart1(a STRING, b STRING) PARTITIONED BY (ds S
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: default@loadpart1
 PREHOOK: query: INSERT OVERWRITE TABLE loadpart1 PARTITION (ds='2009-01-01')
-SELECT TRANSFORM(src.key, src.value) USING '../data/scripts/error_script' AS (tkey, tvalue)
+SELECT TRANSFORM(src.key, src.value) USING '../../data/scripts/error_script' AS (tkey, tvalue)
 FROM src
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src
 PREHOOK: Output: default@loadpart1@ds=2009-01-01
-FAILED: Execution Error, return code 2 from org.apache.hadoop.hive.ql.exec.MapRedTask
+FAILED: Execution Error, return code 2 from org.apache.hadoop.hive.ql.exec.mr.MapRedTask
 PREHOOK: query: DESCRIBE loadpart1
 PREHOOK: type: DESCTABLE
 POSTHOOK: query: DESCRIBE loadpart1

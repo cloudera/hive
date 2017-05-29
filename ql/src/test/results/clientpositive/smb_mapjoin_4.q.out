@@ -1,589 +1,404 @@
 PREHOOK: query: create table smb_bucket_1(key int, value string) CLUSTERED BY (key) SORTED BY (key) INTO 1 BUCKETS STORED AS RCFILE
 PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:default
+PREHOOK: Output: default@smb_bucket_1
 POSTHOOK: query: create table smb_bucket_1(key int, value string) CLUSTERED BY (key) SORTED BY (key) INTO 1 BUCKETS STORED AS RCFILE
 POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@smb_bucket_1
 PREHOOK: query: create table smb_bucket_2(key int, value string) CLUSTERED BY (key) SORTED BY (key) INTO 1 BUCKETS STORED AS RCFILE
 PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:default
+PREHOOK: Output: default@smb_bucket_2
 POSTHOOK: query: create table smb_bucket_2(key int, value string) CLUSTERED BY (key) SORTED BY (key) INTO 1 BUCKETS STORED AS RCFILE
 POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@smb_bucket_2
 PREHOOK: query: create table smb_bucket_3(key int, value string) CLUSTERED BY (key) SORTED BY (key) INTO 1 BUCKETS STORED AS RCFILE
 PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:default
+PREHOOK: Output: default@smb_bucket_3
 POSTHOOK: query: create table smb_bucket_3(key int, value string) CLUSTERED BY (key) SORTED BY (key) INTO 1 BUCKETS STORED AS RCFILE
 POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@smb_bucket_3
-PREHOOK: query: load data local inpath '../data/files/smbbucket_1.rc' overwrite into table smb_bucket_1
+PREHOOK: query: load data local inpath '../../data/files/smbbucket_1.rc' overwrite into table smb_bucket_1
 PREHOOK: type: LOAD
-POSTHOOK: query: load data local inpath '../data/files/smbbucket_1.rc' overwrite into table smb_bucket_1
+#### A masked pattern was here ####
+PREHOOK: Output: default@smb_bucket_1
+POSTHOOK: query: load data local inpath '../../data/files/smbbucket_1.rc' overwrite into table smb_bucket_1
 POSTHOOK: type: LOAD
+#### A masked pattern was here ####
 POSTHOOK: Output: default@smb_bucket_1
-PREHOOK: query: load data local inpath '../data/files/smbbucket_2.rc' overwrite into table smb_bucket_2
+PREHOOK: query: load data local inpath '../../data/files/smbbucket_2.rc' overwrite into table smb_bucket_2
 PREHOOK: type: LOAD
-POSTHOOK: query: load data local inpath '../data/files/smbbucket_2.rc' overwrite into table smb_bucket_2
+#### A masked pattern was here ####
+PREHOOK: Output: default@smb_bucket_2
+POSTHOOK: query: load data local inpath '../../data/files/smbbucket_2.rc' overwrite into table smb_bucket_2
 POSTHOOK: type: LOAD
+#### A masked pattern was here ####
 POSTHOOK: Output: default@smb_bucket_2
-PREHOOK: query: load data local inpath '../data/files/smbbucket_3.rc' overwrite into table smb_bucket_3
+PREHOOK: query: load data local inpath '../../data/files/smbbucket_3.rc' overwrite into table smb_bucket_3
 PREHOOK: type: LOAD
-POSTHOOK: query: load data local inpath '../data/files/smbbucket_3.rc' overwrite into table smb_bucket_3
+#### A masked pattern was here ####
+PREHOOK: Output: default@smb_bucket_3
+POSTHOOK: query: load data local inpath '../../data/files/smbbucket_3.rc' overwrite into table smb_bucket_3
 POSTHOOK: type: LOAD
+#### A masked pattern was here ####
 POSTHOOK: Output: default@smb_bucket_3
-PREHOOK: query: explain
+PREHOOK: query: -- SORT_QUERY_RESULTS
+
+explain
 select /*+mapjoin(a,b)*/ * from smb_bucket_1 a join smb_bucket_2 b on a.key = b.key join smb_bucket_3 c on b.key=c.key
 PREHOOK: type: QUERY
-POSTHOOK: query: explain
+POSTHOOK: query: -- SORT_QUERY_RESULTS
+
+explain
 select /*+mapjoin(a,b)*/ * from smb_bucket_1 a join smb_bucket_2 b on a.key = b.key join smb_bucket_3 c on b.key=c.key
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_JOIN (TOK_JOIN (TOK_TABREF smb_bucket_1 a) (TOK_TABREF smb_bucket_2 b) (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL b) key))) (TOK_TABREF smb_bucket_3 c) (= (. (TOK_TABLE_OR_COL b) key) (. (TOK_TABLE_OR_COL c) key)))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_HINTLIST (TOK_HINT TOK_MAPJOIN (TOK_HINTARGLIST a b))) (TOK_SELEXPR TOK_ALLCOLREF))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        c 
+      Map Operator Tree:
           TableScan
             alias: c
-            Sorted Merge Bucket Map Join Operator
-              condition map:
-                   Inner Join 0 to 1
-                   Inner Join 1 to 2
-              condition expressions:
-                0 {key} {value}
-                1 {key} {value}
-                2 {key} {value}
-              handleSkewJoin: false
-              keys:
-                0 [Column[key]]
-                1 [Column[key]]
-                2 [Column[key]]
-              outputColumnNames: _col0, _col1, _col4, _col5, _col8, _col9
-              Position of Big Table: 2
-              Select Operator
-                expressions:
-                      expr: _col0
-                      type: int
-                      expr: _col1
-                      type: string
-                      expr: _col4
-                      type: int
-                      expr: _col5
-                      type: string
-                      expr: _col8
-                      type: int
-                      expr: _col9
-                      type: string
-                outputColumnNames: _col0, _col1, _col4, _col5, _col8, _col9
+            Statistics: Num rows: 2 Data size: 222 Basic stats: COMPLETE Column stats: NONE
+            Filter Operator
+              predicate: key is not null (type: boolean)
+              Statistics: Num rows: 1 Data size: 111 Basic stats: COMPLETE Column stats: NONE
+              Sorted Merge Bucket Map Join Operator
+                condition map:
+                     Inner Join 0 to 1
+                     Inner Join 1 to 2
+                keys:
+                  0 key (type: int)
+                  1 key (type: int)
+                  2 key (type: int)
+                outputColumnNames: _col0, _col1, _col5, _col6, _col10, _col11
                 Select Operator
-                  expressions:
-                        expr: _col0
-                        type: int
-                        expr: _col1
-                        type: string
-                        expr: _col4
-                        type: int
-                        expr: _col5
-                        type: string
-                        expr: _col8
-                        type: int
-                        expr: _col9
-                        type: string
+                  expressions: _col0 (type: int), _col1 (type: string), _col5 (type: int), _col6 (type: string), _col10 (type: int), _col11 (type: string)
                   outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
                   File Output Operator
                     compressed: false
-                    GlobalTableId: 0
                     table:
                         input format: org.apache.hadoop.mapred.TextInputFormat
                         output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                        serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select /*+mapjoin(a,b)*/ * from smb_bucket_1 a join smb_bucket_2 b on a.key = b.key join smb_bucket_3 c on b.key=c.key
 PREHOOK: type: QUERY
 PREHOOK: Input: default@smb_bucket_1
 PREHOOK: Input: default@smb_bucket_2
 PREHOOK: Input: default@smb_bucket_3
-PREHOOK: Output: file:/tmp/jsichi/hive_2010-08-26_16-42-09_324_5003697422621652815/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select /*+mapjoin(a,b)*/ * from smb_bucket_1 a join smb_bucket_2 b on a.key = b.key join smb_bucket_3 c on b.key=c.key
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@smb_bucket_1
 POSTHOOK: Input: default@smb_bucket_2
 POSTHOOK: Input: default@smb_bucket_3
-POSTHOOK: Output: file:/tmp/jsichi/hive_2010-08-26_16-42-09_324_5003697422621652815/-mr-10000
+#### A masked pattern was here ####
 PREHOOK: query: explain
 select /*+mapjoin(a,b)*/ * from smb_bucket_1 a left outer join smb_bucket_2 b on a.key = b.key join smb_bucket_3 c on b.key=c.key
 PREHOOK: type: QUERY
 POSTHOOK: query: explain
 select /*+mapjoin(a,b)*/ * from smb_bucket_1 a left outer join smb_bucket_2 b on a.key = b.key join smb_bucket_3 c on b.key=c.key
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_JOIN (TOK_LEFTOUTERJOIN (TOK_TABREF smb_bucket_1 a) (TOK_TABREF smb_bucket_2 b) (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL b) key))) (TOK_TABREF smb_bucket_3 c) (= (. (TOK_TABLE_OR_COL b) key) (. (TOK_TABLE_OR_COL c) key)))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_HINTLIST (TOK_HINT TOK_MAPJOIN (TOK_HINTARGLIST a b))) (TOK_SELEXPR TOK_ALLCOLREF))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        c 
+      Map Operator Tree:
           TableScan
             alias: c
+            Statistics: Num rows: 2 Data size: 222 Basic stats: COMPLETE Column stats: NONE
             Sorted Merge Bucket Map Join Operator
               condition map:
                    Left Outer Join0 to 1
                    Inner Join 1 to 2
-              condition expressions:
-                0 {key} {value}
-                1 {key} {value}
-                2 {key} {value}
-              handleSkewJoin: false
               keys:
-                0 [Column[key]]
-                1 [Column[key]]
-                2 [Column[key]]
-              outputColumnNames: _col0, _col1, _col4, _col5, _col8, _col9
-              Position of Big Table: 2
+                0 key (type: int)
+                1 key (type: int)
+                2 key (type: int)
+              outputColumnNames: _col0, _col1, _col5, _col6, _col10, _col11
               Select Operator
-                expressions:
-                      expr: _col0
-                      type: int
-                      expr: _col1
-                      type: string
-                      expr: _col4
-                      type: int
-                      expr: _col5
-                      type: string
-                      expr: _col8
-                      type: int
-                      expr: _col9
-                      type: string
-                outputColumnNames: _col0, _col1, _col4, _col5, _col8, _col9
-                Select Operator
-                  expressions:
-                        expr: _col0
-                        type: int
-                        expr: _col1
-                        type: string
-                        expr: _col4
-                        type: int
-                        expr: _col5
-                        type: string
-                        expr: _col8
-                        type: int
-                        expr: _col9
-                        type: string
-                  outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
-                  File Output Operator
-                    compressed: false
-                    GlobalTableId: 0
-                    table:
-                        input format: org.apache.hadoop.mapred.TextInputFormat
-                        output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                expressions: _col0 (type: int), _col1 (type: string), _col5 (type: int), _col6 (type: string), _col10 (type: int), _col11 (type: string)
+                outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
+                File Output Operator
+                  compressed: false
+                  table:
+                      input format: org.apache.hadoop.mapred.TextInputFormat
+                      output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                      serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select /*+mapjoin(a,b)*/ * from smb_bucket_1 a left outer join smb_bucket_2 b on a.key = b.key join smb_bucket_3 c on b.key=c.key
 PREHOOK: type: QUERY
 PREHOOK: Input: default@smb_bucket_1
 PREHOOK: Input: default@smb_bucket_2
 PREHOOK: Input: default@smb_bucket_3
-PREHOOK: Output: file:/tmp/jsichi/hive_2010-08-26_16-42-12_911_4454279447652036446/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select /*+mapjoin(a,b)*/ * from smb_bucket_1 a left outer join smb_bucket_2 b on a.key = b.key join smb_bucket_3 c on b.key=c.key
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@smb_bucket_1
 POSTHOOK: Input: default@smb_bucket_2
 POSTHOOK: Input: default@smb_bucket_3
-POSTHOOK: Output: file:/tmp/jsichi/hive_2010-08-26_16-42-12_911_4454279447652036446/-mr-10000
+#### A masked pattern was here ####
 PREHOOK: query: explain
 select /*+mapjoin(a,b)*/ * from smb_bucket_1 a left outer join smb_bucket_2 b on a.key = b.key left outer join smb_bucket_3 c on b.key=c.key
 PREHOOK: type: QUERY
 POSTHOOK: query: explain
 select /*+mapjoin(a,b)*/ * from smb_bucket_1 a left outer join smb_bucket_2 b on a.key = b.key left outer join smb_bucket_3 c on b.key=c.key
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_LEFTOUTERJOIN (TOK_LEFTOUTERJOIN (TOK_TABREF smb_bucket_1 a) (TOK_TABREF smb_bucket_2 b) (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL b) key))) (TOK_TABREF smb_bucket_3 c) (= (. (TOK_TABLE_OR_COL b) key) (. (TOK_TABLE_OR_COL c) key)))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_HINTLIST (TOK_HINT TOK_MAPJOIN (TOK_HINTARGLIST a b))) (TOK_SELEXPR TOK_ALLCOLREF))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        c 
+      Map Operator Tree:
           TableScan
             alias: c
+            Statistics: Num rows: 2 Data size: 222 Basic stats: COMPLETE Column stats: NONE
             Sorted Merge Bucket Map Join Operator
               condition map:
                    Left Outer Join0 to 1
                    Left Outer Join1 to 2
-              condition expressions:
-                0 {key} {value}
-                1 {key} {value}
-                2 {key} {value}
-              handleSkewJoin: false
               keys:
-                0 [Column[key]]
-                1 [Column[key]]
-                2 [Column[key]]
-              outputColumnNames: _col0, _col1, _col4, _col5, _col8, _col9
-              Position of Big Table: 2
+                0 key (type: int)
+                1 key (type: int)
+                2 key (type: int)
+              outputColumnNames: _col0, _col1, _col5, _col6, _col10, _col11
               Select Operator
-                expressions:
-                      expr: _col0
-                      type: int
-                      expr: _col1
-                      type: string
-                      expr: _col4
-                      type: int
-                      expr: _col5
-                      type: string
-                      expr: _col8
-                      type: int
-                      expr: _col9
-                      type: string
-                outputColumnNames: _col0, _col1, _col4, _col5, _col8, _col9
-                Select Operator
-                  expressions:
-                        expr: _col0
-                        type: int
-                        expr: _col1
-                        type: string
-                        expr: _col4
-                        type: int
-                        expr: _col5
-                        type: string
-                        expr: _col8
-                        type: int
-                        expr: _col9
-                        type: string
-                  outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
-                  File Output Operator
-                    compressed: false
-                    GlobalTableId: 0
-                    table:
-                        input format: org.apache.hadoop.mapred.TextInputFormat
-                        output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                expressions: _col0 (type: int), _col1 (type: string), _col5 (type: int), _col6 (type: string), _col10 (type: int), _col11 (type: string)
+                outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
+                File Output Operator
+                  compressed: false
+                  table:
+                      input format: org.apache.hadoop.mapred.TextInputFormat
+                      output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                      serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select /*+mapjoin(a,b)*/ * from smb_bucket_1 a left outer join smb_bucket_2 b on a.key = b.key left outer join smb_bucket_3 c on b.key=c.key
 PREHOOK: type: QUERY
 PREHOOK: Input: default@smb_bucket_1
 PREHOOK: Input: default@smb_bucket_2
 PREHOOK: Input: default@smb_bucket_3
-PREHOOK: Output: file:/tmp/jsichi/hive_2010-08-26_16-42-16_467_5197011805004822874/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select /*+mapjoin(a,b)*/ * from smb_bucket_1 a left outer join smb_bucket_2 b on a.key = b.key left outer join smb_bucket_3 c on b.key=c.key
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@smb_bucket_1
 POSTHOOK: Input: default@smb_bucket_2
 POSTHOOK: Input: default@smb_bucket_3
-POSTHOOK: Output: file:/tmp/jsichi/hive_2010-08-26_16-42-16_467_5197011805004822874/-mr-10000
+#### A masked pattern was here ####
 1	val_1	NULL	NULL	NULL	NULL
+10	val_10	NULL	NULL	NULL	NULL
 3	val_3	NULL	NULL	NULL	NULL
 4	val_4	NULL	NULL	NULL	NULL
 5	val_5	NULL	NULL	NULL	NULL
-10	val_10	NULL	NULL	NULL	NULL
 PREHOOK: query: explain
 select /*+mapjoin(a,b)*/ * from smb_bucket_1 a left outer join smb_bucket_2 b on a.key = b.key right outer join smb_bucket_3 c on b.key=c.key
 PREHOOK: type: QUERY
 POSTHOOK: query: explain
 select /*+mapjoin(a,b)*/ * from smb_bucket_1 a left outer join smb_bucket_2 b on a.key = b.key right outer join smb_bucket_3 c on b.key=c.key
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_RIGHTOUTERJOIN (TOK_LEFTOUTERJOIN (TOK_TABREF smb_bucket_1 a) (TOK_TABREF smb_bucket_2 b) (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL b) key))) (TOK_TABREF smb_bucket_3 c) (= (. (TOK_TABLE_OR_COL b) key) (. (TOK_TABLE_OR_COL c) key)))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_HINTLIST (TOK_HINT TOK_MAPJOIN (TOK_HINTARGLIST a b))) (TOK_SELEXPR TOK_ALLCOLREF))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        c 
+      Map Operator Tree:
           TableScan
             alias: c
+            Statistics: Num rows: 2 Data size: 222 Basic stats: COMPLETE Column stats: NONE
             Sorted Merge Bucket Map Join Operator
               condition map:
                    Left Outer Join0 to 1
                    Right Outer Join1 to 2
-              condition expressions:
-                0 {key} {value}
-                1 {key} {value}
-                2 {key} {value}
-              handleSkewJoin: false
               keys:
-                0 [Column[key]]
-                1 [Column[key]]
-                2 [Column[key]]
-              outputColumnNames: _col0, _col1, _col4, _col5, _col8, _col9
-              Position of Big Table: 2
+                0 key (type: int)
+                1 key (type: int)
+                2 key (type: int)
+              outputColumnNames: _col0, _col1, _col5, _col6, _col10, _col11
               Select Operator
-                expressions:
-                      expr: _col0
-                      type: int
-                      expr: _col1
-                      type: string
-                      expr: _col4
-                      type: int
-                      expr: _col5
-                      type: string
-                      expr: _col8
-                      type: int
-                      expr: _col9
-                      type: string
-                outputColumnNames: _col0, _col1, _col4, _col5, _col8, _col9
-                Select Operator
-                  expressions:
-                        expr: _col0
-                        type: int
-                        expr: _col1
-                        type: string
-                        expr: _col4
-                        type: int
-                        expr: _col5
-                        type: string
-                        expr: _col8
-                        type: int
-                        expr: _col9
-                        type: string
-                  outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
-                  File Output Operator
-                    compressed: false
-                    GlobalTableId: 0
-                    table:
-                        input format: org.apache.hadoop.mapred.TextInputFormat
-                        output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                expressions: _col0 (type: int), _col1 (type: string), _col5 (type: int), _col6 (type: string), _col10 (type: int), _col11 (type: string)
+                outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
+                File Output Operator
+                  compressed: false
+                  table:
+                      input format: org.apache.hadoop.mapred.TextInputFormat
+                      output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                      serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select /*+mapjoin(a,b)*/ * from smb_bucket_1 a left outer join smb_bucket_2 b on a.key = b.key right outer join smb_bucket_3 c on b.key=c.key
 PREHOOK: type: QUERY
 PREHOOK: Input: default@smb_bucket_1
 PREHOOK: Input: default@smb_bucket_2
 PREHOOK: Input: default@smb_bucket_3
-PREHOOK: Output: file:/tmp/jsichi/hive_2010-08-26_16-42-20_045_1628227846316651581/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select /*+mapjoin(a,b)*/ * from smb_bucket_1 a left outer join smb_bucket_2 b on a.key = b.key right outer join smb_bucket_3 c on b.key=c.key
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@smb_bucket_1
 POSTHOOK: Input: default@smb_bucket_2
 POSTHOOK: Input: default@smb_bucket_3
-POSTHOOK: Output: file:/tmp/jsichi/hive_2010-08-26_16-42-20_045_1628227846316651581/-mr-10000
-NULL	NULL	NULL	NULL	4	val_4
+#### A masked pattern was here ####
 NULL	NULL	NULL	NULL	10	val_10
 NULL	NULL	NULL	NULL	17	val_17
 NULL	NULL	NULL	NULL	19	val_19
 NULL	NULL	NULL	NULL	20	val_20
 NULL	NULL	NULL	NULL	23	val_23
+NULL	NULL	NULL	NULL	4	val_4
 PREHOOK: query: explain
 select /*+mapjoin(a,b)*/ * from smb_bucket_1 a left outer join smb_bucket_2 b on a.key = b.key full outer join smb_bucket_3 c on b.key=c.key
 PREHOOK: type: QUERY
 POSTHOOK: query: explain
 select /*+mapjoin(a,b)*/ * from smb_bucket_1 a left outer join smb_bucket_2 b on a.key = b.key full outer join smb_bucket_3 c on b.key=c.key
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_FULLOUTERJOIN (TOK_LEFTOUTERJOIN (TOK_TABREF smb_bucket_1 a) (TOK_TABREF smb_bucket_2 b) (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL b) key))) (TOK_TABREF smb_bucket_3 c) (= (. (TOK_TABLE_OR_COL b) key) (. (TOK_TABLE_OR_COL c) key)))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_HINTLIST (TOK_HINT TOK_MAPJOIN (TOK_HINTARGLIST a b))) (TOK_SELEXPR TOK_ALLCOLREF))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        c 
+      Map Operator Tree:
           TableScan
             alias: c
+            Statistics: Num rows: 2 Data size: 222 Basic stats: COMPLETE Column stats: NONE
             Sorted Merge Bucket Map Join Operator
               condition map:
                    Left Outer Join0 to 1
                    Outer Join 1 to 2
-              condition expressions:
-                0 {key} {value}
-                1 {key} {value}
-                2 {key} {value}
-              handleSkewJoin: false
               keys:
-                0 [Column[key]]
-                1 [Column[key]]
-                2 [Column[key]]
-              outputColumnNames: _col0, _col1, _col4, _col5, _col8, _col9
-              Position of Big Table: 2
+                0 key (type: int)
+                1 key (type: int)
+                2 key (type: int)
+              outputColumnNames: _col0, _col1, _col5, _col6, _col10, _col11
               Select Operator
-                expressions:
-                      expr: _col0
-                      type: int
-                      expr: _col1
-                      type: string
-                      expr: _col4
-                      type: int
-                      expr: _col5
-                      type: string
-                      expr: _col8
-                      type: int
-                      expr: _col9
-                      type: string
-                outputColumnNames: _col0, _col1, _col4, _col5, _col8, _col9
-                Select Operator
-                  expressions:
-                        expr: _col0
-                        type: int
-                        expr: _col1
-                        type: string
-                        expr: _col4
-                        type: int
-                        expr: _col5
-                        type: string
-                        expr: _col8
-                        type: int
-                        expr: _col9
-                        type: string
-                  outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
-                  File Output Operator
-                    compressed: false
-                    GlobalTableId: 0
-                    table:
-                        input format: org.apache.hadoop.mapred.TextInputFormat
-                        output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                expressions: _col0 (type: int), _col1 (type: string), _col5 (type: int), _col6 (type: string), _col10 (type: int), _col11 (type: string)
+                outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
+                File Output Operator
+                  compressed: false
+                  table:
+                      input format: org.apache.hadoop.mapred.TextInputFormat
+                      output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                      serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select /*+mapjoin(a,b)*/ * from smb_bucket_1 a left outer join smb_bucket_2 b on a.key = b.key full outer join smb_bucket_3 c on b.key=c.key
 PREHOOK: type: QUERY
 PREHOOK: Input: default@smb_bucket_1
 PREHOOK: Input: default@smb_bucket_2
 PREHOOK: Input: default@smb_bucket_3
-PREHOOK: Output: file:/tmp/jsichi/hive_2010-08-26_16-42-23_706_8199432227541064820/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select /*+mapjoin(a,b)*/ * from smb_bucket_1 a left outer join smb_bucket_2 b on a.key = b.key full outer join smb_bucket_3 c on b.key=c.key
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@smb_bucket_1
 POSTHOOK: Input: default@smb_bucket_2
 POSTHOOK: Input: default@smb_bucket_3
-POSTHOOK: Output: file:/tmp/jsichi/hive_2010-08-26_16-42-23_706_8199432227541064820/-mr-10000
+#### A masked pattern was here ####
 1	val_1	NULL	NULL	NULL	NULL
+10	val_10	NULL	NULL	NULL	NULL
 3	val_3	NULL	NULL	NULL	NULL
 4	val_4	NULL	NULL	NULL	NULL
-NULL	NULL	NULL	NULL	4	val_4
 5	val_5	NULL	NULL	NULL	NULL
-10	val_10	NULL	NULL	NULL	NULL
 NULL	NULL	NULL	NULL	10	val_10
 NULL	NULL	NULL	NULL	17	val_17
 NULL	NULL	NULL	NULL	19	val_19
 NULL	NULL	NULL	NULL	20	val_20
 NULL	NULL	NULL	NULL	23	val_23
+NULL	NULL	NULL	NULL	4	val_4
 PREHOOK: query: explain
 select /*+mapjoin(a,b)*/ * from smb_bucket_1 a right outer join smb_bucket_2 b on a.key = b.key join smb_bucket_3 c on b.key=c.key
 PREHOOK: type: QUERY
 POSTHOOK: query: explain
 select /*+mapjoin(a,b)*/ * from smb_bucket_1 a right outer join smb_bucket_2 b on a.key = b.key join smb_bucket_3 c on b.key=c.key
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_JOIN (TOK_RIGHTOUTERJOIN (TOK_TABREF smb_bucket_1 a) (TOK_TABREF smb_bucket_2 b) (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL b) key))) (TOK_TABREF smb_bucket_3 c) (= (. (TOK_TABLE_OR_COL b) key) (. (TOK_TABLE_OR_COL c) key)))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_HINTLIST (TOK_HINT TOK_MAPJOIN (TOK_HINTARGLIST a b))) (TOK_SELEXPR TOK_ALLCOLREF))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        c 
+      Map Operator Tree:
           TableScan
             alias: c
+            Statistics: Num rows: 2 Data size: 222 Basic stats: COMPLETE Column stats: NONE
             Sorted Merge Bucket Map Join Operator
               condition map:
                    Right Outer Join0 to 1
                    Inner Join 1 to 2
-              condition expressions:
-                0 {key} {value}
-                1 {key} {value}
-                2 {key} {value}
-              handleSkewJoin: false
               keys:
-                0 [Column[key]]
-                1 [Column[key]]
-                2 [Column[key]]
-              outputColumnNames: _col0, _col1, _col4, _col5, _col8, _col9
-              Position of Big Table: 2
+                0 key (type: int)
+                1 key (type: int)
+                2 key (type: int)
+              outputColumnNames: _col0, _col1, _col5, _col6, _col10, _col11
               Select Operator
-                expressions:
-                      expr: _col0
-                      type: int
-                      expr: _col1
-                      type: string
-                      expr: _col4
-                      type: int
-                      expr: _col5
-                      type: string
-                      expr: _col8
-                      type: int
-                      expr: _col9
-                      type: string
-                outputColumnNames: _col0, _col1, _col4, _col5, _col8, _col9
-                Select Operator
-                  expressions:
-                        expr: _col0
-                        type: int
-                        expr: _col1
-                        type: string
-                        expr: _col4
-                        type: int
-                        expr: _col5
-                        type: string
-                        expr: _col8
-                        type: int
-                        expr: _col9
-                        type: string
-                  outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
-                  File Output Operator
-                    compressed: false
-                    GlobalTableId: 0
-                    table:
-                        input format: org.apache.hadoop.mapred.TextInputFormat
-                        output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                expressions: _col0 (type: int), _col1 (type: string), _col5 (type: int), _col6 (type: string), _col10 (type: int), _col11 (type: string)
+                outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
+                File Output Operator
+                  compressed: false
+                  table:
+                      input format: org.apache.hadoop.mapred.TextInputFormat
+                      output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                      serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select /*+mapjoin(a,b)*/ * from smb_bucket_1 a right outer join smb_bucket_2 b on a.key = b.key join smb_bucket_3 c on b.key=c.key
 PREHOOK: type: QUERY
 PREHOOK: Input: default@smb_bucket_1
 PREHOOK: Input: default@smb_bucket_2
 PREHOOK: Input: default@smb_bucket_3
-PREHOOK: Output: file:/tmp/jsichi/hive_2010-08-26_16-42-27_290_3824008948964071639/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select /*+mapjoin(a,b)*/ * from smb_bucket_1 a right outer join smb_bucket_2 b on a.key = b.key join smb_bucket_3 c on b.key=c.key
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@smb_bucket_1
 POSTHOOK: Input: default@smb_bucket_2
 POSTHOOK: Input: default@smb_bucket_3
-POSTHOOK: Output: file:/tmp/jsichi/hive_2010-08-26_16-42-27_290_3824008948964071639/-mr-10000
+#### A masked pattern was here ####
 NULL	NULL	20	val_20	20	val_20
 NULL	NULL	23	val_23	23	val_23
 PREHOOK: query: explain
@@ -592,89 +407,54 @@ PREHOOK: type: QUERY
 POSTHOOK: query: explain
 select /*+mapjoin(a,b)*/ * from smb_bucket_1 a right outer join smb_bucket_2 b on a.key = b.key left outer join smb_bucket_3 c on b.key=c.key
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_LEFTOUTERJOIN (TOK_RIGHTOUTERJOIN (TOK_TABREF smb_bucket_1 a) (TOK_TABREF smb_bucket_2 b) (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL b) key))) (TOK_TABREF smb_bucket_3 c) (= (. (TOK_TABLE_OR_COL b) key) (. (TOK_TABLE_OR_COL c) key)))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_HINTLIST (TOK_HINT TOK_MAPJOIN (TOK_HINTARGLIST a b))) (TOK_SELEXPR TOK_ALLCOLREF))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        c 
+      Map Operator Tree:
           TableScan
             alias: c
+            Statistics: Num rows: 2 Data size: 222 Basic stats: COMPLETE Column stats: NONE
             Sorted Merge Bucket Map Join Operator
               condition map:
                    Right Outer Join0 to 1
                    Left Outer Join1 to 2
-              condition expressions:
-                0 {key} {value}
-                1 {key} {value}
-                2 {key} {value}
-              handleSkewJoin: false
               keys:
-                0 [Column[key]]
-                1 [Column[key]]
-                2 [Column[key]]
-              outputColumnNames: _col0, _col1, _col4, _col5, _col8, _col9
-              Position of Big Table: 2
+                0 key (type: int)
+                1 key (type: int)
+                2 key (type: int)
+              outputColumnNames: _col0, _col1, _col5, _col6, _col10, _col11
               Select Operator
-                expressions:
-                      expr: _col0
-                      type: int
-                      expr: _col1
-                      type: string
-                      expr: _col4
-                      type: int
-                      expr: _col5
-                      type: string
-                      expr: _col8
-                      type: int
-                      expr: _col9
-                      type: string
-                outputColumnNames: _col0, _col1, _col4, _col5, _col8, _col9
-                Select Operator
-                  expressions:
-                        expr: _col0
-                        type: int
-                        expr: _col1
-                        type: string
-                        expr: _col4
-                        type: int
-                        expr: _col5
-                        type: string
-                        expr: _col8
-                        type: int
-                        expr: _col9
-                        type: string
-                  outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
-                  File Output Operator
-                    compressed: false
-                    GlobalTableId: 0
-                    table:
-                        input format: org.apache.hadoop.mapred.TextInputFormat
-                        output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                expressions: _col0 (type: int), _col1 (type: string), _col5 (type: int), _col6 (type: string), _col10 (type: int), _col11 (type: string)
+                outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
+                File Output Operator
+                  compressed: false
+                  table:
+                      input format: org.apache.hadoop.mapred.TextInputFormat
+                      output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                      serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select /*+mapjoin(a,b)*/ * from smb_bucket_1 a right outer join smb_bucket_2 b on a.key = b.key left outer join smb_bucket_3 c on b.key=c.key
 PREHOOK: type: QUERY
 PREHOOK: Input: default@smb_bucket_1
 PREHOOK: Input: default@smb_bucket_2
 PREHOOK: Input: default@smb_bucket_3
-PREHOOK: Output: file:/tmp/jsichi/hive_2010-08-26_16-42-30_936_5263381546938369405/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select /*+mapjoin(a,b)*/ * from smb_bucket_1 a right outer join smb_bucket_2 b on a.key = b.key left outer join smb_bucket_3 c on b.key=c.key
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@smb_bucket_1
 POSTHOOK: Input: default@smb_bucket_2
 POSTHOOK: Input: default@smb_bucket_3
-POSTHOOK: Output: file:/tmp/jsichi/hive_2010-08-26_16-42-30_936_5263381546938369405/-mr-10000
+#### A masked pattern was here ####
 NULL	NULL	20	val_20	20	val_20
 NULL	NULL	23	val_23	23	val_23
 NULL	NULL	25	val_25	NULL	NULL
@@ -685,281 +465,176 @@ PREHOOK: type: QUERY
 POSTHOOK: query: explain
 select /*+mapjoin(a,b)*/ * from smb_bucket_1 a right outer join smb_bucket_2 b on a.key = b.key right outer join smb_bucket_3 c on b.key=c.key
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_RIGHTOUTERJOIN (TOK_RIGHTOUTERJOIN (TOK_TABREF smb_bucket_1 a) (TOK_TABREF smb_bucket_2 b) (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL b) key))) (TOK_TABREF smb_bucket_3 c) (= (. (TOK_TABLE_OR_COL b) key) (. (TOK_TABLE_OR_COL c) key)))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_HINTLIST (TOK_HINT TOK_MAPJOIN (TOK_HINTARGLIST a b))) (TOK_SELEXPR TOK_ALLCOLREF))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        c 
+      Map Operator Tree:
           TableScan
             alias: c
+            Statistics: Num rows: 2 Data size: 222 Basic stats: COMPLETE Column stats: NONE
             Sorted Merge Bucket Map Join Operator
               condition map:
                    Right Outer Join0 to 1
                    Right Outer Join1 to 2
-              condition expressions:
-                0 {key} {value}
-                1 {key} {value}
-                2 {key} {value}
-              handleSkewJoin: false
               keys:
-                0 [Column[key]]
-                1 [Column[key]]
-                2 [Column[key]]
-              outputColumnNames: _col0, _col1, _col4, _col5, _col8, _col9
-              Position of Big Table: 2
+                0 key (type: int)
+                1 key (type: int)
+                2 key (type: int)
+              outputColumnNames: _col0, _col1, _col5, _col6, _col10, _col11
               Select Operator
-                expressions:
-                      expr: _col0
-                      type: int
-                      expr: _col1
-                      type: string
-                      expr: _col4
-                      type: int
-                      expr: _col5
-                      type: string
-                      expr: _col8
-                      type: int
-                      expr: _col9
-                      type: string
-                outputColumnNames: _col0, _col1, _col4, _col5, _col8, _col9
-                Select Operator
-                  expressions:
-                        expr: _col0
-                        type: int
-                        expr: _col1
-                        type: string
-                        expr: _col4
-                        type: int
-                        expr: _col5
-                        type: string
-                        expr: _col8
-                        type: int
-                        expr: _col9
-                        type: string
-                  outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
-                  File Output Operator
-                    compressed: false
-                    GlobalTableId: 0
-                    table:
-                        input format: org.apache.hadoop.mapred.TextInputFormat
-                        output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                expressions: _col0 (type: int), _col1 (type: string), _col5 (type: int), _col6 (type: string), _col10 (type: int), _col11 (type: string)
+                outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
+                File Output Operator
+                  compressed: false
+                  table:
+                      input format: org.apache.hadoop.mapred.TextInputFormat
+                      output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                      serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select /*+mapjoin(a,b)*/ * from smb_bucket_1 a right outer join smb_bucket_2 b on a.key = b.key right outer join smb_bucket_3 c on b.key=c.key
 PREHOOK: type: QUERY
 PREHOOK: Input: default@smb_bucket_1
 PREHOOK: Input: default@smb_bucket_2
 PREHOOK: Input: default@smb_bucket_3
-PREHOOK: Output: file:/tmp/jsichi/hive_2010-08-26_16-42-34_501_9167438490893243306/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select /*+mapjoin(a,b)*/ * from smb_bucket_1 a right outer join smb_bucket_2 b on a.key = b.key right outer join smb_bucket_3 c on b.key=c.key
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@smb_bucket_1
 POSTHOOK: Input: default@smb_bucket_2
 POSTHOOK: Input: default@smb_bucket_3
-POSTHOOK: Output: file:/tmp/jsichi/hive_2010-08-26_16-42-34_501_9167438490893243306/-mr-10000
-NULL	NULL	NULL	NULL	4	val_4
+#### A masked pattern was here ####
+NULL	NULL	20	val_20	20	val_20
+NULL	NULL	23	val_23	23	val_23
 NULL	NULL	NULL	NULL	10	val_10
 NULL	NULL	NULL	NULL	17	val_17
 NULL	NULL	NULL	NULL	19	val_19
-NULL	NULL	20	val_20	20	val_20
-NULL	NULL	23	val_23	23	val_23
+NULL	NULL	NULL	NULL	4	val_4
 PREHOOK: query: explain
 select /*+mapjoin(a,b)*/ * from smb_bucket_1 a right outer join smb_bucket_2 b on a.key = b.key full outer join smb_bucket_3 c on b.key=c.key
 PREHOOK: type: QUERY
 POSTHOOK: query: explain
 select /*+mapjoin(a,b)*/ * from smb_bucket_1 a right outer join smb_bucket_2 b on a.key = b.key full outer join smb_bucket_3 c on b.key=c.key
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_FULLOUTERJOIN (TOK_RIGHTOUTERJOIN (TOK_TABREF smb_bucket_1 a) (TOK_TABREF smb_bucket_2 b) (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL b) key))) (TOK_TABREF smb_bucket_3 c) (= (. (TOK_TABLE_OR_COL b) key) (. (TOK_TABLE_OR_COL c) key)))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_HINTLIST (TOK_HINT TOK_MAPJOIN (TOK_HINTARGLIST a b))) (TOK_SELEXPR TOK_ALLCOLREF))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        c 
+      Map Operator Tree:
           TableScan
             alias: c
+            Statistics: Num rows: 2 Data size: 222 Basic stats: COMPLETE Column stats: NONE
             Sorted Merge Bucket Map Join Operator
               condition map:
                    Right Outer Join0 to 1
                    Outer Join 1 to 2
-              condition expressions:
-                0 {key} {value}
-                1 {key} {value}
-                2 {key} {value}
-              handleSkewJoin: false
               keys:
-                0 [Column[key]]
-                1 [Column[key]]
-                2 [Column[key]]
-              outputColumnNames: _col0, _col1, _col4, _col5, _col8, _col9
-              Position of Big Table: 2
+                0 key (type: int)
+                1 key (type: int)
+                2 key (type: int)
+              outputColumnNames: _col0, _col1, _col5, _col6, _col10, _col11
               Select Operator
-                expressions:
-                      expr: _col0
-                      type: int
-                      expr: _col1
-                      type: string
-                      expr: _col4
-                      type: int
-                      expr: _col5
-                      type: string
-                      expr: _col8
-                      type: int
-                      expr: _col9
-                      type: string
-                outputColumnNames: _col0, _col1, _col4, _col5, _col8, _col9
-                Select Operator
-                  expressions:
-                        expr: _col0
-                        type: int
-                        expr: _col1
-                        type: string
-                        expr: _col4
-                        type: int
-                        expr: _col5
-                        type: string
-                        expr: _col8
-                        type: int
-                        expr: _col9
-                        type: string
-                  outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
-                  File Output Operator
-                    compressed: false
-                    GlobalTableId: 0
-                    table:
-                        input format: org.apache.hadoop.mapred.TextInputFormat
-                        output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                expressions: _col0 (type: int), _col1 (type: string), _col5 (type: int), _col6 (type: string), _col10 (type: int), _col11 (type: string)
+                outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
+                File Output Operator
+                  compressed: false
+                  table:
+                      input format: org.apache.hadoop.mapred.TextInputFormat
+                      output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                      serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select /*+mapjoin(a,b)*/ * from smb_bucket_1 a right outer join smb_bucket_2 b on a.key = b.key full outer join smb_bucket_3 c on b.key=c.key
 PREHOOK: type: QUERY
 PREHOOK: Input: default@smb_bucket_1
 PREHOOK: Input: default@smb_bucket_2
 PREHOOK: Input: default@smb_bucket_3
-PREHOOK: Output: file:/tmp/jsichi/hive_2010-08-26_16-42-38_051_4511190830431439223/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select /*+mapjoin(a,b)*/ * from smb_bucket_1 a right outer join smb_bucket_2 b on a.key = b.key full outer join smb_bucket_3 c on b.key=c.key
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@smb_bucket_1
 POSTHOOK: Input: default@smb_bucket_2
 POSTHOOK: Input: default@smb_bucket_3
-POSTHOOK: Output: file:/tmp/jsichi/hive_2010-08-26_16-42-38_051_4511190830431439223/-mr-10000
-NULL	NULL	NULL	NULL	4	val_4
-NULL	NULL	NULL	NULL	10	val_10
-NULL	NULL	NULL	NULL	17	val_17
-NULL	NULL	NULL	NULL	19	val_19
+#### A masked pattern was here ####
 NULL	NULL	20	val_20	20	val_20
 NULL	NULL	23	val_23	23	val_23
 NULL	NULL	25	val_25	NULL	NULL
 NULL	NULL	30	val_30	NULL	NULL
+NULL	NULL	NULL	NULL	10	val_10
+NULL	NULL	NULL	NULL	17	val_17
+NULL	NULL	NULL	NULL	19	val_19
+NULL	NULL	NULL	NULL	4	val_4
 PREHOOK: query: explain
 select /*+mapjoin(a,b)*/ * from smb_bucket_1 a full outer join smb_bucket_2 b on a.key = b.key join smb_bucket_3 c on b.key=c.key
 PREHOOK: type: QUERY
 POSTHOOK: query: explain
 select /*+mapjoin(a,b)*/ * from smb_bucket_1 a full outer join smb_bucket_2 b on a.key = b.key join smb_bucket_3 c on b.key=c.key
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_JOIN (TOK_FULLOUTERJOIN (TOK_TABREF smb_bucket_1 a) (TOK_TABREF smb_bucket_2 b) (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL b) key))) (TOK_TABREF smb_bucket_3 c) (= (. (TOK_TABLE_OR_COL b) key) (. (TOK_TABLE_OR_COL c) key)))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_HINTLIST (TOK_HINT TOK_MAPJOIN (TOK_HINTARGLIST a b))) (TOK_SELEXPR TOK_ALLCOLREF))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        c 
+      Map Operator Tree:
           TableScan
             alias: c
+            Statistics: Num rows: 2 Data size: 222 Basic stats: COMPLETE Column stats: NONE
             Sorted Merge Bucket Map Join Operator
               condition map:
                    Outer Join 0 to 1
                    Inner Join 1 to 2
-              condition expressions:
-                0 {key} {value}
-                1 {key} {value}
-                2 {key} {value}
-              handleSkewJoin: false
               keys:
-                0 [Column[key]]
-                1 [Column[key]]
-                2 [Column[key]]
-              outputColumnNames: _col0, _col1, _col4, _col5, _col8, _col9
-              Position of Big Table: 2
+                0 key (type: int)
+                1 key (type: int)
+                2 key (type: int)
+              outputColumnNames: _col0, _col1, _col5, _col6, _col10, _col11
               Select Operator
-                expressions:
-                      expr: _col0
-                      type: int
-                      expr: _col1
-                      type: string
-                      expr: _col4
-                      type: int
-                      expr: _col5
-                      type: string
-                      expr: _col8
-                      type: int
-                      expr: _col9
-                      type: string
-                outputColumnNames: _col0, _col1, _col4, _col5, _col8, _col9
-                Select Operator
-                  expressions:
-                        expr: _col0
-                        type: int
-                        expr: _col1
-                        type: string
-                        expr: _col4
-                        type: int
-                        expr: _col5
-                        type: string
-                        expr: _col8
-                        type: int
-                        expr: _col9
-                        type: string
-                  outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
-                  File Output Operator
-                    compressed: false
-                    GlobalTableId: 0
-                    table:
-                        input format: org.apache.hadoop.mapred.TextInputFormat
-                        output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                expressions: _col0 (type: int), _col1 (type: string), _col5 (type: int), _col6 (type: string), _col10 (type: int), _col11 (type: string)
+                outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
+                File Output Operator
+                  compressed: false
+                  table:
+                      input format: org.apache.hadoop.mapred.TextInputFormat
+                      output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                      serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select /*+mapjoin(a,b)*/ * from smb_bucket_1 a full outer join smb_bucket_2 b on a.key = b.key join smb_bucket_3 c on b.key=c.key
 PREHOOK: type: QUERY
 PREHOOK: Input: default@smb_bucket_1
 PREHOOK: Input: default@smb_bucket_2
 PREHOOK: Input: default@smb_bucket_3
-PREHOOK: Output: file:/tmp/jsichi/hive_2010-08-26_16-42-41_627_6765762965982547245/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select /*+mapjoin(a,b)*/ * from smb_bucket_1 a full outer join smb_bucket_2 b on a.key = b.key join smb_bucket_3 c on b.key=c.key
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@smb_bucket_1
 POSTHOOK: Input: default@smb_bucket_2
 POSTHOOK: Input: default@smb_bucket_3
-POSTHOOK: Output: file:/tmp/jsichi/hive_2010-08-26_16-42-41_627_6765762965982547245/-mr-10000
+#### A masked pattern was here ####
 NULL	NULL	20	val_20	20	val_20
 NULL	NULL	23	val_23	23	val_23
 PREHOOK: query: explain
@@ -968,94 +643,59 @@ PREHOOK: type: QUERY
 POSTHOOK: query: explain
 select /*+mapjoin(a,b)*/ * from smb_bucket_1 a full outer join smb_bucket_2 b on a.key = b.key left outer join smb_bucket_3 c on b.key=c.key
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_LEFTOUTERJOIN (TOK_FULLOUTERJOIN (TOK_TABREF smb_bucket_1 a) (TOK_TABREF smb_bucket_2 b) (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL b) key))) (TOK_TABREF smb_bucket_3 c) (= (. (TOK_TABLE_OR_COL b) key) (. (TOK_TABLE_OR_COL c) key)))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_HINTLIST (TOK_HINT TOK_MAPJOIN (TOK_HINTARGLIST a b))) (TOK_SELEXPR TOK_ALLCOLREF))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        c 
+      Map Operator Tree:
           TableScan
             alias: c
+            Statistics: Num rows: 2 Data size: 222 Basic stats: COMPLETE Column stats: NONE
             Sorted Merge Bucket Map Join Operator
               condition map:
                    Outer Join 0 to 1
                    Left Outer Join1 to 2
-              condition expressions:
-                0 {key} {value}
-                1 {key} {value}
-                2 {key} {value}
-              handleSkewJoin: false
               keys:
-                0 [Column[key]]
-                1 [Column[key]]
-                2 [Column[key]]
-              outputColumnNames: _col0, _col1, _col4, _col5, _col8, _col9
-              Position of Big Table: 2
+                0 key (type: int)
+                1 key (type: int)
+                2 key (type: int)
+              outputColumnNames: _col0, _col1, _col5, _col6, _col10, _col11
               Select Operator
-                expressions:
-                      expr: _col0
-                      type: int
-                      expr: _col1
-                      type: string
-                      expr: _col4
-                      type: int
-                      expr: _col5
-                      type: string
-                      expr: _col8
-                      type: int
-                      expr: _col9
-                      type: string
-                outputColumnNames: _col0, _col1, _col4, _col5, _col8, _col9
-                Select Operator
-                  expressions:
-                        expr: _col0
-                        type: int
-                        expr: _col1
-                        type: string
-                        expr: _col4
-                        type: int
-                        expr: _col5
-                        type: string
-                        expr: _col8
-                        type: int
-                        expr: _col9
-                        type: string
-                  outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
-                  File Output Operator
-                    compressed: false
-                    GlobalTableId: 0
-                    table:
-                        input format: org.apache.hadoop.mapred.TextInputFormat
-                        output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                expressions: _col0 (type: int), _col1 (type: string), _col5 (type: int), _col6 (type: string), _col10 (type: int), _col11 (type: string)
+                outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
+                File Output Operator
+                  compressed: false
+                  table:
+                      input format: org.apache.hadoop.mapred.TextInputFormat
+                      output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                      serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select /*+mapjoin(a,b)*/ * from smb_bucket_1 a full outer join smb_bucket_2 b on a.key = b.key left outer join smb_bucket_3 c on b.key=c.key
 PREHOOK: type: QUERY
 PREHOOK: Input: default@smb_bucket_1
 PREHOOK: Input: default@smb_bucket_2
 PREHOOK: Input: default@smb_bucket_3
-PREHOOK: Output: file:/tmp/jsichi/hive_2010-08-26_16-42-45_184_5223207976717364002/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select /*+mapjoin(a,b)*/ * from smb_bucket_1 a full outer join smb_bucket_2 b on a.key = b.key left outer join smb_bucket_3 c on b.key=c.key
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@smb_bucket_1
 POSTHOOK: Input: default@smb_bucket_2
 POSTHOOK: Input: default@smb_bucket_3
-POSTHOOK: Output: file:/tmp/jsichi/hive_2010-08-26_16-42-45_184_5223207976717364002/-mr-10000
+#### A masked pattern was here ####
 1	val_1	NULL	NULL	NULL	NULL
+10	val_10	NULL	NULL	NULL	NULL
 3	val_3	NULL	NULL	NULL	NULL
 4	val_4	NULL	NULL	NULL	NULL
 5	val_5	NULL	NULL	NULL	NULL
-10	val_10	NULL	NULL	NULL	NULL
 NULL	NULL	20	val_20	20	val_20
 NULL	NULL	23	val_23	23	val_23
 NULL	NULL	25	val_25	NULL	NULL
@@ -1066,194 +706,124 @@ PREHOOK: type: QUERY
 POSTHOOK: query: explain
 select /*+mapjoin(a,b)*/ * from smb_bucket_1 a full outer join smb_bucket_2 b on a.key = b.key right outer join smb_bucket_3 c on b.key=c.key
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_RIGHTOUTERJOIN (TOK_FULLOUTERJOIN (TOK_TABREF smb_bucket_1 a) (TOK_TABREF smb_bucket_2 b) (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL b) key))) (TOK_TABREF smb_bucket_3 c) (= (. (TOK_TABLE_OR_COL b) key) (. (TOK_TABLE_OR_COL c) key)))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_HINTLIST (TOK_HINT TOK_MAPJOIN (TOK_HINTARGLIST a b))) (TOK_SELEXPR TOK_ALLCOLREF))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        c 
+      Map Operator Tree:
           TableScan
             alias: c
+            Statistics: Num rows: 2 Data size: 222 Basic stats: COMPLETE Column stats: NONE
             Sorted Merge Bucket Map Join Operator
               condition map:
                    Outer Join 0 to 1
                    Right Outer Join1 to 2
-              condition expressions:
-                0 {key} {value}
-                1 {key} {value}
-                2 {key} {value}
-              handleSkewJoin: false
               keys:
-                0 [Column[key]]
-                1 [Column[key]]
-                2 [Column[key]]
-              outputColumnNames: _col0, _col1, _col4, _col5, _col8, _col9
-              Position of Big Table: 2
+                0 key (type: int)
+                1 key (type: int)
+                2 key (type: int)
+              outputColumnNames: _col0, _col1, _col5, _col6, _col10, _col11
               Select Operator
-                expressions:
-                      expr: _col0
-                      type: int
-                      expr: _col1
-                      type: string
-                      expr: _col4
-                      type: int
-                      expr: _col5
-                      type: string
-                      expr: _col8
-                      type: int
-                      expr: _col9
-                      type: string
-                outputColumnNames: _col0, _col1, _col4, _col5, _col8, _col9
-                Select Operator
-                  expressions:
-                        expr: _col0
-                        type: int
-                        expr: _col1
-                        type: string
-                        expr: _col4
-                        type: int
-                        expr: _col5
-                        type: string
-                        expr: _col8
-                        type: int
-                        expr: _col9
-                        type: string
-                  outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
-                  File Output Operator
-                    compressed: false
-                    GlobalTableId: 0
-                    table:
-                        input format: org.apache.hadoop.mapred.TextInputFormat
-                        output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                expressions: _col0 (type: int), _col1 (type: string), _col5 (type: int), _col6 (type: string), _col10 (type: int), _col11 (type: string)
+                outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
+                File Output Operator
+                  compressed: false
+                  table:
+                      input format: org.apache.hadoop.mapred.TextInputFormat
+                      output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                      serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select /*+mapjoin(a,b)*/ * from smb_bucket_1 a full outer join smb_bucket_2 b on a.key = b.key right outer join smb_bucket_3 c on b.key=c.key
 PREHOOK: type: QUERY
 PREHOOK: Input: default@smb_bucket_1
 PREHOOK: Input: default@smb_bucket_2
 PREHOOK: Input: default@smb_bucket_3
-PREHOOK: Output: file:/tmp/jsichi/hive_2010-08-26_16-42-48_743_7572889603110654998/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select /*+mapjoin(a,b)*/ * from smb_bucket_1 a full outer join smb_bucket_2 b on a.key = b.key right outer join smb_bucket_3 c on b.key=c.key
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@smb_bucket_1
 POSTHOOK: Input: default@smb_bucket_2
 POSTHOOK: Input: default@smb_bucket_3
-POSTHOOK: Output: file:/tmp/jsichi/hive_2010-08-26_16-42-48_743_7572889603110654998/-mr-10000
-NULL	NULL	NULL	NULL	4	val_4
+#### A masked pattern was here ####
+NULL	NULL	20	val_20	20	val_20
+NULL	NULL	23	val_23	23	val_23
 NULL	NULL	NULL	NULL	10	val_10
 NULL	NULL	NULL	NULL	17	val_17
 NULL	NULL	NULL	NULL	19	val_19
-NULL	NULL	20	val_20	20	val_20
-NULL	NULL	23	val_23	23	val_23
+NULL	NULL	NULL	NULL	4	val_4
 PREHOOK: query: explain
 select /*+mapjoin(a,b)*/ * from smb_bucket_1 a full outer join smb_bucket_2 b on a.key = b.key full outer join smb_bucket_3 c on b.key=c.key
 PREHOOK: type: QUERY
 POSTHOOK: query: explain
 select /*+mapjoin(a,b)*/ * from smb_bucket_1 a full outer join smb_bucket_2 b on a.key = b.key full outer join smb_bucket_3 c on b.key=c.key
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_FULLOUTERJOIN (TOK_FULLOUTERJOIN (TOK_TABREF smb_bucket_1 a) (TOK_TABREF smb_bucket_2 b) (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL b) key))) (TOK_TABREF smb_bucket_3 c) (= (. (TOK_TABLE_OR_COL b) key) (. (TOK_TABLE_OR_COL c) key)))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_HINTLIST (TOK_HINT TOK_MAPJOIN (TOK_HINTARGLIST a b))) (TOK_SELEXPR TOK_ALLCOLREF))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        c 
+      Map Operator Tree:
           TableScan
             alias: c
+            Statistics: Num rows: 2 Data size: 222 Basic stats: COMPLETE Column stats: NONE
             Sorted Merge Bucket Map Join Operator
               condition map:
                    Outer Join 0 to 1
                    Outer Join 1 to 2
-              condition expressions:
-                0 {key} {value}
-                1 {key} {value}
-                2 {key} {value}
-              handleSkewJoin: false
               keys:
-                0 [Column[key]]
-                1 [Column[key]]
-                2 [Column[key]]
-              outputColumnNames: _col0, _col1, _col4, _col5, _col8, _col9
-              Position of Big Table: 2
+                0 key (type: int)
+                1 key (type: int)
+                2 key (type: int)
+              outputColumnNames: _col0, _col1, _col5, _col6, _col10, _col11
               Select Operator
-                expressions:
-                      expr: _col0
-                      type: int
-                      expr: _col1
-                      type: string
-                      expr: _col4
-                      type: int
-                      expr: _col5
-                      type: string
-                      expr: _col8
-                      type: int
-                      expr: _col9
-                      type: string
-                outputColumnNames: _col0, _col1, _col4, _col5, _col8, _col9
-                Select Operator
-                  expressions:
-                        expr: _col0
-                        type: int
-                        expr: _col1
-                        type: string
-                        expr: _col4
-                        type: int
-                        expr: _col5
-                        type: string
-                        expr: _col8
-                        type: int
-                        expr: _col9
-                        type: string
-                  outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
-                  File Output Operator
-                    compressed: false
-                    GlobalTableId: 0
-                    table:
-                        input format: org.apache.hadoop.mapred.TextInputFormat
-                        output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                expressions: _col0 (type: int), _col1 (type: string), _col5 (type: int), _col6 (type: string), _col10 (type: int), _col11 (type: string)
+                outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
+                File Output Operator
+                  compressed: false
+                  table:
+                      input format: org.apache.hadoop.mapred.TextInputFormat
+                      output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                      serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select /*+mapjoin(a,b)*/ * from smb_bucket_1 a full outer join smb_bucket_2 b on a.key = b.key full outer join smb_bucket_3 c on b.key=c.key
 PREHOOK: type: QUERY
 PREHOOK: Input: default@smb_bucket_1
 PREHOOK: Input: default@smb_bucket_2
 PREHOOK: Input: default@smb_bucket_3
-PREHOOK: Output: file:/tmp/jsichi/hive_2010-08-26_16-42-52_303_1702164061537345426/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select /*+mapjoin(a,b)*/ * from smb_bucket_1 a full outer join smb_bucket_2 b on a.key = b.key full outer join smb_bucket_3 c on b.key=c.key
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@smb_bucket_1
 POSTHOOK: Input: default@smb_bucket_2
 POSTHOOK: Input: default@smb_bucket_3
-POSTHOOK: Output: file:/tmp/jsichi/hive_2010-08-26_16-42-52_303_1702164061537345426/-mr-10000
+#### A masked pattern was here ####
 1	val_1	NULL	NULL	NULL	NULL
+10	val_10	NULL	NULL	NULL	NULL
 3	val_3	NULL	NULL	NULL	NULL
 4	val_4	NULL	NULL	NULL	NULL
-NULL	NULL	NULL	NULL	4	val_4
 5	val_5	NULL	NULL	NULL	NULL
-10	val_10	NULL	NULL	NULL	NULL
-NULL	NULL	NULL	NULL	10	val_10
-NULL	NULL	NULL	NULL	17	val_17
-NULL	NULL	NULL	NULL	19	val_19
 NULL	NULL	20	val_20	20	val_20
 NULL	NULL	23	val_23	23	val_23
 NULL	NULL	25	val_25	NULL	NULL
 NULL	NULL	30	val_30	NULL	NULL
+NULL	NULL	NULL	NULL	10	val_10
+NULL	NULL	NULL	NULL	17	val_17
+NULL	NULL	NULL	NULL	19	val_19
+NULL	NULL	NULL	NULL	4	val_4

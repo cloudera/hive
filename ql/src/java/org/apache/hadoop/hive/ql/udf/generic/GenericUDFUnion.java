@@ -18,10 +18,9 @@
 
 package org.apache.hadoop.hive.ql.udf.generic;
 
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.List;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.ql.exec.Description;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentException;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
@@ -35,19 +34,17 @@ import org.apache.hadoop.hive.serde2.objectinspector.primitive.IntObjectInspecto
    extended = "Example:\n"
    + "  > SELECT _FUNC_(1, 1, \"one\") FROM src LIMIT 1;\n" + "  one")
 public class GenericUDFUnion extends GenericUDF {
-  Log LOG = LogFactory.getLog("GenericUDFUnion");
-  ObjectInspector tagOI;
+  private transient ObjectInspector tagOI;
 
   @Override
   public ObjectInspector initialize(ObjectInspector[] arguments)
       throws UDFArgumentException {
     tagOI = arguments[0];
-    ObjectInspector[] unionOIs = new ObjectInspector[arguments.length-1];
+    List<ObjectInspector> unionOIs = new ArrayList<ObjectInspector>(arguments.length-1);
     for (int i = 1; i < arguments.length; i++) {
-      unionOIs[i-1] = arguments[i];
+      unionOIs.add(arguments[i]);
     }
-    return ObjectInspectorFactory.getStandardUnionObjectInspector(
-        Arrays.asList(unionOIs));
+    return ObjectInspectorFactory.getStandardUnionObjectInspector(unionOIs);
   }
 
   @Override

@@ -22,6 +22,7 @@ import java.io.Serializable;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.ql.io.IOContext;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.plan.FilterDesc;
 import org.apache.hadoop.hive.ql.plan.api.OperatorType;
@@ -36,26 +37,15 @@ public class FilterOperator extends Operator<FilterDesc> implements
     Serializable {
 
   private static final long serialVersionUID = 1L;
-
-  /**
-   * Counter.
-   *
-   */
-  public static enum Counter {
-    FILTERED, PASSED
-  }
-
-  private final transient LongWritable filtered_count, passed_count;
   private transient ExprNodeEvaluator conditionEvaluator;
   private transient PrimitiveObjectInspector conditionInspector;
-  private transient int consecutiveFails;
-  transient int heartbeatInterval;
+  private transient int consecutiveSearches;
+  private transient IOContext ioContext;
+  protected transient int heartbeatInterval;
 
   public FilterOperator() {
     super();
-    filtered_count = new LongWritable();
-    passed_count = new LongWritable();
-    consecutiveFails = 0;
+    consecutiveSearches = 0;
   }
 
   @Override
@@ -64,9 +54,12 @@ public class FilterOperator extends Operator<FilterDesc> implements
       heartbeatInterval = HiveConf.getIntVar(hconf,
           HiveConf.ConfVars.HIVESENDHEARTBEAT);
       conditionEvaluator = ExprNodeEvaluatorFactory.get(conf.getPredicate());
-      statsMap.put(Counter.FILTERED, filtered_count);
-      statsMap.put(Counter.PASSED, passed_count);
+      if (HiveConf.getBoolVar(hconf, HiveConf.ConfVars.HIVEEXPREVALUATIONCACHE)) {
+        conditionEvaluator = ExprNodeEvaluatorFactory.toCachedEval(conditionEvaluator);
+      }
+
       conditionInspector = null;
+      ioContext = IOContext.get(hconf);
     } catch (Throwable e) {
       throw new HiveException(e);
     }
@@ -80,22 +73,51 @@ public class FilterOperator extends Operator<FilterDesc> implements
       conditionInspector = (PrimitiveObjectInspector) conditionEvaluator
           .initialize(rowInspector);
     }
+
+    // If the input is sorted, and we are executing a search based on the arguments to this filter,
+    // set the comparison in the IOContext and the type of the UDF
+    if (conf.isSortedFilter() && ioContext.useSorted()) {
+      if (!(conditionEvaluator instanceof ExprNodeGenericFuncEvaluator)) {
+        LOG.error("Attempted to use the fact data is sorted when the conditionEvaluator is not " +
+                  "of type ExprNodeGenericFuncEvaluator");
+        ioContext.setUseSorted(false);
+        return;
+      } else {
+        ioContext.setComparison(((ExprNodeGenericFuncEvaluator)conditionEvaluator).compare(row));
+      }
+
+      if (ioContext.getGenericUDFClassName() == null) {
+        ioContext.setGenericUDFClassName(
+            ((ExprNodeGenericFuncEvaluator)conditionEvaluator).genericUDF.getClass().getName());
+      }
+
+      // If we are currently searching the data for a place to begin, do not return data yet
+      if (ioContext.isBinarySearching()) {
+        consecutiveSearches++;
+        // In case we're searching through an especially large set of data, send a heartbeat in
+        // order to avoid timeout
+        if (((consecutiveSearches % heartbeatInterval) == 0) && (reporter != null)) {
+          reporter.progress();
+        }
+        return;
+      }
+    }
+
     Object condition = conditionEvaluator.evaluate(row);
+
+    // If we are currently performing a binary search on the input, don't forward the results
+    // Currently this value is set when a query is optimized using a compact index.  The map reduce
+    // job responsible for scanning and filtering the index sets this value.  It remains set
+    // throughout the binary search executed by the HiveBinarySearchRecordResder until a starting
+    // point for a linear scan has been identified, at which point this value is unset.
+    if (ioContext.isBinarySearching()) {
+      return;
+    }
+
     Boolean ret = (Boolean) conditionInspector
         .getPrimitiveJavaObject(condition);
     if (Boolean.TRUE.equals(ret)) {
       forward(row, rowInspector);
-      passed_count.set(passed_count.get() + 1);
-      consecutiveFails = 0;
-    } else {
-      filtered_count.set(filtered_count.get() + 1);
-      consecutiveFails++;
-
-      // In case of a lot of consecutive failures, send a heartbeat in order to
-      // avoid timeout
-      if (((consecutiveFails % heartbeatInterval) == 0) && (reporter != null)) {
-        reporter.progress();
-      }
     }
   }
 
@@ -104,11 +126,35 @@ public class FilterOperator extends Operator<FilterDesc> implements
    */
   @Override
   public String getName() {
-    return new String("FIL");
+    return getOperatorName();
+  }
+
+  static public String getOperatorName() {
+    return "FIL";
   }
 
   @Override
   public OperatorType getType() {
     return OperatorType.FILTER;
+  }
+
+  @Override
+  public boolean supportSkewJoinOptimization() {
+    return true;
+  }
+
+  @Override
+  public boolean columnNamesRowResolvedCanBeObtained() {
+    return true;
+  }
+
+  @Override
+  public boolean supportAutomaticSortMergeJoin() {
+    return true;
+  }
+
+  @Override
+  public boolean supportUnionRemoveOptimization() {
+    return true;
   }
 }

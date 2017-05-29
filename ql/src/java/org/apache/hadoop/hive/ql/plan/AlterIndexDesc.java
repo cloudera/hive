@@ -19,13 +19,7 @@
 package org.apache.hadoop.hive.ql.plan;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-
-import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.hadoop.hive.metastore.api.Order;
-import org.apache.hadoop.hive.ql.exec.Utilities;
+import java.util.Map;
 
 /**
  * AlterIndexDesc.
@@ -36,14 +30,15 @@ public class AlterIndexDesc extends DDLDesc implements Serializable {
   private static final long serialVersionUID = 1L;
   private String indexName;
   private String baseTable;
-  private String dbName;
-  private HashMap<String, String> props;
+  private Map<String, String> partSpec; // partition specification of partitions touched
+  private Map<String, String> props;
 
   /**
    * alterIndexTypes.
    *
    */
   public static enum AlterIndexTypes {
+    UPDATETIMESTAMP,
     ADDPROPS};
 
   AlterIndexTypes op;
@@ -88,18 +83,18 @@ public class AlterIndexDesc extends DDLDesc implements Serializable {
   }
 
   /**
-   * @return the name of the database that the base table is in
+   * @return the partition spec
    */
-  public String getDbName() {
-    return dbName;
+  public Map<String, String> getSpec() {
+    return partSpec;
   }
 
   /**
-   * @param dbName
-   *          the dbName to set
+   * @param partSpec
+   *          the partition spec to set
    */
-  public void setDbName(String dbName) {
-    this.dbName = dbName;
+  public void setSpec(Map<String, String> partSpec) {
+    this.partSpec = partSpec;
   }
 
   /**
@@ -121,7 +116,7 @@ public class AlterIndexDesc extends DDLDesc implements Serializable {
    * @return the props
    */
   @Explain(displayName = "properties")
-  public HashMap<String, String> getProps() {
+  public Map<String, String> getProps() {
     return props;
   }
 
@@ -129,7 +124,7 @@ public class AlterIndexDesc extends DDLDesc implements Serializable {
    * @param props
    *          the props to set
    */
-  public void setProps(HashMap<String, String> props) {
+  public void setProps(Map<String, String> props) {
     this.props = props;
   }
 }

@@ -22,17 +22,25 @@ import java.util.List;
 
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
+import org.apache.hadoop.hive.ql.session.SessionState;
 
 /**
  * HiveAuthenticationProvider is an interface for authentication. The
  * implementation should return userNames and groupNames.
  */
 public interface HiveAuthenticationProvider extends Configurable{
-  
+
   public String getUserName();
-  
+
   public List<String> getGroupNames();
-  
+
   public void destroy() throws HiveException;
+
+  /**
+   * This function is meant to be used only for hive internal implementations of this interface.
+   * SessionState is not a public interface.
+   * @param ss SessionState that created this instance
+   */
+  public void setSessionState(SessionState ss);
 
 }

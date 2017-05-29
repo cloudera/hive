@@ -1,3 +1,20 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.apache.hadoop.hive.ql.io;
 
 import java.io.BufferedReader;
@@ -9,9 +26,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.common.FileUtils;
+import org.apache.hadoop.hive.io.HiveIOExceptionHandlerUtil;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.FileInputFormat;
@@ -31,8 +51,9 @@ import org.apache.hadoop.mapred.TextInputFormat;
  * actual map-reduce input. The target input data should be in TextInputFormat.
  */
 @SuppressWarnings("deprecation")
-public class SymlinkTextInputFormat
-    implements InputFormat<LongWritable, Text>, JobConfigurable {
+public class SymlinkTextInputFormat extends SymbolicInputFormat implements
+    InputFormat<LongWritable, Text>, JobConfigurable,
+    ContentSummaryInputFormat, ReworkMapredInputFormat {
   /**
    * This input split wraps the FileSplit generated from
    * TextInputFormat.getSplits(), while setting the original link file path
@@ -81,9 +102,19 @@ public class SymlinkTextInputFormat
     // The target data is in TextInputFormat.
     TextInputFormat inputFormat = new TextInputFormat();
     inputFormat.configure(job);
-    return inputFormat.getRecordReader(targetSplit, job, reporter);
+    RecordReader innerReader = null;
+    try {
+      innerReader = inputFormat.getRecordReader(targetSplit, job,
+          reporter);
+    } catch (Exception e) {
+      innerReader = HiveIOExceptionHandlerUtil
+          .handleRecordReaderCreationException(e, job);
+    }
+    HiveRecordReader rr = new HiveRecordReader(innerReader, job);
+    rr.initIOContext((FileSplit)targetSplit, job, TextInputFormat.class, innerReader);
+    return rr;
   }
-
+  
   /**
    * Parses all target paths from job input directory which contains symlink
    * files, and splits the target data using TextInputFormat.
@@ -157,28 +188,52 @@ public class SymlinkTextInputFormat
       List<Path> targetPaths, List<Path> symlinkPaths) throws IOException {
     for (Path symlinkDir : symlinksDirs) {
       FileSystem fileSystem = symlinkDir.getFileSystem(conf);
-      FileStatus[] symlinks = fileSystem.listStatus(symlinkDir);
+      FileStatus[] symlinks = fileSystem.listStatus(symlinkDir, FileUtils.HIDDEN_FILES_PATH_FILTER);
 
       // Read paths from each symlink file.
       for (FileStatus symlink : symlinks) {
-        BufferedReader reader =
-            new BufferedReader(
-                new InputStreamReader(
-                    fileSystem.open(symlink.getPath())));
-
-        String line;
-        while ((line = reader.readLine()) != null) {
-          targetPaths.add(new Path(line));
-          symlinkPaths.add(symlink.getPath());
+        BufferedReader reader = null;
+        try {
+          reader = new BufferedReader(
+              new InputStreamReader(
+                  fileSystem.open(symlink.getPath())));
+          String line;
+          while ((line = reader.readLine()) != null) {
+            targetPaths.add(new Path(line));
+            symlinkPaths.add(symlink.getPath());
+          }
+        } finally {
+          org.apache.hadoop.io.IOUtils.closeStream(reader);
         }
       }
     }
   }
 
-  /**
-   * For backward compatibility with hadoop 0.17.
-   */
-  public void validateInput(JobConf job) throws IOException {
-    // do nothing
+  @Override
+  public ContentSummary getContentSummary(Path p, JobConf job)
+      throws IOException {
+    //length, file count, directory count
+    long[] summary = {0, 0, 0};
+    List<Path> targetPaths = new ArrayList<Path>();
+    List<Path> symlinkPaths = new ArrayList<Path>();
+    try {
+      getTargetPathsFromSymlinksDirs(
+          job,
+          new Path[]{p},
+          targetPaths,
+          symlinkPaths);
+    } catch (Exception e) {
+      throw new IOException(
+          "Error parsing symlinks from specified job input path.", e);
+    }
+    for(Path path : targetPaths) {
+      FileSystem fs = path.getFileSystem(job);
+      ContentSummary cs = fs.getContentSummary(path);
+      summary[0] += cs.getLength();
+      summary[1] += cs.getFileCount();
+      summary[2] += cs.getDirectoryCount();
+    }
+    return new ContentSummary(summary[0], summary[1], summary[2]);
   }
+
 }

@@ -4,43 +4,26 @@ PREHOOK: type: CREATEFUNCTION
 POSTHOOK: query: EXPLAIN
 CREATE TEMPORARY FUNCTION testlength AS 'org.apache.hadoop.hive.ql.udf.UDFTestLength'
 POSTHOOK: type: CREATEFUNCTION
-ABSTRACT SYNTAX TREE:
-  (TOK_CREATEFUNCTION testlength 'org.apache.hadoop.hive.ql.udf.UDFTestLength')
-
 STAGE DEPENDENCIES:
   Stage-0 is a root stage
 
 STAGE PLANS:
   Stage: Stage-0
 
-
 PREHOOK: query: CREATE TEMPORARY FUNCTION testlength AS 'org.apache.hadoop.hive.ql.udf.UDFTestLength'
 PREHOOK: type: CREATEFUNCTION
+PREHOOK: Output: testlength
 POSTHOOK: query: CREATE TEMPORARY FUNCTION testlength AS 'org.apache.hadoop.hive.ql.udf.UDFTestLength'
 POSTHOOK: type: CREATEFUNCTION
-PREHOOK: query: CREATE TABLE dest1(len INT)
-PREHOOK: type: CREATETABLE
-POSTHOOK: query: CREATE TABLE dest1(len INT)
-POSTHOOK: type: CREATETABLE
-POSTHOOK: Output: default@dest1
-PREHOOK: query: FROM src INSERT OVERWRITE TABLE dest1 SELECT testlength(src.value)
+POSTHOOK: Output: testlength
+PREHOOK: query: SELECT testlength(src.value) FROM src
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src
-PREHOOK: Output: default@dest1
-POSTHOOK: query: FROM src INSERT OVERWRITE TABLE dest1 SELECT testlength(src.value)
+#### A masked pattern was here ####
+POSTHOOK: query: SELECT testlength(src.value) FROM src
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@src
-POSTHOOK: Output: default@dest1
-POSTHOOK: Lineage: dest1.len EXPRESSION [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-PREHOOK: query: SELECT dest1.* FROM dest1
-PREHOOK: type: QUERY
-PREHOOK: Input: default@dest1
-PREHOOK: Output: file:/data/users/athusoo/apache_workspaces/hive_trunk_ws1/.ptest_1/build/ql/scratchdir/hive_2010-04-05_18-36-20_684_2066191954563590193/10000
-POSTHOOK: query: SELECT dest1.* FROM dest1
-POSTHOOK: type: QUERY
-POSTHOOK: Input: default@dest1
-POSTHOOK: Output: file:/data/users/athusoo/apache_workspaces/hive_trunk_ws1/.ptest_1/build/ql/scratchdir/hive_2010-04-05_18-36-20_684_2066191954563590193/10000
-POSTHOOK: Lineage: dest1.len EXPRESSION [(src)src.FieldSchema(name:value, type:string, comment:default), ]
+#### A masked pattern was here ####
 7
 6
 7
@@ -543,6 +526,7 @@ POSTHOOK: Lineage: dest1.len EXPRESSION [(src)src.FieldSchema(name:value, type:s
 6
 PREHOOK: query: DROP TEMPORARY FUNCTION testlength
 PREHOOK: type: DROPFUNCTION
+PREHOOK: Output: testlength
 POSTHOOK: query: DROP TEMPORARY FUNCTION testlength
 POSTHOOK: type: DROPFUNCTION
-POSTHOOK: Lineage: dest1.len EXPRESSION [(src)src.FieldSchema(name:value, type:string, comment:default), ]
+POSTHOOK: Output: testlength

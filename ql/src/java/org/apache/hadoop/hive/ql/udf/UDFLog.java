@@ -19,28 +19,57 @@
 package org.apache.hadoop.hive.ql.udf;
 
 import org.apache.hadoop.hive.ql.exec.Description;
-import org.apache.hadoop.hive.ql.exec.UDF;
+import org.apache.hadoop.hive.ql.exec.vector.VectorizedExpressions;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.FuncLogWithBaseDoubleToDouble;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.FuncLogWithBaseLongToDouble;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.FuncLnDoubleToDouble;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.FuncLnLongToDouble;
 import org.apache.hadoop.hive.serde2.io.DoubleWritable;
+import org.apache.hadoop.hive.serde2.io.HiveDecimalWritable;
 
 /**
  * UDFLog.
- *
  */
 @Description(name = "log",
-    value = "_FUNC_([b], x) - Returns the logarithm of x with base b",
-    extended = "Example:\n"
-    + "  > SELECT _FUNC_(13, 13) FROM src LIMIT 1;\n" + "  1")
-public class UDFLog extends UDF {
-  private DoubleWritable result = new DoubleWritable();
+             value = "_FUNC_([b], x) - Returns the logarithm of x with base b",
+             extended = "Example:\n"
+                        + "  > SELECT _FUNC_(13, 13) FROM src LIMIT 1;\n"
+                        + "  1")
+@VectorizedExpressions({FuncLogWithBaseLongToDouble.class, FuncLogWithBaseDoubleToDouble.class,
+                         FuncLnLongToDouble.class, FuncLnDoubleToDouble.class})
+public class UDFLog extends UDFMath {
 
-  public UDFLog() {
+  private final DoubleWritable result = new DoubleWritable();
+
+  /**
+   * Returns the logarithm of "a" with base "base".
+   */
+  public DoubleWritable evaluate(DoubleWritable base, DoubleWritable a) {
+    if (a == null || base == null) {
+      return null;
+    }
+    return log(base.get(), a.get());
+  }
+
+  /**
+   * Get the logarithm of the given decimal input with the given decimal base.
+   */
+  public DoubleWritable evaluate(HiveDecimalWritable baseWritable, HiveDecimalWritable writable) {
+    if (baseWritable == null || writable == null) {
+      return null;
+    }
+
+    double base = baseWritable.getHiveDecimal().bigDecimalValue().doubleValue();
+    double d = writable.getHiveDecimal().bigDecimalValue().doubleValue();
+    return log(base, d);
   }
 
   /**
    * Returns the natural logarithm of "a".
    */
-  public DoubleWritable evaluate(DoubleWritable a) {
-    if (a == null || a.get() <= 0.0) {
+  @Override
+  protected DoubleWritable doEvaluate(DoubleWritable a) {
+    if (a.get() <= 0.0) {
       return null;
     } else {
       result.set(Math.log(a.get()));
@@ -48,16 +77,12 @@ public class UDFLog extends UDF {
     }
   }
 
-  /**
-   * Returns the logarithm of "a" with base "base".
-   */
-  public DoubleWritable evaluate(DoubleWritable base, DoubleWritable a) {
-    if (a == null || a.get() <= 0.0 || base == null || base.get() <= 1.0) {
+  private DoubleWritable log(double base, double input) {
+    if (base <= 1.0 || input <= 0.0) {
       return null;
-    } else {
-      result.set(Math.log(a.get()) / Math.log(base.get()));
-      return result;
     }
+    result.set(Math.log(input) / Math.log(base));
+    return result;
   }
 
 }

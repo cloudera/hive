@@ -4,7 +4,7 @@
 
 drop temporary function row_sequence;
 
-add jar ../build/contrib/hive_contrib.jar;
+add jar ${system:maven.local.repository}/org/apache/hive/hive-contrib/${system:hive.version}/hive-contrib-${system:hive.version}.jar;
 
 create temporary function row_sequence as 
 'org.apache.hadoop.hive.contrib.udf.UDFRowSequence';
@@ -21,5 +21,11 @@ order by r;
 select key, row_sequence() as r
 from (select key from src order by key) x
 order by r;
+
+-- make sure stateful functions do not get short-circuited away
+-- a true result for key=105 would indicate undesired short-circuiting
+select key, (key = 105) and (row_sequence() = 1)
+from (select key from src order by key) x
+order by key limit 20;
 
 drop temporary function row_sequence;

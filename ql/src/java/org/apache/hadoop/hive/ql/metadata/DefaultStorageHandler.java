@@ -25,7 +25,10 @@ import org.apache.hadoop.hive.metastore.HiveMetaHook;
 import org.apache.hadoop.hive.ql.plan.TableDesc;
 import org.apache.hadoop.hive.serde2.SerDe;
 import org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe;
+import org.apache.hadoop.hive.ql.security.authorization.HiveAuthorizationProvider;
+import org.apache.hadoop.hive.ql.security.authorization.DefaultHiveAuthorizationProvider;
 import org.apache.hadoop.mapred.InputFormat;
+import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.OutputFormat;
 import org.apache.hadoop.mapred.SequenceFileInputFormat;
 import org.apache.hadoop.mapred.SequenceFileOutputFormat;
@@ -61,11 +64,32 @@ public class DefaultStorageHandler implements HiveStorageHandler {
     return null;
   }
 
-  @Override
-  public void configureTableJobProperties(
-    TableDesc tableDesc,
-    Map<String, String> jobProperties) {
+  public HiveAuthorizationProvider getAuthorizationProvider()
+         throws HiveException {
+     return new DefaultHiveAuthorizationProvider();
+  }
+
+   @Override
+  public void configureInputJobProperties(TableDesc tableDesc,
+                                          Map<String, String> jobProperties) {
     // do nothing by default
+  }
+
+  @Override
+  public void configureOutputJobProperties(TableDesc tableDesc,
+                                           Map<String, String> jobProperties) {
+    // do nothing by default
+  }
+
+  @Override
+  public void configureTableJobProperties(TableDesc tableDesc,
+                                          Map<String, String> jobProperties) {
+    //do nothing by default
+  }
+
+  @Override
+  public void configureJobConf(TableDesc tableDesc, JobConf jobConf) {
+    //do nothing by default
   }
 
   @Override
@@ -76,5 +100,9 @@ public class DefaultStorageHandler implements HiveStorageHandler {
   @Override
   public void setConf(Configuration conf) {
     this.conf = conf;
+  }
+  @Override
+  public String toString() {
+    return this.getClass().getName();
   }
 }

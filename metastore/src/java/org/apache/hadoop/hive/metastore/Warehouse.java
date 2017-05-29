@@ -18,10 +18,12 @@
 
 package org.apache.hadoop.hive.metastore;
 
+import static org.apache.hadoop.hive.metastore.MetaStoreUtils.DATABASE_WAREHOUSE_SUFFIX;
 import static org.apache.hadoop.hive.metastore.MetaStoreUtils.DEFAULT_DATABASE_NAME;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -30,18 +32,31 @@ import java.util.Map.Entry;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.security.auth.login.LoginException;
+
+import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.permission.FsAction;
 import org.apache.hadoop.hive.common.FileUtils;
+import org.apache.hadoop.hive.common.HiveStatsUtils;
 import org.apache.hadoop.hive.common.JavaUtils;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.MetaException;
+import org.apache.hadoop.hive.metastore.api.Partition;
+import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
+import org.apache.hadoop.hive.metastore.api.Table;
+import org.apache.hadoop.hive.shims.ShimLoader;
+import org.apache.hadoop.hive.shims.Utils;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.ReflectionUtils;
 
 /**
@@ -52,11 +67,10 @@ public class Warehouse {
   private final Configuration conf;
   private final String whRootString;
 
-  private static final String DATABASE_WAREHOUSE_SUFFIX = ".db";
-
   public static final Log LOG = LogFactory.getLog("hive.metastore.warehouse");
-  
+
   private MetaStoreFS fsHandler = null;
+  private boolean storageAuthCheck = false;
 
   public Warehouse(Configuration conf) throws MetaException {
     this.conf = conf;
@@ -66,8 +80,10 @@ public class Warehouse {
           + " is not set in the config or blank");
     }
     fsHandler = getMetaStoreFsHandler(conf);
+    storageAuthCheck = HiveConf.getBoolVar(conf,
+        HiveConf.ConfVars.METASTORE_AUTHORIZATION_STORAGE_AUTH_CHECKS);
   }
-  
+
   private MetaStoreFS getMetaStoreFsHandler(Configuration conf)
       throws MetaException {
     String handlerClassStr = HiveConf.getVar(conf,
@@ -75,8 +91,7 @@ public class Warehouse {
     try {
       Class<? extends MetaStoreFS> handlerClass = (Class<? extends MetaStoreFS>) Class
           .forName(handlerClassStr, true, JavaUtils.getClassLoader());
-      MetaStoreFS handler = (MetaStoreFS) ReflectionUtils.newInstance(
-          handlerClass, conf);
+      MetaStoreFS handler = ReflectionUtils.newInstance(handlerClass, conf);
       return handler;
     } catch (ClassNotFoundException e) {
       throw new MetaException("Error in loading MetaStoreFS handler."
@@ -88,13 +103,17 @@ public class Warehouse {
   /**
    * Helper functions to convert IOException to MetaException
    */
-  public FileSystem getFs(Path f) throws MetaException {
+  public static FileSystem getFs(Path f, Configuration conf) throws MetaException {
     try {
       return f.getFileSystem(conf);
     } catch (IOException e) {
       MetaStoreUtils.logAndThrowMetaException(e);
     }
     return null;
+  }
+
+  public FileSystem getFs(Path f) throws MetaException {
+    return getFs(f, conf);
   }
 
   public static void closeFs(FileSystem fs) throws MetaException {
@@ -121,10 +140,14 @@ public class Warehouse {
    *          Path to be canonicalized
    * @return Path with canonical scheme and authority
    */
-  public Path getDnsPath(Path path) throws MetaException {
-    FileSystem fs = getFs(path);
+  public static Path getDnsPath(Path path, Configuration conf) throws MetaException {
+    FileSystem fs = getFs(path, conf);
     return (new Path(fs.getUri().getScheme(), fs.getUri().getAuthority(), path
         .toUri().getPath()));
+  }
+
+  public Path getDnsPath(Path path) throws MetaException {
+    return getDnsPath(path, conf);
   }
 
   /**
@@ -133,12 +156,24 @@ public class Warehouse {
    * dir (but that should be ok given that this is only called during DDL
    * statements for non-external tables).
    */
-  private Path getWhRoot() throws MetaException {
+  public Path getWhRoot() throws MetaException {
     if (whRoot != null) {
       return whRoot;
     }
     whRoot = getDnsPath(new Path(whRootString));
     return whRoot;
+  }
+
+  public Path getTablePath(String whRootString, String tableName) throws MetaException {
+    Path whRoot = getDnsPath(new Path(whRootString));
+    return new Path(whRoot, tableName.toLowerCase());
+  }
+
+  public Path getDatabasePath(Database db) throws MetaException {
+    if (db.getName().equalsIgnoreCase(DEFAULT_DATABASE_NAME)) {
+      return getWhRoot();
+    }
+    return new Path(db.getLocationUri());
   }
 
   public Path getDefaultDatabasePath(String dbName) throws MetaException {
@@ -148,17 +183,26 @@ public class Warehouse {
     return new Path(getWhRoot(), dbName.toLowerCase() + DATABASE_WAREHOUSE_SUFFIX);
   }
 
-  public Path getDefaultTablePath(String dbName, String tableName)
+  public Path getTablePath(Database db, String tableName)
       throws MetaException {
-    return new Path(getDefaultDatabasePath(dbName), tableName.toLowerCase());
+    return getDnsPath(new Path(getDatabasePath(db), tableName.toLowerCase()));
   }
 
-  public boolean mkdirs(Path f) throws MetaException {
+  public static String getQualifiedName(Table table) {
+    return table.getDbName() + "." + table.getTableName();
+  }
+
+  public static String getQualifiedName(Partition partition) {
+    return partition.getDbName() + "." + partition.getTableName() + partition.getValues();
+  }
+
+  public boolean mkdirs(Path f, boolean inheritPermCandidate) throws MetaException {
+    boolean inheritPerms = HiveConf.getBoolVar(conf,
+      HiveConf.ConfVars.HIVE_WAREHOUSE_SUBDIR_INHERIT_PERMS) && inheritPermCandidate;
     FileSystem fs = null;
     try {
       fs = getFs(f);
-      LOG.debug("Creating directory if it doesn't exist: " + f);
-      return (fs.mkdirs(f) || fs.getFileStatus(f).isDir());
+      return FileUtils.mkdir(fs, f, inheritPerms, conf);
     } catch (IOException e) {
       closeFs(fs);
       MetaStoreUtils.logAndThrowMetaException(e);
@@ -166,11 +210,81 @@ public class Warehouse {
     return false;
   }
 
-  public boolean deleteDir(Path f, boolean recursive) throws MetaException {
-    FileSystem fs = getFs(f);
-    return fsHandler.deleteDir(fs, f, recursive, conf);
+  public boolean renameDir(Path sourcePath, Path destPath) throws MetaException {
+    return renameDir(sourcePath, destPath, false);
   }
 
+  public boolean renameDir(Path sourcePath, Path destPath, boolean inheritPerms) throws MetaException {
+    try {
+      FileSystem fs = getFs(sourcePath);
+      return FileUtils.renameWithPerms(fs, sourcePath, destPath, inheritPerms, conf);
+    } catch (Exception ex) {
+      MetaStoreUtils.logAndThrowMetaException(ex);
+    }
+    return false;
+  }
+
+  public boolean deleteDir(Path f, boolean recursive) throws MetaException {
+    return deleteDir(f, recursive, false);
+  }
+
+  public boolean deleteDir(Path f, boolean recursive, boolean ifPurge) throws MetaException {
+    FileSystem fs = getFs(f);
+    return fsHandler.deleteDir(fs, f, recursive, ifPurge, conf);
+  }
+
+  public boolean isEmpty(Path path) throws IOException, MetaException {
+    ContentSummary contents = getFs(path).getContentSummary(path);
+    if (contents != null && contents.getFileCount() == 0 && contents.getDirectoryCount() == 1) {
+      return true;
+    }
+    return false;
+  }
+
+  public boolean isWritable(Path path) throws IOException {
+    if (!storageAuthCheck) {
+      // no checks for non-secure hadoop installations
+      return true;
+    }
+    if (path == null) { //what??!!
+      return false;
+    }
+    final FileStatus stat;
+    try {
+      stat = getFs(path).getFileStatus(path);
+    } catch (FileNotFoundException fnfe){
+      // File named by path doesn't exist; nothing to validate.
+      return true;
+    } catch (Exception e) {
+      // all other exceptions are considered as emanating from
+      // unauthorized accesses
+      return false;
+    }
+    final UserGroupInformation ugi;
+    try {
+      ugi = Utils.getUGI();
+    } catch (LoginException le) {
+      throw new IOException(le);
+    }
+    String user = ugi.getShortUserName();
+    //check whether owner can delete
+    if (stat.getOwner().equals(user) &&
+        stat.getPermission().getUserAction().implies(FsAction.WRITE)) {
+      return true;
+    }
+    //check whether group of the user can delete
+    if (stat.getPermission().getGroupAction().implies(FsAction.WRITE)) {
+      String[] groups = ugi.getGroupNames();
+      if (ArrayUtils.contains(groups, stat.getGroup())) {
+        return true;
+      }
+    }
+    //check whether others can delete (uncommon case!!)
+    if (stat.getPermission().getOtherAction().implies(FsAction.WRITE)) {
+      return true;
+    }
+    return false;
+  }
   /*
   // NOTE: This is for generating the internal path name for partitions. Users
   // should always use the MetaStore API to get the path name for a partition.
@@ -222,7 +336,7 @@ public class Warehouse {
    * Makes a partition name from a specification
    * @param spec
    * @param addTrailingSeperator if true, adds a trailing separator e.g. 'ds=1/'
-   * @return
+   * @return partition name
    * @throws MetaException
    */
   public static String makePartName(Map<String, String> spec,
@@ -271,6 +385,30 @@ public class Warehouse {
 
   static final Pattern pat = Pattern.compile("([^/]+)=([^/]+)");
 
+  private static final Pattern slash = Pattern.compile("/");
+
+  /**
+   * Extracts values from partition name without the column names.
+   * @param name Partition name.
+   * @param result The result. Must be pre-sized to the expected number of columns.
+   */
+  public static void makeValsFromName(
+      String name, AbstractList<String> result) throws MetaException {
+    assert name != null;
+    String[] parts = slash.split(name, 0);
+    if (parts.length != result.size()) {
+      throw new MetaException(
+          "Expected " + result.size() + " components, got " + parts.length + " (" + name + ")");
+    }
+    for (int i = 0; i < parts.length; ++i) {
+      int eq = parts[i].indexOf('=');
+      if (eq <= 0) {
+        throw new MetaException("Unexpected component " + parts[i]);
+      }
+      result.set(i, unescapePathName(parts[i].substring(eq + 1)));
+    }
+  }
+
   public static LinkedHashMap<String, String> makeSpecFromName(String name)
       throws MetaException {
     if (name == null || name.isEmpty()) {
@@ -303,9 +441,41 @@ public class Warehouse {
     }
   }
 
-  public Path getPartitionPath(String dbName, String tableName,
+  public static Map<String, String> makeEscSpecFromName(String name) throws MetaException {
+
+    if (name == null || name.isEmpty()) {
+      throw new MetaException("Partition name is invalid. " + name);
+    }
+    LinkedHashMap<String, String> partSpec = new LinkedHashMap<String, String>();
+
+    Path currPath = new Path(name);
+
+    List<String[]> kvs = new ArrayList<String[]>();
+    do {
+      String component = currPath.getName();
+      Matcher m = pat.matcher(component);
+      if (m.matches()) {
+        String k = m.group(1);
+        String v = m.group(2);
+        String[] kv = new String[2];
+        kv[0] = k;
+        kv[1] = v;
+        kvs.add(kv);
+      }
+      currPath = currPath.getParent();
+    } while (currPath != null && !currPath.getName().isEmpty());
+
+    // reverse the list since we checked the part from leaf dir to table's base dir
+    for (int i = kvs.size(); i > 0; i--) {
+      partSpec.put(kvs.get(i - 1)[0], kvs.get(i - 1)[1]);
+    }
+
+    return partSpec;
+  }
+
+  public Path getPartitionPath(Database db, String tableName,
       LinkedHashMap<String, String> pm) throws MetaException {
-    return new Path(getDefaultTablePath(dbName, tableName), makePartPath(pm));
+    return new Path(getTablePath(db, tableName), makePartPath(pm));
   }
 
   public Path getPartitionPath(Path tblPath, LinkedHashMap<String, String> pm)
@@ -332,14 +502,80 @@ public class Warehouse {
 
   public static String makePartName(List<FieldSchema> partCols,
       List<String> vals) throws MetaException {
+    return makePartName(partCols, vals, null);
+  }
+
+  /**
+   * @param desc
+   * @return array of FileStatus objects corresponding to the files
+   * making up the passed storage description
+   */
+  public FileStatus[] getFileStatusesForSD(StorageDescriptor desc)
+      throws MetaException {
+    return getFileStatusesForLocation(desc.getLocation());
+  }
+
+  /**
+   * @param location
+   * @return array of FileStatus objects corresponding to the files
+   * making up the passed storage description
+   */
+  public FileStatus[] getFileStatusesForLocation(String location)
+      throws MetaException {
+    try {
+      Path path = new Path(location);
+      FileSystem fileSys = path.getFileSystem(conf);
+      return HiveStatsUtils.getFileStatusRecurse(path, -1, fileSys);
+    } catch (IOException ioe) {
+      MetaStoreUtils.logAndThrowMetaException(ioe);
+    }
+    return null;
+  }
+
+  /**
+   * @param table
+   * @return array of FileStatus objects corresponding to the files making up the passed
+   * unpartitioned table
+   */
+  public FileStatus[] getFileStatusesForUnpartitionedTable(Database db, Table table)
+      throws MetaException {
+    Path tablePath = getTablePath(db, table.getTableName());
+    try {
+      FileSystem fileSys = tablePath.getFileSystem(conf);
+      return HiveStatsUtils.getFileStatusRecurse(tablePath, -1, fileSys);
+    } catch (IOException ioe) {
+      MetaStoreUtils.logAndThrowMetaException(ioe);
+    }
+    return null;
+  }
+
+  /**
+   * Makes a valid partition name.
+   * @param partCols The partition columns
+   * @param vals The partition values
+   * @param defaultStr
+   *    The default name given to a partition value if the respective value is empty or null.
+   * @return An escaped, valid partition name.
+   * @throws MetaException
+   */
+  public static String makePartName(List<FieldSchema> partCols,
+      List<String> vals, String defaultStr) throws MetaException {
     if ((partCols.size() != vals.size()) || (partCols.size() == 0)) {
-      throw new MetaException("Invalid partition key & values");
+      String errorStr = "Invalid partition key & values; keys [";
+      for (FieldSchema fs : partCols) {
+        errorStr += (fs.getName() + ", ");
+      }
+      errorStr += "], values [";
+      for (String val : vals) {
+        errorStr += (val + ", ");
+      }
+      throw new MetaException(errorStr + "]");
     }
     List<String> colNames = new ArrayList<String>();
     for (FieldSchema col: partCols) {
       colNames.add(col.getName());
     }
-    return FileUtils.makePartName(colNames, vals);
+    return FileUtils.makePartName(colNames, vals, defaultStr);
   }
 
   public static List<String> getPartValuesFromPartName(String partName)
@@ -350,4 +586,12 @@ public class Warehouse {
     return values;
   }
 
+  public static Map<String, String> makeSpecFromValues(List<FieldSchema> partCols,
+      List<String> values) {
+    Map<String, String> spec = new LinkedHashMap<String, String>();
+    for (int i = 0; i < values.size(); i++) {
+      spec.put(partCols.get(i).getName(), values.get(i));
+    }
+    return spec;
+  }
 }

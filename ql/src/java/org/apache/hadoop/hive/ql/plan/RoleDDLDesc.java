@@ -28,19 +28,52 @@ public class RoleDDLDesc extends DDLDesc implements Serializable {
   private static final long serialVersionUID = 1L;
 
   private String name;
-  
+
   private PrincipalType principalType;
-  
+
   private boolean group;
 
   private RoleOperation operation;
-  
+
   private String resFile;
-  
+
   private String roleOwnerName;
 
+  /**
+   * thrift ddl for the result of show roles.
+   */
+  private static final String roleNameSchema = "role#string";
+
+  /**
+   * thrift ddl for the result of show role grant principalName
+   */
+  private static final String roleShowGrantSchema =
+      "role,grant_option,grant_time,grantor#" +
+      "string:boolean:bigint:string";
+
+  /**
+   * thrift ddl for the result of describe role roleName
+   */
+  private static final String roleShowRolePrincipals =
+      "principal_name,principal_type,grant_option,grantor,grantor_type,grant_time#" +
+      "string:string:boolean:string:string:bigint";
+
+  public static String getRoleNameSchema() {
+    return roleNameSchema;
+  }
+
+  public static String getRoleShowGrantSchema() {
+    return roleShowGrantSchema;
+  }
+
+  public static String getShowRolePrincipalsSchema() {
+    return roleShowRolePrincipals;
+  }
+
   public static enum RoleOperation {
-    DROP_ROLE("drop_role"), CREATE_ROLE("create_role"), SHOW_ROLE_GRANT("show_roles");
+    DROP_ROLE("drop_role"), CREATE_ROLE("create_role"), SHOW_ROLE_GRANT("show_role_grant"),
+    SHOW_ROLES("show_roles"), SET_ROLE("set_role"), SHOW_CURRENT_ROLE("show_current_role"),
+    SHOW_ROLE_PRINCIPALS("show_role_principals");
     private String operationName;
 
     private RoleOperation() {
@@ -54,11 +87,12 @@ public class RoleDDLDesc extends DDLDesc implements Serializable {
       return operationName;
     }
 
+    @Override
     public String toString () {
       return this.operationName;
     }
   }
-  
+
   public RoleDDLDesc(){
   }
 
@@ -79,10 +113,6 @@ public class RoleDDLDesc extends DDLDesc implements Serializable {
     return name;
   }
 
-  public void setName(String roleName) {
-    this.name = roleName;
-  }
-  
   @Explain(displayName = "role operation")
   public RoleOperation getOperation() {
     return operation;
@@ -91,7 +121,7 @@ public class RoleDDLDesc extends DDLDesc implements Serializable {
   public void setOperation(RoleOperation operation) {
     this.operation = operation;
   }
-  
+
   public PrincipalType getPrincipalType() {
     return principalType;
   }
@@ -107,7 +137,7 @@ public class RoleDDLDesc extends DDLDesc implements Serializable {
   public void setGroup(boolean group) {
     this.group = group;
   }
-  
+
   public String getResFile() {
     return resFile;
   }
@@ -115,7 +145,7 @@ public class RoleDDLDesc extends DDLDesc implements Serializable {
   public void setResFile(String resFile) {
     this.resFile = resFile;
   }
-  
+
   public String getRoleOwnerName() {
     return roleOwnerName;
   }

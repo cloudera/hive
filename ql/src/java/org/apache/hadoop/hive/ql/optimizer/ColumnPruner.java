@@ -18,16 +18,24 @@
 
 package org.apache.hadoop.hive.ql.optimizer;
 
-import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.apache.hadoop.hive.ql.exec.CommonJoinOperator;
 import org.apache.hadoop.hive.ql.exec.FileSinkOperator;
-import org.apache.hadoop.hive.ql.exec.Operator;
+import org.apache.hadoop.hive.ql.exec.FilterOperator;
+import org.apache.hadoop.hive.ql.exec.GroupByOperator;
+import org.apache.hadoop.hive.ql.exec.LateralViewForwardOperator;
+import org.apache.hadoop.hive.ql.exec.LateralViewJoinOperator;
+import org.apache.hadoop.hive.ql.exec.LimitOperator;
+import org.apache.hadoop.hive.ql.exec.MapJoinOperator;
+import org.apache.hadoop.hive.ql.exec.PTFOperator;
+import org.apache.hadoop.hive.ql.exec.ReduceSinkOperator;
 import org.apache.hadoop.hive.ql.exec.ScriptOperator;
 import org.apache.hadoop.hive.ql.exec.SelectOperator;
+import org.apache.hadoop.hive.ql.exec.TableScanOperator;
+import org.apache.hadoop.hive.ql.exec.UnionOperator;
 import org.apache.hadoop.hive.ql.lib.DefaultGraphWalker;
 import org.apache.hadoop.hive.ql.lib.DefaultRuleDispatcher;
 import org.apache.hadoop.hive.ql.lib.Dispatcher;
@@ -36,7 +44,6 @@ import org.apache.hadoop.hive.ql.lib.Node;
 import org.apache.hadoop.hive.ql.lib.NodeProcessor;
 import org.apache.hadoop.hive.ql.lib.Rule;
 import org.apache.hadoop.hive.ql.lib.RuleRegExp;
-import org.apache.hadoop.hive.ql.parse.OpParseContext;
 import org.apache.hadoop.hive.ql.parse.ParseContext;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 
@@ -50,7 +57,6 @@ import org.apache.hadoop.hive.ql.parse.SemanticException;
  */
 public class ColumnPruner implements Transform {
   protected ParseContext pGraphContext;
-  private HashMap<Operator<? extends Serializable>, OpParseContext> opToParseCtxMap;
 
   /**
    * empty constructor.
@@ -67,33 +73,56 @@ public class ColumnPruner implements Transform {
    * @param pactx
    *          the current parse context
    */
+  @Override
   public ParseContext transform(ParseContext pactx) throws SemanticException {
     pGraphContext = pactx;
-    opToParseCtxMap = pGraphContext.getOpParseCtx();
 
     // generate pruned column list for all relevant operators
-    ColumnPrunerProcCtx cppCtx = new ColumnPrunerProcCtx(opToParseCtxMap);
+    ColumnPrunerProcCtx cppCtx = new ColumnPrunerProcCtx(pactx);
 
     // create a walker which walks the tree in a DFS manner while maintaining
     // the operator stack. The dispatcher
     // generates the plan from the operator tree
     Map<Rule, NodeProcessor> opRules = new LinkedHashMap<Rule, NodeProcessor>();
-    opRules.put(new RuleRegExp("R1", "FIL%"), ColumnPrunerProcFactory
-        .getFilterProc());
-    opRules.put(new RuleRegExp("R2", "GBY%"), ColumnPrunerProcFactory
-        .getGroupByProc());
-    opRules.put(new RuleRegExp("R3", "RS%"), ColumnPrunerProcFactory
-        .getReduceSinkProc());
-    opRules.put(new RuleRegExp("R4", "SEL%"), ColumnPrunerProcFactory
-        .getSelectProc());
-    opRules.put(new RuleRegExp("R5", "JOIN%"), ColumnPrunerProcFactory
-        .getJoinProc());
-    opRules.put(new RuleRegExp("R6", "MAPJOIN%"), ColumnPrunerProcFactory
-        .getMapJoinProc());
-    opRules.put(new RuleRegExp("R7", "TS%"), ColumnPrunerProcFactory
-        .getTableScanProc());
-    opRules.put(new RuleRegExp("R8", "LVJ%"), ColumnPrunerProcFactory
-        .getLateralViewJoinProc());
+    opRules.put(new RuleRegExp("R1",
+      FilterOperator.getOperatorName() + "%"),
+      ColumnPrunerProcFactory.getFilterProc());
+    opRules.put(new RuleRegExp("R2",
+      GroupByOperator.getOperatorName() + "%"),
+      ColumnPrunerProcFactory.getGroupByProc());
+    opRules.put(new RuleRegExp("R3",
+      ReduceSinkOperator.getOperatorName() + "%"),
+      ColumnPrunerProcFactory.getReduceSinkProc());
+    opRules.put(new RuleRegExp("R4",
+      SelectOperator.getOperatorName() + "%"),
+      ColumnPrunerProcFactory.getSelectProc());
+    opRules.put(new RuleRegExp("R5",
+      CommonJoinOperator.getOperatorName() + "%"),
+      ColumnPrunerProcFactory.getJoinProc());
+    opRules.put(new RuleRegExp("R6",
+      MapJoinOperator.getOperatorName() + "%"),
+      ColumnPrunerProcFactory.getMapJoinProc());
+    opRules.put(new RuleRegExp("R7",
+      TableScanOperator.getOperatorName() + "%"),
+      ColumnPrunerProcFactory.getTableScanProc());
+    opRules.put(new RuleRegExp("R8",
+      LateralViewJoinOperator.getOperatorName() + "%"),
+      ColumnPrunerProcFactory.getLateralViewJoinProc());
+    opRules.put(new RuleRegExp("R9",
+      LateralViewForwardOperator.getOperatorName() + "%"),
+      ColumnPrunerProcFactory.getLateralViewForwardProc());
+    opRules.put(new RuleRegExp("R10",
+        PTFOperator.getOperatorName() + "%"),
+        ColumnPrunerProcFactory.getPTFProc());
+    opRules.put(new RuleRegExp("R11",
+        ScriptOperator.getOperatorName() + "%"),
+        ColumnPrunerProcFactory.getScriptProc());
+    opRules.put(new RuleRegExp("R12",
+        LimitOperator.getOperatorName() + "%"),
+        ColumnPrunerProcFactory.getLimitProc());
+    opRules.put(new RuleRegExp("R13",
+        UnionOperator.getOperatorName() + "%"),
+        ColumnPrunerProcFactory.getUnionProc());
     // The dispatcher fires the processor corresponding to the closest matching
     // rule and passes the context along
     Dispatcher disp = new DefaultRuleDispatcher(ColumnPrunerProcFactory

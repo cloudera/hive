@@ -20,8 +20,10 @@ package org.apache.hadoop.hive.ql.exec;
 
 import java.io.Serializable;
 
+import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
+import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
 
 /**
  * Implementation for ColumnInfo which contains the internal name for the column
@@ -37,6 +39,10 @@ public class ColumnInfo implements Serializable {
 
   private String alias = null; // [optional] alias of the column (external name
   // as seen by the users)
+  /**
+   * Indicates whether the column is a skewed column.
+   */
+  private boolean isSkewedCol;
 
   /**
    * Store the alias of the table where available.
@@ -48,9 +54,11 @@ public class ColumnInfo implements Serializable {
    */
   private boolean isVirtualCol;
 
-  private transient TypeInfo type;
+  private ObjectInspector objectInspector;
 
   private boolean isHiddenVirtualCol;
+
+  private String typeName;
 
   public ColumnInfo() {
   }
@@ -69,15 +77,53 @@ public class ColumnInfo implements Serializable {
 
   public ColumnInfo(String internalName, TypeInfo type, String tabAlias,
       boolean isVirtualCol, boolean isHiddenVirtualCol) {
+    this(internalName,
+         TypeInfoUtils.getStandardWritableObjectInspectorFromTypeInfo(type),
+         tabAlias,
+         isVirtualCol,
+         isHiddenVirtualCol);
+  }
+
+  public ColumnInfo(String internalName, ObjectInspector objectInspector,
+      String tabAlias, boolean isVirtualCol) {
+    this(internalName, objectInspector, tabAlias, isVirtualCol, false);
+  }
+
+  public ColumnInfo(String internalName, ObjectInspector objectInspector,
+      String tabAlias, boolean isVirtualCol, boolean isHiddenVirtualCol) {
     this.internalName = internalName;
-    this.type = type;
+    this.objectInspector = objectInspector;
     this.tabAlias = tabAlias;
     this.isVirtualCol = isVirtualCol;
     this.isHiddenVirtualCol = isHiddenVirtualCol;
+    this.typeName = getType().getTypeName();
+  }
+
+  public ColumnInfo(ColumnInfo columnInfo) {
+    this.internalName = columnInfo.getInternalName();
+    this.alias = columnInfo.getAlias();
+    this.isSkewedCol = columnInfo.isSkewedCol();
+    this.tabAlias = columnInfo.getTabAlias();
+    this.isVirtualCol = columnInfo.getIsVirtualCol();
+    this.isHiddenVirtualCol = columnInfo.isHiddenVirtualCol();
+    this.setType(columnInfo.getType());
+    this.typeName = columnInfo.getType().getTypeName();
+  }
+
+  public String getTypeName() {
+    return this.typeName;
+  }
+
+  public void setTypeName(String typeName) {
+    this.typeName = typeName;
   }
 
   public TypeInfo getType() {
-    return type;
+    return TypeInfoUtils.getTypeInfoFromObjectInspector(objectInspector);
+  }
+
+  public ObjectInspector getObjectInspector() {
+    return objectInspector;
   }
 
   public String getInternalName() {
@@ -85,7 +131,8 @@ public class ColumnInfo implements Serializable {
   }
 
   public void setType(TypeInfo type) {
-    this.type = type;
+    objectInspector =
+        TypeInfoUtils.getStandardWritableObjectInspectorFromTypeInfo(type);
   }
 
   public void setInternalName(String internalName) {
@@ -109,7 +156,7 @@ public class ColumnInfo implements Serializable {
    */
   @Override
   public String toString() {
-    return internalName + ": " + type;
+    return internalName + ": " + typeName;
   }
 
   public void setAlias(String col_alias) {
@@ -132,5 +179,78 @@ public class ColumnInfo implements Serializable {
     this.isHiddenVirtualCol = isHiddenVirtualCol;
   }
 
+  /**
+   * @return the isSkewedCol
+   */
+  public boolean isSkewedCol() {
+    return isSkewedCol;
+  }
 
+  /**
+   * @param isSkewedCol the isSkewedCol to set
+   */
+  public void setSkewedCol(boolean isSkewedCol) {
+    this.isSkewedCol = isSkewedCol;
+  }
+
+  private boolean checkEquals(Object obj1, Object obj2) {
+    return obj1 == null ? obj2 == null : obj1.equals(obj2);
+  }
+
+  @Override
+  public int hashCode() {
+    return internalName.hashCode() + typeName.hashCode();
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (!(obj instanceof ColumnInfo) || (obj == null)) {
+      return false;
+    }
+
+    ColumnInfo dest = (ColumnInfo)obj;
+    if ((!checkEquals(internalName, dest.getInternalName())) ||
+        (!checkEquals(tabAlias, dest.getTabAlias())) ||
+        (!checkEquals(alias, dest.getAlias())) ||
+        (!checkEquals(getType(), dest.getType())) ||
+        (isSkewedCol != dest.isSkewedCol()) ||
+        (isVirtualCol != dest.getIsVirtualCol()) ||
+        (isHiddenVirtualCol != dest.isHiddenVirtualCol())) {
+      return false;
+    }
+
+    return true;
+  }
+
+  public boolean internalEquals(ColumnInfo dest) {
+    if (dest == null) {
+      return false;
+    }
+
+    if ((!checkEquals(internalName, dest.getInternalName())) ||
+        (!checkEquals(getType(), dest.getType())) ||
+        (isSkewedCol != dest.isSkewedCol()) ||
+        (isVirtualCol != dest.getIsVirtualCol()) ||
+        (isHiddenVirtualCol != dest.isHiddenVirtualCol())) {
+      return false;
+    }
+
+    return true;
+  }
+
+  public boolean isSameColumnForRR(ColumnInfo other) {
+    return checkEquals(tabAlias, other.tabAlias)
+        && checkEquals(alias, other.alias)
+        && checkEquals(internalName, other.internalName)
+        && checkEquals(getType(), other.getType());
+  }
+
+  public String toMappingString(String tab, String col) {
+    return tab + "." + col + " => {" + tabAlias + ", " + alias + ", "
+        + internalName + ": " + getType() + "}";
+  }
+
+  public void setObjectinspector(ObjectInspector writableObjectInspector) {
+    this.objectInspector = writableObjectInspector;
+  }
 }

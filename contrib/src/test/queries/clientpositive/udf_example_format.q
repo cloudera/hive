@@ -1,4 +1,4 @@
-add jar ../build/contrib/hive_contrib.jar;
+add jar ${system:maven.local.repository}/org/apache/hive/hive-contrib/${system:hive.version}/hive-contrib-${system:hive.version}.jar;
 
 CREATE TEMPORARY FUNCTION example_format AS 'org.apache.hadoop.hive.contrib.udf.example.UDFExampleFormat';
 

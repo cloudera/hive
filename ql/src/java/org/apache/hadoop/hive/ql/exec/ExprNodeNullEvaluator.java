@@ -29,22 +29,19 @@ import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectIn
  * ExprNodeNullEvaluator.
  *
  */
-public class ExprNodeNullEvaluator extends ExprNodeEvaluator {
-
-  protected ExprNodeNullDesc expr;
+public class ExprNodeNullEvaluator extends ExprNodeEvaluator<ExprNodeNullDesc> {
 
   public ExprNodeNullEvaluator(ExprNodeNullDesc expr) {
-    this.expr = expr;
+    super(expr);
   }
 
   @Override
   public ObjectInspector initialize(ObjectInspector rowInspector) throws HiveException {
-    return PrimitiveObjectInspectorFactory.writableVoidObjectInspector;
+    return outputOI = PrimitiveObjectInspectorFactory.writableVoidObjectInspector;
   }
 
   @Override
-  public Object evaluate(Object row) throws HiveException {
+  protected Object _evaluate(Object row, int version) throws HiveException {
     return null;
   }
-
 }

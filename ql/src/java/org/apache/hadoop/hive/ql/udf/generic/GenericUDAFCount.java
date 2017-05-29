@@ -23,6 +23,7 @@ import org.apache.hadoop.hive.ql.exec.Description;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentException;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
+import org.apache.hadoop.hive.ql.util.JavaDataModel;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.LongObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
@@ -99,8 +100,11 @@ public class GenericUDAFCount implements GenericUDAFResolver2 {
     }
 
     /** class for storing count value. */
-    static class CountAgg implements AggregationBuffer {
+    @AggregationType(estimable = true)
+    static class CountAgg extends AbstractAggregationBuffer {
       long value;
+      @Override
+      public int estimate() { return JavaDataModel.PRIMITIVES2; }
     }
 
     @Override
@@ -126,7 +130,6 @@ public class GenericUDAFCount implements GenericUDAFResolver2 {
         assert parameters.length == 0;
         ((CountAgg) agg).value++;
       } else {
-        assert parameters.length > 0;
         boolean countThisRow = true;
         for (Object nextParam : parameters) {
           if (nextParam == null) {

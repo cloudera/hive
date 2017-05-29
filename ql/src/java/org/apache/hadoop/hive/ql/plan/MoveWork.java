@@ -19,7 +19,6 @@
 package org.apache.hadoop.hive.ql.plan;
 
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
@@ -39,7 +38,7 @@ public class MoveWork implements Serializable {
   private LoadMultiFilesDesc loadMultiFilesWork;
 
   private boolean checkFileFormat;
-  ArrayList<String> dpSpecPaths; // dynamic partition specified paths -- the root of DP columns
+  private boolean srcLocal;
 
   /**
    * ReadEntitites that are passed to the hooks.
@@ -65,19 +64,21 @@ public class MoveWork implements Serializable {
 
   public MoveWork(HashSet<ReadEntity> inputs, HashSet<WriteEntity> outputs,
       final LoadTableDesc loadTableWork, final LoadFileDesc loadFileWork,
+      boolean checkFileFormat, boolean srcLocal) {
+    this(inputs, outputs);
+    this.loadTableWork = loadTableWork;
+    this.loadFileWork = loadFileWork;
+    this.checkFileFormat = checkFileFormat;
+    this.srcLocal = srcLocal;
+  }
+
+  public MoveWork(HashSet<ReadEntity> inputs, HashSet<WriteEntity> outputs,
+      final LoadTableDesc loadTableWork, final LoadFileDesc loadFileWork,
       boolean checkFileFormat) {
     this(inputs, outputs);
     this.loadTableWork = loadTableWork;
     this.loadFileWork = loadFileWork;
     this.checkFileFormat = checkFileFormat;
-  }
-
-  public void setDPSpecPaths(ArrayList<String> dpsp) {
-    dpSpecPaths = dpsp;
-  }
-
-  public ArrayList<String> getDPSpecPaths() {
-    return dpSpecPaths;
   }
 
   @Explain(displayName = "tables")
@@ -129,6 +130,14 @@ public class MoveWork implements Serializable {
 
   public void setOutputs(HashSet<WriteEntity> outputs) {
     this.outputs = outputs;
+  }
+
+  public boolean isSrcLocal() {
+    return srcLocal;
+  }
+
+  public void setSrcLocal(boolean srcLocal) {
+    this.srcLocal = srcLocal;
   }
 
 }

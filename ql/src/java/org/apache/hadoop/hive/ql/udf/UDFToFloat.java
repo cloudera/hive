@@ -19,9 +19,15 @@
 package org.apache.hadoop.hive.ql.udf;
 
 import org.apache.hadoop.hive.ql.exec.UDF;
+import org.apache.hadoop.hive.ql.exec.vector.VectorizedExpressions;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.CastDecimalToDouble;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.CastLongToDouble;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.CastTimestampToDoubleViaLongToDouble;
 import org.apache.hadoop.hive.serde2.io.ByteWritable;
 import org.apache.hadoop.hive.serde2.io.DoubleWritable;
+import org.apache.hadoop.hive.serde2.io.HiveDecimalWritable;
 import org.apache.hadoop.hive.serde2.io.ShortWritable;
+import org.apache.hadoop.hive.serde2.io.TimestampWritable;
 import org.apache.hadoop.io.BooleanWritable;
 import org.apache.hadoop.io.FloatWritable;
 import org.apache.hadoop.io.IntWritable;
@@ -33,15 +39,17 @@ import org.apache.hadoop.io.Text;
  * UDFToFloat.
  *
  */
+@VectorizedExpressions({CastTimestampToDoubleViaLongToDouble.class, CastLongToDouble.class,
+    CastDecimalToDouble.class})
 public class UDFToFloat extends UDF {
-  private FloatWritable floatWritable = new FloatWritable();
+  private final FloatWritable floatWritable = new FloatWritable();
 
   public UDFToFloat() {
   }
 
   /**
    * Convert from void to a float. This is called for CAST(... AS FLOAT)
-   * 
+   *
    * @param i
    *          The void value to convert
    * @return FloatWritable
@@ -52,7 +60,7 @@ public class UDFToFloat extends UDF {
 
   /**
    * Convert from boolean to a float. This is called for CAST(... AS FLOAT)
-   * 
+   *
    * @param i
    *          The boolean value to convert
    * @return FloatWritable
@@ -68,7 +76,7 @@ public class UDFToFloat extends UDF {
 
   /**
    * Convert from byte to a float. This is called for CAST(... AS FLOAT)
-   * 
+   *
    * @param i
    *          The byte value to convert
    * @return FloatWritable
@@ -84,7 +92,7 @@ public class UDFToFloat extends UDF {
 
   /**
    * Convert from short to a float. This is called for CAST(... AS FLOAT)
-   * 
+   *
    * @param i
    *          The short value to convert
    * @return FloatWritable
@@ -100,7 +108,7 @@ public class UDFToFloat extends UDF {
 
   /**
    * Convert from integer to a float. This is called for CAST(... AS FLOAT)
-   * 
+   *
    * @param i
    *          The integer value to convert
    * @return FloatWritable
@@ -116,7 +124,7 @@ public class UDFToFloat extends UDF {
 
   /**
    * Convert from long to a float. This is called for CAST(... AS FLOAT)
-   * 
+   *
    * @param i
    *          The long value to convert
    * @return FloatWritable
@@ -132,7 +140,7 @@ public class UDFToFloat extends UDF {
 
   /**
    * Convert from double to a float. This is called for CAST(... AS FLOAT)
-   * 
+   *
    * @param i
    *          The double value to convert
    * @return FloatWritable
@@ -148,7 +156,7 @@ public class UDFToFloat extends UDF {
 
   /**
    * Convert from string to a float. This is called for CAST(... AS FLOAT)
-   * 
+   *
    * @param i
    *          The string value to convert
    * @return FloatWritable
@@ -165,6 +173,30 @@ public class UDFToFloat extends UDF {
         // But we decided to return NULL instead, which is more conservative.
         return null;
       }
+    }
+  }
+
+  public FloatWritable evaluate(TimestampWritable i) {
+    if (i == null) {
+      return null;
+    } else {
+      try {
+        floatWritable.set((float) i.getDouble());
+        return floatWritable;
+      } catch (NumberFormatException e) {
+        // MySQL returns 0 if the string is not a well-formed numeric value.
+        // But we decided to return NULL instead, which is more conservative.
+        return null;
+      }
+    }
+  }
+
+  public FloatWritable evaluate(HiveDecimalWritable i) {
+    if (i == null) {
+      return null;
+    } else {
+      floatWritable.set(i.getHiveDecimal().floatValue());
+      return floatWritable;
     }
   }
 

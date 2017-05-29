@@ -22,57 +22,46 @@ POSTHOOK: query: EXPLAIN
 SELECT minute('2009-08-07 13:14:15'), minute('13:14:15'), minute('2009-08-07')
 FROM src WHERE key = 86
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF src)) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_FUNCTION minute '2009-08-07 13:14:15')) (TOK_SELEXPR (TOK_FUNCTION minute '13:14:15')) (TOK_SELEXPR (TOK_FUNCTION minute '2009-08-07'))) (TOK_WHERE (= (TOK_TABLE_OR_COL key) 86))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        src 
+      Map Operator Tree:
           TableScan
             alias: src
+            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
-              predicate:
-                  expr: (key = 86)
-                  type: boolean
-              Filter Operator
-                predicate:
-                    expr: (key = 86)
-                    type: boolean
-                Select Operator
-                  expressions:
-                        expr: minute('2009-08-07 13:14:15')
-                        type: int
-                        expr: minute('13:14:15')
-                        type: int
-                        expr: minute('2009-08-07')
-                        type: int
-                  outputColumnNames: _col0, _col1, _col2
-                  File Output Operator
-                    compressed: false
-                    GlobalTableId: 0
-                    table:
-                        input format: org.apache.hadoop.mapred.TextInputFormat
-                        output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+              predicate: (UDFToDouble(key) = 86.0) (type: boolean)
+              Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+              Select Operator
+                expressions: 14 (type: int), 14 (type: int), null (type: void)
+                outputColumnNames: _col0, _col1, _col2
+                Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+                File Output Operator
+                  compressed: false
+                  Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+                  table:
+                      input format: org.apache.hadoop.mapred.TextInputFormat
+                      output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                      serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: SELECT minute('2009-08-07 13:14:15'), minute('13:14:15'), minute('2009-08-07')
 FROM src WHERE key = 86
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src
-PREHOOK: Output: file:/Users/carl/Projects/hd8/hive-trunk/build/ql/tmp/113919951/10000
+#### A masked pattern was here ####
 POSTHOOK: query: SELECT minute('2009-08-07 13:14:15'), minute('13:14:15'), minute('2009-08-07')
 FROM src WHERE key = 86
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@src
-POSTHOOK: Output: file:/Users/carl/Projects/hd8/hive-trunk/build/ql/tmp/113919951/10000
+#### A masked pattern was here ####
 14	14	NULL

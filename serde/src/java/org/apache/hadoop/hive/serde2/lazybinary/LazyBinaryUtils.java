@@ -18,12 +18,11 @@
 package org.apache.hadoop.hive.serde2.lazybinary;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.hive.serde2.ByteStream.Output;
+import org.apache.hadoop.hive.serde2.ByteStream.RandomAccessOutput;
+import org.apache.hadoop.hive.serde2.io.TimestampWritable;
 import org.apache.hadoop.hive.serde2.lazybinary.objectinspector.LazyBinaryObjectInspectorFactory;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Category;
@@ -35,6 +34,7 @@ import org.apache.hadoop.hive.serde2.typeinfo.MapTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.StructTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.UnionTypeInfo;
 import org.apache.hadoop.io.WritableUtils;
 
 /**
@@ -42,8 +42,6 @@ import org.apache.hadoop.io.WritableUtils;
  *
  */
 public final class LazyBinaryUtils {
-
-  private static Log LOG = LogFactory.getLog(LazyBinaryUtils.class.getName());
 
   /**
    * Convert the byte array to an int starting from the given offset. Refer to
@@ -122,8 +120,6 @@ public final class LazyBinaryUtils {
     }
   }
 
-  static VInt vInt = new LazyBinaryUtils.VInt();
-
   /**
    * Check a particular field and set its size and offset in bytes based on the
    * field type and the bytes arrays.
@@ -133,6 +129,8 @@ public final class LazyBinaryUtils {
    * bytes are used to store the size. So the offset is 4 and the size is
    * computed by concating the first four bytes together. The first four bytes
    * are defined with respect to the offset in the bytes arrays.
+   * For timestamp, if the first bit is 0, the record length is 4, otherwise
+   * a VInt begins at the 5th byte and its length is added to 4.
    *
    * @param objectInspector
    *          object inspector of the field
@@ -144,7 +142,7 @@ public final class LazyBinaryUtils {
    *          modify this byteinfo object and return it
    */
   public static void checkObjectByteInfo(ObjectInspector objectInspector,
-      byte[] bytes, int offset, RecordInfo recordInfo) {
+      byte[] bytes, int offset, RecordInfo recordInfo, VInt vInt) {
     Category category = objectInspector.getCategory();
     switch (category) {
     case PRIMITIVE:
@@ -186,6 +184,34 @@ public final class LazyBinaryUtils {
         recordInfo.elementOffset = vInt.length;
         recordInfo.elementSize = vInt.value;
         break;
+      case CHAR:
+      case VARCHAR:
+        LazyBinaryUtils.readVInt(bytes, offset, vInt);
+        recordInfo.elementOffset = vInt.length;
+        recordInfo.elementSize = vInt.value;
+        break;
+      case BINARY:
+        // using vint instead of 4 bytes
+        LazyBinaryUtils.readVInt(bytes, offset, vInt);
+        recordInfo.elementOffset = vInt.length;
+        recordInfo.elementSize = vInt.value;
+        break;
+      case DATE:
+        recordInfo.elementOffset = 0;
+        recordInfo.elementSize = WritableUtils.decodeVIntSize(bytes[offset]);
+        break;
+      case TIMESTAMP:
+        recordInfo.elementOffset = 0;
+        recordInfo.elementSize = TimestampWritable.getTotalLength(bytes, offset);
+        break;
+      case DECIMAL:
+        // using vint instead of 4 bytes
+        LazyBinaryUtils.readVInt(bytes, offset, vInt);
+        recordInfo.elementOffset = 0;
+        recordInfo.elementSize = vInt.length;
+        LazyBinaryUtils.readVInt(bytes, offset + vInt.length, vInt);
+        recordInfo.elementSize += vInt.length + vInt.value;
+        break;
       default: {
         throw new RuntimeException("Unrecognized primitive type: "
             + primitiveCategory);
@@ -195,6 +221,7 @@ public final class LazyBinaryUtils {
     case LIST:
     case MAP:
     case STRUCT:
+    case UNION:
       recordInfo.elementOffset = 4;
       recordInfo.elementSize = LazyBinaryUtils.byteArrayToInt(bytes, offset);
       break;
@@ -256,6 +283,13 @@ public final class LazyBinaryUtils {
     public byte length;
   };
 
+  public static final ThreadLocal<VInt> threadLocalVInt = new ThreadLocal<VInt>() {
+    @Override
+    protected VInt initialValue() {
+      return new VInt();
+    }
+  };
+
   /**
    * Reads a zero-compressed encoded int from a byte array and returns it.
    *
@@ -290,22 +324,48 @@ public final class LazyBinaryUtils {
    * @param i
    *          the int
    */
-  public static void writeVInt(Output byteStream, int i) {
+  public static void writeVInt(RandomAccessOutput byteStream, int i) {
     writeVLong(byteStream, i);
+  }
+
+  /**
+   * Read a zero-compressed encoded long from a byte array.
+   *
+   * @param bytes the byte array
+   * @param offset the offset in the byte array where the VLong is stored
+   * @return the long
+   */
+  public static long readVLongFromByteArray(final byte[] bytes, int offset) {
+    byte firstByte = bytes[offset++];
+    int len = WritableUtils.decodeVIntSize(firstByte);
+    if (len == 1) {
+      return firstByte;
+    }
+    long i = 0;
+    for (int idx = 0; idx < len-1; idx++) {
+      byte b = bytes[offset++];
+      i = i << 8;
+      i = i | (b & 0xFF);
+    }
+    return (WritableUtils.isNegativeVInt(firstByte) ? ~i : i);
   }
 
   /**
    * Write a zero-compressed encoded long to a byte array.
    *
-   * @param byteStream
+   * @param bytes
    *          the byte array/stream
    * @param l
    *          the long
    */
-  public static void writeVLong(Output byteStream, long l) {
+  public static int writeVLongToByteArray(byte[] bytes, long l) {
+    return LazyBinaryUtils.writeVLongToByteArray(bytes, 0, l);
+  }
+
+  public static int writeVLongToByteArray(byte[] bytes, int offset, long l) {
     if (l >= -112 && l <= 127) {
-      byteStream.write((byte) l);
-      return;
+      bytes[offset] = (byte) l;
+      return 1;
     }
 
     int len = -112;
@@ -320,18 +380,45 @@ public final class LazyBinaryUtils {
       len--;
     }
 
-    byteStream.write((byte) len);
+    bytes[offset] = (byte) len;
 
     len = (len < -120) ? -(len + 120) : -(len + 112);
 
     for (int idx = len; idx != 0; idx--) {
       int shiftbits = (idx - 1) * 8;
       long mask = 0xFFL << shiftbits;
-      byteStream.write((byte) ((l & mask) >> shiftbits));
+      bytes[offset+1-(idx - len)] = (byte) ((l & mask) >> shiftbits);
     }
+    return 1 + len;
   }
 
-  static HashMap<TypeInfo, ObjectInspector> cachedLazyBinaryObjectInspector = new HashMap<TypeInfo, ObjectInspector>();
+  private static ThreadLocal<byte[]> vLongBytesThreadLocal = new ThreadLocal<byte[]>() {
+    @Override
+    public byte[] initialValue() {
+      return new byte[9];
+    }
+  };
+
+  public static void writeVLong(RandomAccessOutput byteStream, long l) {
+    byte[] vLongBytes = vLongBytesThreadLocal.get();
+    int len = LazyBinaryUtils.writeVLongToByteArray(vLongBytes, l);
+    byteStream.write(vLongBytes, 0, len);
+  }
+  
+  public static void writeDouble(RandomAccessOutput byteStream, double d) {
+    long v = Double.doubleToLongBits(d);
+    byteStream.write((byte) (v >> 56));
+    byteStream.write((byte) (v >> 48));
+    byteStream.write((byte) (v >> 40));
+    byteStream.write((byte) (v >> 32));
+    byteStream.write((byte) (v >> 24));
+    byteStream.write((byte) (v >> 16));
+    byteStream.write((byte) (v >> 8));
+    byteStream.write((byte) (v));
+  }
+
+  static ConcurrentHashMap<TypeInfo, ObjectInspector> cachedLazyBinaryObjectInspector =
+      new ConcurrentHashMap<TypeInfo, ObjectInspector>();
 
   /**
    * Returns the lazy binary object inspector that can be used to inspect an
@@ -346,8 +433,7 @@ public final class LazyBinaryUtils {
       switch (typeInfo.getCategory()) {
       case PRIMITIVE: {
         result = PrimitiveObjectInspectorFactory
-            .getPrimitiveWritableObjectInspector(((PrimitiveTypeInfo) typeInfo)
-            .getPrimitiveCategory());
+            .getPrimitiveWritableObjectInspector(((PrimitiveTypeInfo) typeInfo));
         break;
       }
       case LIST: {
@@ -385,11 +471,29 @@ public final class LazyBinaryUtils {
             fieldObjectInspectors);
         break;
       }
+      case UNION: {
+        UnionTypeInfo unionTypeInfo = (UnionTypeInfo) typeInfo;
+        final List<TypeInfo> fieldTypeInfos = unionTypeInfo.getAllUnionObjectTypeInfos();
+        List<ObjectInspector> fieldObjectInspectors = new ArrayList<ObjectInspector>(
+          fieldTypeInfos.size());
+        for (int i = 0; i < fieldTypeInfos.size(); i++) {
+          fieldObjectInspectors
+            .add(getLazyBinaryObjectInspectorFromTypeInfo(fieldTypeInfos
+                                                            .get(i)));
+        }
+        result = LazyBinaryObjectInspectorFactory
+            .getLazyBinaryUnionObjectInspector(fieldObjectInspectors);
+        break;
+      }
       default: {
         result = null;
       }
       }
-      cachedLazyBinaryObjectInspector.put(typeInfo, result);
+      ObjectInspector prev =
+        cachedLazyBinaryObjectInspector.putIfAbsent(typeInfo, result);
+      if (prev != null) {
+        result = prev;
+      }
     }
     return result;
   }

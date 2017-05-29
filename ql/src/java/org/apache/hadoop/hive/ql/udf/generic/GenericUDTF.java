@@ -18,9 +18,13 @@
 
 package org.apache.hadoop.hive.ql.udf.generic;
 
+import java.util.List;
+
+import org.apache.hadoop.hive.ql.exec.MapredContext;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentException;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.StructField;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
 
 /**
@@ -34,22 +38,44 @@ public abstract class GenericUDTF {
   Collector collector = null;
 
   /**
+   * Additionally setup GenericUDTF with MapredContext before initializing.
+   * This is only called in runtime of MapRedTask.
+   *
+   * @param context context
+   */
+  public void configure(MapredContext mapredContext) {
+  }
+
+  public StructObjectInspector initialize(StructObjectInspector argOIs)
+      throws UDFArgumentException {
+    List<? extends StructField> inputFields = argOIs.getAllStructFieldRefs();
+    ObjectInspector[] udtfInputOIs = new ObjectInspector[inputFields.size()];
+    for (int i = 0; i < inputFields.size(); i++) {
+      udtfInputOIs[i] = inputFields.get(i).getFieldObjectInspector();
+    }
+    return initialize(udtfInputOIs);
+  }
+
+  /**
    * Initialize this GenericUDTF. This will be called only once per instance.
    *
-   * @param args
+   * @param argOIs
    *          An array of ObjectInspectors for the arguments
    * @return A StructObjectInspector for output. The output struct represents a
    *         row of the table where the fields of the stuct are the columns. The
    *         field names are unimportant as they will be overridden by user
    *         supplied column aliases.
    */
-  public abstract StructObjectInspector initialize(ObjectInspector[] argOIs)
-      throws UDFArgumentException;
+  @Deprecated
+  public StructObjectInspector initialize(ObjectInspector[] argOIs)
+      throws UDFArgumentException {
+    throw new IllegalStateException("Should not be called directly");
+  }
 
   /**
    * Give a set of arguments for the UDTF to process.
    *
-   * @param o
+   * @param args
    *          object array of arguments
    */
   public abstract void process(Object[] args) throws HiveException;

@@ -18,16 +18,13 @@
 package org.apache.hadoop.hive.serde2.lazy;
 
 import org.apache.hadoop.hive.serde2.lazy.objectinspector.LazyUnionObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
-import org.apache.hadoop.io.Text;
 
 /**
  * LazyObject for storing a union. The field of a union can be primitive or
  * non-primitive.
  *
  */
-public class LazyUnion extends
-    LazyNonPrimitive<LazyUnionObjectInspector> {
+public class LazyUnion extends LazyNonPrimitive<LazyUnionObjectInspector> {
   /**
    * Whether the data is already parsed or not.
    */
@@ -41,7 +38,7 @@ public class LazyUnion extends
   /**
    * The object of the union.
    */
-  private LazyObject<? extends ObjectInspector> field;
+  private Object field;
 
   /**
    * Tag of the Union
@@ -54,10 +51,23 @@ public class LazyUnion extends
   private boolean fieldInited = false;
 
   /**
+   * Whether the field has been set or not
+   * */
+  private boolean fieldSet = false;
+
+  /**
    * Construct a LazyUnion object with the ObjectInspector.
    */
   public LazyUnion(LazyUnionObjectInspector oi) {
     super(oi);
+  }
+
+  // exceptional use case for avro
+  public LazyUnion(LazyUnionObjectInspector oi, byte tag, Object field) {
+    super(oi);
+    this.field = field;
+    this.tag = tag;
+    fieldSet = true;
   }
 
   /**
@@ -123,18 +133,20 @@ public class LazyUnion extends
    *
    * @return The value of the field
    */
+  @SuppressWarnings("rawtypes")
   private Object uncheckedGetField() {
-    Text nullSequence = oi.getNullSequence();
-    int fieldLength = start + length - startPosition;
-    if (fieldLength != 0 && fieldLength == nullSequence.getLength() &&
-        LazyUtils.compare(bytes.getData(), startPosition, fieldLength,
-        nullSequence.getBytes(), 0, nullSequence.getLength()) == 0) {
-      return null;
+    LazyObject field = (LazyObject) this.field;
+    if (fieldInited) {
+      return field.getObject();
     }
+    fieldInited = true;
 
-    if (!fieldInited) {
-      fieldInited = true;
-      field.init(bytes, startPosition, fieldLength);
+    int fieldStart = startPosition;
+    int fieldLength = start + length - startPosition;
+    if (isNull(oi.getNullSequence(), bytes, fieldStart, fieldLength)) {
+      field.setNull();
+    } else {
+      field.init(bytes, fieldStart, fieldLength);
     }
     return field.getObject();
   }
@@ -145,6 +157,10 @@ public class LazyUnion extends
    * @return The field as a LazyObject
    */
   public Object getField() {
+    if (fieldSet) {
+      return field;
+    }
+
     if (!parsed) {
       parse();
     }
@@ -157,6 +173,10 @@ public class LazyUnion extends
    * @return The tag byte
    */
   public byte getTag() {
+    if (fieldSet) {
+      return tag;
+    }
+
     if (!parsed) {
       parse();
     }

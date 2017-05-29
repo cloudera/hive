@@ -18,21 +18,24 @@
 
 package org.apache.hadoop.hive.ql.plan;
 
-import java.io.Serializable;
 
 /**
  * unionDesc is a empty class currently. However, union has more than one input
  * (as compared with forward), and therefore, we need a separate class.
  **/
 @Explain(displayName = "Union")
-public class UnionDesc implements Serializable {
+public class UnionDesc extends AbstractOperatorDesc {
   private static final long serialVersionUID = 1L;
-
   private transient int numInputs;
+  // If this UnionOperator is inside the reduce side of an MR job generated
+  // by Correlation Optimizer, which means all inputs of this UnionOperator are
+  // from DemuxOperator. If so, we should not touch this UnionOperator in genMapRedTasks.
+  private transient boolean allInputsInSameReducer;
 
   @SuppressWarnings("nls")
   public UnionDesc() {
     numInputs = 2;
+    allInputsInSameReducer = false;
   }
 
   /**
@@ -48,5 +51,13 @@ public class UnionDesc implements Serializable {
    */
   public void setNumInputs(int numInputs) {
     this.numInputs = numInputs;
+  }
+
+  public boolean isAllInputsInSameReducer() {
+    return allInputsInSameReducer;
+  }
+
+  public void setAllInputsInSameReducer(boolean allInputsInSameReducer) {
+    this.allInputsInSameReducer = allInputsInSameReducer;
   }
 }

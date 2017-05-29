@@ -19,7 +19,7 @@
 package org.apache.hadoop.hive.ql.plan;
 
 import java.io.Serializable;
-import java.util.HashMap;
+import java.util.Map;
 
 import org.apache.hadoop.fs.Path;
 
@@ -29,17 +29,25 @@ import org.apache.hadoop.fs.Path;
  */
 @Explain(displayName = "Describe Table")
 public class DescTableDesc extends DDLDesc implements Serializable {
-  public void setPartSpec(HashMap<String, String> partSpec) {
+  public void setPartSpec(Map<String, String> partSpec) {
     this.partSpec = partSpec;
   }
 
   private static final long serialVersionUID = 1L;
 
   String tableName;
-  HashMap<String, String> partSpec;
+  Map<String, String> partSpec;
   String resFile;
+
+  String colPath;
   boolean isExt;
   boolean isFormatted;
+
+  /** Show pretty output?  This has more human-readable formatting than
+   * isFormatted mode.
+   */
+  private boolean isPretty;
+
   /**
    * table name for the result of describe table.
    */
@@ -48,6 +56,9 @@ public class DescTableDesc extends DDLDesc implements Serializable {
    * thrift ddl for the result of describe table.
    */
   private static final String schema = "col_name,data_type,comment#string:string:string";
+  private static final String colStatsSchema = "col_name,data_type,min,max,num_nulls,"
+      + "distinct_count,avg_col_len,max_col_len,num_trues,num_falses,comment"
+      + "#string:string:string:string:string:string:string:string:string:string:string";
 
   public DescTableDesc() {
   }
@@ -58,19 +69,24 @@ public class DescTableDesc extends DDLDesc implements Serializable {
    * @param tableName
    */
   public DescTableDesc(Path resFile, String tableName,
-      HashMap<String, String> partSpec) {
+      Map<String, String> partSpec, String colPath) {
     this.isExt = false;
     this.isFormatted = false;
+    this.isPretty = false;
     this.partSpec = partSpec;
     this.resFile = resFile.toString();
     this.tableName = tableName;
+    this.colPath = colPath;
   }
 
   public String getTable() {
     return table;
   }
 
-  public static String getSchema() {
+  public static String getSchema(boolean colStats) {
+    if (colStats) {
+      return colStatsSchema;
+    }
     return schema;
   }
 
@@ -89,7 +105,7 @@ public class DescTableDesc extends DDLDesc implements Serializable {
     this.isExt = isExt;
   }
 
-    /**
+  /**
    * @return the isFormatted
    */
   public boolean isFormatted() {
@@ -97,11 +113,19 @@ public class DescTableDesc extends DDLDesc implements Serializable {
   }
 
   /**
-   * @param isFormatted
+   * @param isFormat
    *          the isFormat to set
    */
   public void setFormatted(boolean isFormat) {
     this.isFormatted = isFormat;
+  }
+
+  public boolean isPretty() {
+    return this.isPretty;
+  }
+
+  public void setPretty(boolean isPretty) {
+    this.isPretty = isPretty;
   }
 
   /**
@@ -121,10 +145,25 @@ public class DescTableDesc extends DDLDesc implements Serializable {
   }
 
   /**
+   * @param colPath
+   *          the colPath to set
+   */
+  public void setColPath(String colPath) {
+    this.colPath = colPath;
+  }
+
+  /**
+   * @return the columnPath
+   */
+  public String getColumnPath() {
+    return colPath;
+  }
+
+  /**
    * @return the partSpec
    */
   @Explain(displayName = "partition")
-  public HashMap<String, String> getPartSpec() {
+  public Map<String, String> getPartSpec() {
     return partSpec;
   }
 
@@ -132,7 +171,7 @@ public class DescTableDesc extends DDLDesc implements Serializable {
    * @param partSpec
    *          the partSpec to set
    */
-  public void setPartSpecs(HashMap<String, String> partSpec) {
+  public void setPartSpecs(Map<String, String> partSpec) {
     this.partSpec = partSpec;
   }
 

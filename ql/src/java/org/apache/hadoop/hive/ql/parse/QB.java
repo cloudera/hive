@@ -19,12 +19,17 @@
 package org.apache.hadoop.hive.ql.parse;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.hive.ql.plan.CreateTableDesc;
 
 /**
@@ -42,13 +47,49 @@ public class QB {
   private int numSelDi = 0;
   private HashMap<String, String> aliasToTabs;
   private HashMap<String, QBExpr> aliasToSubq;
+  private HashMap<String, Map<String, String>> aliasToProps;
   private List<String> aliases;
   private QBParseInfo qbp;
   private QBMetaData qbm;
   private QBJoinTree qbjoin;
   private String id;
   private boolean isQuery;
+  private boolean isAnalyzeRewrite;
   private CreateTableDesc tblDesc = null; // table descriptor of the final
+  private CreateTableDesc localDirectoryDesc = null ;
+  private List<Path> encryptedTargetTablePaths;
+
+  // used by PTFs
+  /*
+   * This map maintains the PTFInvocationSpec for each PTF chain invocation in this QB.
+   */
+  private HashMap<ASTNode, PTFInvocationSpec> ptfNodeToSpec;
+  /*
+   * the WindowingSpec used for windowing clauses in this QB.
+   */
+  private HashMap<String, WindowingSpec> destToWindowingSpec;
+
+  /*
+   * If this QB represents a  SubQuery predicate then this will point to the SubQuery object.
+   */
+  private QBSubQuery subQueryPredicateDef;
+
+  /*
+   * used to give a unique name to each SubQuery QB Currently there can be at
+   * most 2 SubQueries in a Query: 1 in the Where clause, and 1 in the Having
+   * clause.
+   */
+  private int numSubQueryPredicates;
+
+  /*
+   * for now a top level QB can have 1 where clause SQ predicate.
+   */
+  private QBSubQuery whereClauseSubQueryPredicate;
+
+  /*
+   * for now a top level QB can have 1 where clause SQ predicate.
+   */
+  private QBSubQuery havingClauseSubQueryPredicate;
 
   // results
 
@@ -66,15 +107,37 @@ public class QB {
   }
 
   public QB(String outer_id, String alias, boolean isSubQ) {
-    aliasToTabs = new HashMap<String, String>();
-    aliasToSubq = new HashMap<String, QBExpr>();
+    // Must be deterministic order maps - see HIVE-8707
+    aliasToTabs = new LinkedHashMap<String, String>();
+    aliasToSubq = new LinkedHashMap<String, QBExpr>();
+    aliasToProps = new LinkedHashMap<String, Map<String, String>>();
     aliases = new ArrayList<String>();
     if (alias != null) {
       alias = alias.toLowerCase();
     }
     qbp = new QBParseInfo(alias, isSubQ);
     qbm = new QBMetaData();
-    id = (outer_id == null ? alias : outer_id + ":" + alias);
+    // Must be deterministic order maps - see HIVE-8707
+    ptfNodeToSpec = new LinkedHashMap<ASTNode, PTFInvocationSpec>();
+    destToWindowingSpec = new LinkedHashMap<String, WindowingSpec>();
+    id = getAppendedAliasFromId(outer_id, alias);
+  }
+
+  // For sub-queries, the id. and alias should be appended since same aliases can be re-used
+  // within different sub-queries.
+  // For a query like:
+  // select ...
+  //   (select * from T1 a where ...) subq1
+  //  join
+  //   (select * from T2 a where ...) subq2
+  // ..
+  // the alias is modified to subq1:a and subq2:a from a, to identify the right sub-query.
+  public static String getAppendedAliasFromId(String outer_id, String alias) {
+    return (outer_id == null ? alias : outer_id + ":" + alias);
+  }
+
+  public String getAlias() {
+    return qbp.getAlias();
   }
 
   public QBParseInfo getParseInfo() {
@@ -112,6 +175,10 @@ public class QB {
 
   public void setSubqAlias(String alias, QBExpr qbexpr) {
     aliasToSubq.put(alias.toLowerCase(), qbexpr);
+  }
+
+  public void setTabProps(String alias, Map<String, String> props) {
+    aliasToProps.put(alias.toLowerCase(), props);
   }
 
   public void addAlias(String alias) {
@@ -160,11 +227,19 @@ public class QB {
     return aliasToTabs.get(alias.toLowerCase());
   }
 
+  public Map<String, String> getTabPropsForAlias(String alias) {
+    return aliasToProps.get(alias.toLowerCase());
+  }
+
   public void rewriteViewToSubq(String alias, String viewName, QBExpr qbexpr) {
     alias = alias.toLowerCase();
     String tableName = aliasToTabs.remove(alias);
     assert (viewName.equals(tableName));
     aliasToSubq.put(alias, qbexpr);
+  }
+
+  public void rewriteCTEToSubq(String alias, String cteName, QBExpr qbexpr) {
+    rewriteViewToSubq(alias, cteName, qbexpr);
   }
 
   public QBJoinTree getQbJoinTree() {
@@ -183,8 +258,26 @@ public class QB {
     return isQuery;
   }
 
-  public boolean isSelectStarQuery() {
-    return qbp.isSelectStarQuery() && aliasToSubq.isEmpty() && !isCTAS() && !qbp.isAnalyzeCommand();
+  // to decide whether to rewrite RR of subquery
+  public boolean isTopLevelSelectStarQuery() {
+    return !isCTAS() && qbp.isTopLevelSimpleSelectStarQuery();
+  }
+
+  // to find target for fetch task conversion optimizer (not allows subqueries)
+  public boolean isSimpleSelectQuery() {
+    if (!qbp.isSimpleSelectQuery() || isCTAS() || qbp.isAnalyzeCommand()) {
+      return false;
+    }
+    for (QBExpr qbexpr : aliasToSubq.values()) {
+      if (!qbexpr.isSimpleSelectQuery()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  public boolean hasTableSample(String alias) {
+    return qbp.getTabSample(alias) != null;
   }
 
   public CreateTableDesc getTableDesc() {
@@ -195,10 +288,122 @@ public class QB {
     tblDesc = desc;
   }
 
+  public CreateTableDesc getLLocalDirectoryDesc() {
+    return localDirectoryDesc;
+  }
+
+  public void setLocalDirectoryDesc(CreateTableDesc localDirectoryDesc) {
+    this.localDirectoryDesc = localDirectoryDesc;
+  }
+
   /**
    * Whether this QB is for a CREATE-TABLE-AS-SELECT.
    */
   public boolean isCTAS() {
     return tblDesc != null;
+  }
+
+  /**
+   * Retrieve skewed column name for a table.
+   * @param alias table alias
+   * @return
+   */
+  public List<String> getSkewedColumnNames(String alias) {
+    List<String> skewedColNames = null;
+    if (null != qbm &&
+        null != qbm.getAliasToTable() &&
+            qbm.getAliasToTable().size() > 0) {
+      Table tbl = getMetaData().getTableForAlias(alias);
+      skewedColNames = tbl.getSkewedColNames();
+    }
+    return skewedColNames;
+
+  }
+
+  public boolean isAnalyzeRewrite() {
+    return isAnalyzeRewrite;
+  }
+
+  public void setAnalyzeRewrite(boolean isAnalyzeRewrite) {
+    this.isAnalyzeRewrite = isAnalyzeRewrite;
+  }
+
+  public PTFInvocationSpec getPTFInvocationSpec(ASTNode node) {
+    return ptfNodeToSpec == null ? null : ptfNodeToSpec.get(node);
+  }
+
+  public void addPTFNodeToSpec(ASTNode node, PTFInvocationSpec spec) {
+    // Must be deterministic order map - see HIVE-8707
+    ptfNodeToSpec = ptfNodeToSpec == null ? new LinkedHashMap<ASTNode, PTFInvocationSpec>() : ptfNodeToSpec;
+    ptfNodeToSpec.put(node, spec);
+  }
+
+  public HashMap<ASTNode, PTFInvocationSpec> getPTFNodeToSpec() {
+    return ptfNodeToSpec;
+  }
+
+  public WindowingSpec getWindowingSpec(String dest) {
+    return destToWindowingSpec.get(dest);
+  }
+
+  public void addDestToWindowingSpec(String dest, WindowingSpec windowingSpec) {
+    destToWindowingSpec.put(dest, windowingSpec);
+  }
+
+  public boolean hasWindowingSpec(String dest) {
+    return destToWindowingSpec.get(dest) != null;
+  }
+
+  public HashMap<String, WindowingSpec> getAllWindowingSpecs() {
+    return destToWindowingSpec;
+  }
+
+  protected void setSubQueryDef(QBSubQuery subQueryPredicateDef) {
+    this.subQueryPredicateDef = subQueryPredicateDef;
+  }
+
+  protected QBSubQuery getSubQueryPredicateDef() {
+    return subQueryPredicateDef;
+  }
+
+  protected int getNumSubQueryPredicates() {
+    return numSubQueryPredicates;
+  }
+
+  protected int incrNumSubQueryPredicates() {
+    return ++numSubQueryPredicates;
+  }
+
+  void setWhereClauseSubQueryPredicate(QBSubQuery sq) {
+    whereClauseSubQueryPredicate = sq;
+  }
+
+  public QBSubQuery getWhereClauseSubQueryPredicate() {
+    return whereClauseSubQueryPredicate;
+  }
+
+  void setHavingClauseSubQueryPredicate(QBSubQuery sq) {
+    havingClauseSubQueryPredicate = sq;
+  }
+
+  public QBSubQuery getHavingClauseSubQueryPredicate() {
+    return havingClauseSubQueryPredicate;
+  }
+
+  void addEncryptedTargetTablePath(Path p) {
+    if(encryptedTargetTablePaths == null) {
+      encryptedTargetTablePaths = new ArrayList<>();
+    }
+    encryptedTargetTablePaths.add(p);
+  }
+  /**
+   * List of dbName.tblName of encrypted target tables of insert statement
+   * Used to support Insert ... values(...)
+   */
+  List<Path> getEncryptedTargetTablePaths() {
+    if(encryptedTargetTablePaths == null) {
+      return Collections.emptyList();
+    }
+    return encryptedTargetTablePaths;
   }
 }

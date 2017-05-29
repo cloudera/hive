@@ -1,21 +1,29 @@
-PREHOOK: query: create table t1 as select cast(key as int) key, value from src where key <= 10
+PREHOOK: query: -- SORT_QUERY_RESULTS
+
+create table t1 as select cast(key as int) key, value from src where key <= 10
 PREHOOK: type: CREATETABLE_AS_SELECT
 PREHOOK: Input: default@src
-POSTHOOK: query: create table t1 as select cast(key as int) key, value from src where key <= 10
+PREHOOK: Output: database:default
+PREHOOK: Output: default@t1
+POSTHOOK: query: -- SORT_QUERY_RESULTS
+
+create table t1 as select cast(key as int) key, value from src where key <= 10
 POSTHOOK: type: CREATETABLE_AS_SELECT
 POSTHOOK: Input: default@src
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@t1
 PREHOOK: query: select * from t1 sort by key
 PREHOOK: type: QUERY
 PREHOOK: Input: default@t1
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-00-19_046_3895376692139653549/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select * from t1 sort by key
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@t1
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-00-19_046_3895376692139653549/-mr-10000
+#### A masked pattern was here ####
 0	val_0
 0	val_0
 0	val_0
+10	val_10
 2	val_2
 4	val_4
 5	val_5
@@ -23,57 +31,69 @@ POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongq
 5	val_5
 8	val_8
 9	val_9
-10	val_10
 PREHOOK: query: create table t2 as select cast(2*key as int) key, value from t1
 PREHOOK: type: CREATETABLE_AS_SELECT
 PREHOOK: Input: default@t1
+PREHOOK: Output: database:default
+PREHOOK: Output: default@t2
 POSTHOOK: query: create table t2 as select cast(2*key as int) key, value from t1
 POSTHOOK: type: CREATETABLE_AS_SELECT
 POSTHOOK: Input: default@t1
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@t2
 PREHOOK: query: select * from t2 sort by key
 PREHOOK: type: QUERY
 PREHOOK: Input: default@t2
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-00-35_454_4705187275126291053/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select * from t2 sort by key
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@t2
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-00-35_454_4705187275126291053/-mr-10000
+#### A masked pattern was here ####
 0	val_0
 0	val_0
 0	val_0
-4	val_2
-8	val_4
 10	val_5
 10	val_5
 10	val_5
 16	val_8
 18	val_9
 20	val_10
+4	val_2
+8	val_4
 PREHOOK: query: create table t3 as select * from (select * from t1 union all select * from t2) b
 PREHOOK: type: CREATETABLE_AS_SELECT
 PREHOOK: Input: default@t1
 PREHOOK: Input: default@t2
+PREHOOK: Output: database:default
+PREHOOK: Output: default@t3
 POSTHOOK: query: create table t3 as select * from (select * from t1 union all select * from t2) b
 POSTHOOK: type: CREATETABLE_AS_SELECT
 POSTHOOK: Input: default@t1
 POSTHOOK: Input: default@t2
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@t3
 PREHOOK: query: select * from t3 sort by key, value
 PREHOOK: type: QUERY
 PREHOOK: Input: default@t3
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-00-56_521_5858394420847642107/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select * from t3 sort by key, value
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@t3
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-00-56_521_5858394420847642107/-mr-10000
+#### A masked pattern was here ####
 0	val_0
 0	val_0
 0	val_0
 0	val_0
 0	val_0
 0	val_0
+10	val_10
+10	val_5
+10	val_5
+10	val_5
+16	val_8
+18	val_9
 2	val_2
+20	val_10
 4	val_2
 4	val_4
 5	val_5
@@ -82,526 +102,428 @@ POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongq
 8	val_4
 8	val_8
 9	val_9
-10	val_10
-10	val_5
-10	val_5
-10	val_5
-16	val_8
-18	val_9
-20	val_10
 PREHOOK: query: create table t4 (key int, value string)
 PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:default
+PREHOOK: Output: default@t4
 POSTHOOK: query: create table t4 (key int, value string)
 POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@t4
 PREHOOK: query: select * from t4
 PREHOOK: type: QUERY
 PREHOOK: Input: default@t4
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-01-05_957_5547541419038535698/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select * from t4
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@t4
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-01-05_957_5547541419038535698/-mr-10000
+#### A masked pattern was here ####
 PREHOOK: query: explain select * from t1 a left semi join t2 b on a.key=b.key sort by a.key, a.value
 PREHOOK: type: QUERY
 POSTHOOK: query: explain select * from t1 a left semi join t2 b on a.key=b.key sort by a.key, a.value
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_LEFTSEMIJOIN (TOK_TABREF t1 a) (TOK_TABREF t2 b) (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL b) key)))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR TOK_ALLCOLREF)) (TOK_SORTBY (TOK_TABSORTCOLNAMEASC (. (TOK_TABLE_OR_COL a) key)) (TOK_TABSORTCOLNAMEASC (. (TOK_TABLE_OR_COL a) value)))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
   Stage-2 depends on stages: Stage-1
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-2
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        a 
+      Map Operator Tree:
           TableScan
             alias: a
-            Reduce Output Operator
-              key expressions:
-                    expr: key
-                    type: int
-              sort order: +
-              Map-reduce partition columns:
-                    expr: key
-                    type: int
-              tag: 0
-              value expressions:
-                    expr: key
-                    type: int
-                    expr: value
-                    type: string
-        b 
+            Statistics: Num rows: 11 Data size: 79 Basic stats: COMPLETE Column stats: NONE
+            Filter Operator
+              predicate: key is not null (type: boolean)
+              Statistics: Num rows: 6 Data size: 43 Basic stats: COMPLETE Column stats: NONE
+              Reduce Output Operator
+                key expressions: key (type: int)
+                sort order: +
+                Map-reduce partition columns: key (type: int)
+                Statistics: Num rows: 6 Data size: 43 Basic stats: COMPLETE Column stats: NONE
+                value expressions: value (type: string)
           TableScan
             alias: b
-            Select Operator
-              expressions:
-                    expr: key
-                    type: int
-              outputColumnNames: key
-              Group By Operator
-                bucketGroup: false
-                keys:
-                      expr: key
-                      type: int
-                mode: hash
-                outputColumnNames: _col0
-                Reduce Output Operator
-                  key expressions:
-                        expr: _col0
-                        type: int
-                  sort order: +
-                  Map-reduce partition columns:
-                        expr: _col0
-                        type: int
-                  tag: 1
+            Statistics: Num rows: 11 Data size: 84 Basic stats: COMPLETE Column stats: NONE
+            Filter Operator
+              predicate: key is not null (type: boolean)
+              Statistics: Num rows: 6 Data size: 45 Basic stats: COMPLETE Column stats: NONE
+              Select Operator
+                expressions: key (type: int)
+                outputColumnNames: key
+                Statistics: Num rows: 6 Data size: 45 Basic stats: COMPLETE Column stats: NONE
+                Group By Operator
+                  keys: key (type: int)
+                  mode: hash
+                  outputColumnNames: _col0
+                  Statistics: Num rows: 6 Data size: 45 Basic stats: COMPLETE Column stats: NONE
+                  Reduce Output Operator
+                    key expressions: _col0 (type: int)
+                    sort order: +
+                    Map-reduce partition columns: _col0 (type: int)
+                    Statistics: Num rows: 6 Data size: 45 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
         Join Operator
           condition map:
                Left Semi Join 0 to 1
-          condition expressions:
-            0 {VALUE._col0} {VALUE._col1}
-            1 
-          handleSkewJoin: false
+          keys:
+            0 key (type: int)
+            1 _col0 (type: int)
           outputColumnNames: _col0, _col1
-          Select Operator
-            expressions:
-                  expr: _col0
-                  type: int
-                  expr: _col1
-                  type: string
-            outputColumnNames: _col0, _col1
-            File Output Operator
-              compressed: false
-              GlobalTableId: 0
-              table:
-                  input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-                  output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+          Statistics: Num rows: 6 Data size: 47 Basic stats: COMPLETE Column stats: NONE
+          File Output Operator
+            compressed: false
+            table:
+                input format: org.apache.hadoop.mapred.SequenceFileInputFormat
+                output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe
 
   Stage: Stage-2
     Map Reduce
-      Alias -> Map Operator Tree:
-        file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-01-06_152_355729472898392348/-mr-10002 
+      Map Operator Tree:
+          TableScan
             Reduce Output Operator
-              key expressions:
-                    expr: _col0
-                    type: int
-                    expr: _col1
-                    type: string
+              key expressions: _col0 (type: int), _col1 (type: string)
               sort order: ++
-              tag: -1
-              value expressions:
-                    expr: _col0
-                    type: int
-                    expr: _col1
-                    type: string
+              Statistics: Num rows: 6 Data size: 47 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
-        Extract
+        Select Operator
+          expressions: KEY.reducesinkkey0 (type: int), KEY.reducesinkkey1 (type: string)
+          outputColumnNames: _col0, _col1
+          Statistics: Num rows: 6 Data size: 47 Basic stats: COMPLETE Column stats: NONE
           File Output Operator
             compressed: false
-            GlobalTableId: 0
+            Statistics: Num rows: 6 Data size: 47 Basic stats: COMPLETE Column stats: NONE
             table:
                 input format: org.apache.hadoop.mapred.TextInputFormat
                 output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select * from t1 a left semi join t2 b on a.key=b.key sort by a.key, a.value
 PREHOOK: type: QUERY
 PREHOOK: Input: default@t1
 PREHOOK: Input: default@t2
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-01-06_413_6128740965053236566/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select * from t1 a left semi join t2 b on a.key=b.key sort by a.key, a.value
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@t1
 POSTHOOK: Input: default@t2
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-01-06_413_6128740965053236566/-mr-10000
+#### A masked pattern was here ####
 0	val_0
 0	val_0
 0	val_0
+10	val_10
 4	val_4
 8	val_8
-10	val_10
 PREHOOK: query: explain select * from t2 a left semi join t1 b on b.key=a.key sort by a.key, a.value
 PREHOOK: type: QUERY
 POSTHOOK: query: explain select * from t2 a left semi join t1 b on b.key=a.key sort by a.key, a.value
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_LEFTSEMIJOIN (TOK_TABREF t2 a) (TOK_TABREF t1 b) (= (. (TOK_TABLE_OR_COL b) key) (. (TOK_TABLE_OR_COL a) key)))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR TOK_ALLCOLREF)) (TOK_SORTBY (TOK_TABSORTCOLNAMEASC (. (TOK_TABLE_OR_COL a) key)) (TOK_TABSORTCOLNAMEASC (. (TOK_TABLE_OR_COL a) value)))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
   Stage-2 depends on stages: Stage-1
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-2
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        a 
+      Map Operator Tree:
           TableScan
             alias: a
-            Reduce Output Operator
-              key expressions:
-                    expr: key
-                    type: int
-              sort order: +
-              Map-reduce partition columns:
-                    expr: key
-                    type: int
-              tag: 0
-              value expressions:
-                    expr: key
-                    type: int
-                    expr: value
-                    type: string
-        b 
+            Statistics: Num rows: 11 Data size: 84 Basic stats: COMPLETE Column stats: NONE
+            Filter Operator
+              predicate: key is not null (type: boolean)
+              Statistics: Num rows: 6 Data size: 45 Basic stats: COMPLETE Column stats: NONE
+              Reduce Output Operator
+                key expressions: key (type: int)
+                sort order: +
+                Map-reduce partition columns: key (type: int)
+                Statistics: Num rows: 6 Data size: 45 Basic stats: COMPLETE Column stats: NONE
+                value expressions: value (type: string)
           TableScan
             alias: b
-            Select Operator
-              expressions:
-                    expr: key
-                    type: int
-              outputColumnNames: key
-              Group By Operator
-                bucketGroup: false
-                keys:
-                      expr: key
-                      type: int
-                mode: hash
-                outputColumnNames: _col0
-                Reduce Output Operator
-                  key expressions:
-                        expr: _col0
-                        type: int
-                  sort order: +
-                  Map-reduce partition columns:
-                        expr: _col0
-                        type: int
-                  tag: 1
+            Statistics: Num rows: 11 Data size: 79 Basic stats: COMPLETE Column stats: NONE
+            Filter Operator
+              predicate: key is not null (type: boolean)
+              Statistics: Num rows: 6 Data size: 43 Basic stats: COMPLETE Column stats: NONE
+              Select Operator
+                expressions: key (type: int)
+                outputColumnNames: key
+                Statistics: Num rows: 6 Data size: 43 Basic stats: COMPLETE Column stats: NONE
+                Group By Operator
+                  keys: key (type: int)
+                  mode: hash
+                  outputColumnNames: _col0
+                  Statistics: Num rows: 6 Data size: 43 Basic stats: COMPLETE Column stats: NONE
+                  Reduce Output Operator
+                    key expressions: _col0 (type: int)
+                    sort order: +
+                    Map-reduce partition columns: _col0 (type: int)
+                    Statistics: Num rows: 6 Data size: 43 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
         Join Operator
           condition map:
                Left Semi Join 0 to 1
-          condition expressions:
-            0 {VALUE._col0} {VALUE._col1}
-            1 
-          handleSkewJoin: false
+          keys:
+            0 key (type: int)
+            1 _col0 (type: int)
           outputColumnNames: _col0, _col1
-          Select Operator
-            expressions:
-                  expr: _col0
-                  type: int
-                  expr: _col1
-                  type: string
-            outputColumnNames: _col0, _col1
-            File Output Operator
-              compressed: false
-              GlobalTableId: 0
-              table:
-                  input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-                  output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+          Statistics: Num rows: 6 Data size: 49 Basic stats: COMPLETE Column stats: NONE
+          File Output Operator
+            compressed: false
+            table:
+                input format: org.apache.hadoop.mapred.SequenceFileInputFormat
+                output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe
 
   Stage: Stage-2
     Map Reduce
-      Alias -> Map Operator Tree:
-        file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-01-24_265_4466548024067433690/-mr-10002 
+      Map Operator Tree:
+          TableScan
             Reduce Output Operator
-              key expressions:
-                    expr: _col0
-                    type: int
-                    expr: _col1
-                    type: string
+              key expressions: _col0 (type: int), _col1 (type: string)
               sort order: ++
-              tag: -1
-              value expressions:
-                    expr: _col0
-                    type: int
-                    expr: _col1
-                    type: string
+              Statistics: Num rows: 6 Data size: 49 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
-        Extract
+        Select Operator
+          expressions: KEY.reducesinkkey0 (type: int), KEY.reducesinkkey1 (type: string)
+          outputColumnNames: _col0, _col1
+          Statistics: Num rows: 6 Data size: 49 Basic stats: COMPLETE Column stats: NONE
           File Output Operator
             compressed: false
-            GlobalTableId: 0
+            Statistics: Num rows: 6 Data size: 49 Basic stats: COMPLETE Column stats: NONE
             table:
                 input format: org.apache.hadoop.mapred.TextInputFormat
                 output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select * from t2 a left semi join t1 b on b.key=a.key sort by a.key, a.value
 PREHOOK: type: QUERY
 PREHOOK: Input: default@t1
 PREHOOK: Input: default@t2
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-01-24_509_4270214608701232060/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select * from t2 a left semi join t1 b on b.key=a.key sort by a.key, a.value
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@t1
 POSTHOOK: Input: default@t2
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-01-24_509_4270214608701232060/-mr-10000
+#### A masked pattern was here ####
 0	val_0
 0	val_0
 0	val_0
+10	val_5
+10	val_5
+10	val_5
 4	val_2
 8	val_4
-10	val_5
-10	val_5
-10	val_5
 PREHOOK: query: explain select * from t1 a left semi join t4 b on b.key=a.key sort by a.key, a.value
 PREHOOK: type: QUERY
 POSTHOOK: query: explain select * from t1 a left semi join t4 b on b.key=a.key sort by a.key, a.value
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_LEFTSEMIJOIN (TOK_TABREF t1 a) (TOK_TABREF t4 b) (= (. (TOK_TABLE_OR_COL b) key) (. (TOK_TABLE_OR_COL a) key)))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR TOK_ALLCOLREF)) (TOK_SORTBY (TOK_TABSORTCOLNAMEASC (. (TOK_TABLE_OR_COL a) key)) (TOK_TABSORTCOLNAMEASC (. (TOK_TABLE_OR_COL a) value)))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
   Stage-2 depends on stages: Stage-1
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-2
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        a 
+      Map Operator Tree:
           TableScan
             alias: a
-            Reduce Output Operator
-              key expressions:
-                    expr: key
-                    type: int
-              sort order: +
-              Map-reduce partition columns:
-                    expr: key
-                    type: int
-              tag: 0
-              value expressions:
-                    expr: key
-                    type: int
-                    expr: value
-                    type: string
-        b 
+            Statistics: Num rows: 11 Data size: 79 Basic stats: COMPLETE Column stats: NONE
+            Filter Operator
+              predicate: key is not null (type: boolean)
+              Statistics: Num rows: 6 Data size: 43 Basic stats: COMPLETE Column stats: NONE
+              Reduce Output Operator
+                key expressions: key (type: int)
+                sort order: +
+                Map-reduce partition columns: key (type: int)
+                Statistics: Num rows: 6 Data size: 43 Basic stats: COMPLETE Column stats: NONE
+                value expressions: value (type: string)
           TableScan
             alias: b
-            Select Operator
-              expressions:
-                    expr: key
-                    type: int
-              outputColumnNames: key
-              Group By Operator
-                bucketGroup: false
-                keys:
-                      expr: key
-                      type: int
-                mode: hash
-                outputColumnNames: _col0
-                Reduce Output Operator
-                  key expressions:
-                        expr: _col0
-                        type: int
-                  sort order: +
-                  Map-reduce partition columns:
-                        expr: _col0
-                        type: int
-                  tag: 1
+            Statistics: Num rows: 0 Data size: 0 Basic stats: NONE Column stats: NONE
+            Filter Operator
+              predicate: key is not null (type: boolean)
+              Statistics: Num rows: 0 Data size: 0 Basic stats: NONE Column stats: NONE
+              Select Operator
+                expressions: key (type: int)
+                outputColumnNames: key
+                Statistics: Num rows: 0 Data size: 0 Basic stats: NONE Column stats: NONE
+                Group By Operator
+                  keys: key (type: int)
+                  mode: hash
+                  outputColumnNames: _col0
+                  Statistics: Num rows: 0 Data size: 0 Basic stats: NONE Column stats: NONE
+                  Reduce Output Operator
+                    key expressions: _col0 (type: int)
+                    sort order: +
+                    Map-reduce partition columns: _col0 (type: int)
+                    Statistics: Num rows: 0 Data size: 0 Basic stats: NONE Column stats: NONE
       Reduce Operator Tree:
         Join Operator
           condition map:
                Left Semi Join 0 to 1
-          condition expressions:
-            0 {VALUE._col0} {VALUE._col1}
-            1 
-          handleSkewJoin: false
+          keys:
+            0 key (type: int)
+            1 _col0 (type: int)
           outputColumnNames: _col0, _col1
-          Select Operator
-            expressions:
-                  expr: _col0
-                  type: int
-                  expr: _col1
-                  type: string
-            outputColumnNames: _col0, _col1
-            File Output Operator
-              compressed: false
-              GlobalTableId: 0
-              table:
-                  input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-                  output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+          Statistics: Num rows: 6 Data size: 47 Basic stats: COMPLETE Column stats: NONE
+          File Output Operator
+            compressed: false
+            table:
+                input format: org.apache.hadoop.mapred.SequenceFileInputFormat
+                output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe
 
   Stage: Stage-2
     Map Reduce
-      Alias -> Map Operator Tree:
-        file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-01-40_609_1842300352332686282/-mr-10002 
+      Map Operator Tree:
+          TableScan
             Reduce Output Operator
-              key expressions:
-                    expr: _col0
-                    type: int
-                    expr: _col1
-                    type: string
+              key expressions: _col0 (type: int), _col1 (type: string)
               sort order: ++
-              tag: -1
-              value expressions:
-                    expr: _col0
-                    type: int
-                    expr: _col1
-                    type: string
+              Statistics: Num rows: 6 Data size: 47 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
-        Extract
+        Select Operator
+          expressions: KEY.reducesinkkey0 (type: int), KEY.reducesinkkey1 (type: string)
+          outputColumnNames: _col0, _col1
+          Statistics: Num rows: 6 Data size: 47 Basic stats: COMPLETE Column stats: NONE
           File Output Operator
             compressed: false
-            GlobalTableId: 0
+            Statistics: Num rows: 6 Data size: 47 Basic stats: COMPLETE Column stats: NONE
             table:
                 input format: org.apache.hadoop.mapred.TextInputFormat
                 output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select * from t1 a left semi join t4 b on b.key=a.key sort by a.key, a.value
 PREHOOK: type: QUERY
 PREHOOK: Input: default@t1
 PREHOOK: Input: default@t4
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-01-40_927_8797191922320768648/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select * from t1 a left semi join t4 b on b.key=a.key sort by a.key, a.value
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@t1
 POSTHOOK: Input: default@t4
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-01-40_927_8797191922320768648/-mr-10000
+#### A masked pattern was here ####
 PREHOOK: query: explain select a.value from t1 a left semi join t3 b on (b.key = a.key and b.key < '15') sort by a.value
 PREHOOK: type: QUERY
 POSTHOOK: query: explain select a.value from t1 a left semi join t3 b on (b.key = a.key and b.key < '15') sort by a.value
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_LEFTSEMIJOIN (TOK_TABREF t1 a) (TOK_TABREF t3 b) (and (= (. (TOK_TABLE_OR_COL b) key) (. (TOK_TABLE_OR_COL a) key)) (< (. (TOK_TABLE_OR_COL b) key) '15')))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (. (TOK_TABLE_OR_COL a) value))) (TOK_SORTBY (TOK_TABSORTCOLNAMEASC (. (TOK_TABLE_OR_COL a) value)))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
   Stage-2 depends on stages: Stage-1
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-2
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        a 
+      Map Operator Tree:
           TableScan
             alias: a
-            Reduce Output Operator
-              key expressions:
-                    expr: key
-                    type: int
-              sort order: +
-              Map-reduce partition columns:
-                    expr: key
-                    type: int
-              tag: 0
-              value expressions:
-                    expr: value
-                    type: string
-        b 
+            Statistics: Num rows: 11 Data size: 79 Basic stats: COMPLETE Column stats: NONE
+            Filter Operator
+              predicate: key is not null (type: boolean)
+              Statistics: Num rows: 6 Data size: 43 Basic stats: COMPLETE Column stats: NONE
+              Reduce Output Operator
+                key expressions: key (type: int)
+                sort order: +
+                Map-reduce partition columns: key (type: int)
+                Statistics: Num rows: 6 Data size: 43 Basic stats: COMPLETE Column stats: NONE
+                value expressions: value (type: string)
           TableScan
             alias: b
+            Statistics: Num rows: 22 Data size: 163 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
-              predicate:
-                  expr: (key < '15')
-                  type: boolean
-              Filter Operator
-                predicate:
-                    expr: (key < '15')
-                    type: boolean
-                Select Operator
-                  expressions:
-                        expr: key
-                        type: int
-                  outputColumnNames: key
-                  Group By Operator
-                    bucketGroup: false
-                    keys:
-                          expr: key
-                          type: int
-                          expr: key
-                          type: int
-                    mode: hash
-                    outputColumnNames: _col0, _col1
-                    Reduce Output Operator
-                      key expressions:
-                            expr: _col1
-                            type: int
-                      sort order: +
-                      Map-reduce partition columns:
-                            expr: _col1
-                            type: int
-                      tag: 1
+              predicate: (key < 15) (type: boolean)
+              Statistics: Num rows: 7 Data size: 51 Basic stats: COMPLETE Column stats: NONE
+              Group By Operator
+                keys: key (type: int), key (type: int)
+                mode: hash
+                outputColumnNames: _col0, _col1
+                Statistics: Num rows: 7 Data size: 51 Basic stats: COMPLETE Column stats: NONE
+                Reduce Output Operator
+                  key expressions: _col1 (type: int)
+                  sort order: +
+                  Map-reduce partition columns: _col1 (type: int)
+                  Statistics: Num rows: 7 Data size: 51 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
         Join Operator
           condition map:
                Left Semi Join 0 to 1
-          condition expressions:
-            0 {VALUE._col1}
-            1 
-          handleSkewJoin: false
+          keys:
+            0 key (type: int)
+            1 _col1 (type: int)
           outputColumnNames: _col1
+          Statistics: Num rows: 7 Data size: 56 Basic stats: COMPLETE Column stats: NONE
           Select Operator
-            expressions:
-                  expr: _col1
-                  type: string
+            expressions: _col1 (type: string)
             outputColumnNames: _col0
+            Statistics: Num rows: 7 Data size: 56 Basic stats: COMPLETE Column stats: NONE
             File Output Operator
               compressed: false
-              GlobalTableId: 0
               table:
                   input format: org.apache.hadoop.mapred.SequenceFileInputFormat
                   output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                  serde: org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe
 
   Stage: Stage-2
     Map Reduce
-      Alias -> Map Operator Tree:
-        file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-01-57_384_3089194844599355448/-mr-10002 
+      Map Operator Tree:
+          TableScan
             Reduce Output Operator
-              key expressions:
-                    expr: _col0
-                    type: string
+              key expressions: _col0 (type: string)
               sort order: +
-              tag: -1
-              value expressions:
-                    expr: _col0
-                    type: string
+              Statistics: Num rows: 7 Data size: 56 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
-        Extract
+        Select Operator
+          expressions: KEY.reducesinkkey0 (type: string)
+          outputColumnNames: _col0
+          Statistics: Num rows: 7 Data size: 56 Basic stats: COMPLETE Column stats: NONE
           File Output Operator
             compressed: false
-            GlobalTableId: 0
+            Statistics: Num rows: 7 Data size: 56 Basic stats: COMPLETE Column stats: NONE
             table:
                 input format: org.apache.hadoop.mapred.TextInputFormat
                 output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select a.value from t1 a left semi join t3 b on (b.key = a.key and b.key < '15') sort by a.value
 PREHOOK: type: QUERY
 PREHOOK: Input: default@t1
 PREHOOK: Input: default@t3
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-01-57_517_5261225666744367069/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select a.value from t1 a left semi join t3 b on (b.key = a.key and b.key < '15') sort by a.value
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@t1
 POSTHOOK: Input: default@t3
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-01-57_517_5261225666744367069/-mr-10000
+#### A masked pattern was here ####
 val_0
 val_0
 val_0
@@ -617,135 +539,100 @@ PREHOOK: query: explain select * from t1 a left semi join t2 b on a.key = b.key 
 PREHOOK: type: QUERY
 POSTHOOK: query: explain select * from t1 a left semi join t2 b on a.key = b.key and b.value < "val_10" sort by a.key, a.value
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_LEFTSEMIJOIN (TOK_TABREF t1 a) (TOK_TABREF t2 b) (and (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL b) key)) (< (. (TOK_TABLE_OR_COL b) value) "val_10")))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR TOK_ALLCOLREF)) (TOK_SORTBY (TOK_TABSORTCOLNAMEASC (. (TOK_TABLE_OR_COL a) key)) (TOK_TABSORTCOLNAMEASC (. (TOK_TABLE_OR_COL a) value)))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
   Stage-2 depends on stages: Stage-1
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-2
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        a 
+      Map Operator Tree:
           TableScan
             alias: a
-            Reduce Output Operator
-              key expressions:
-                    expr: key
-                    type: int
-              sort order: +
-              Map-reduce partition columns:
-                    expr: key
-                    type: int
-              tag: 0
-              value expressions:
-                    expr: key
-                    type: int
-                    expr: value
-                    type: string
-        b 
+            Statistics: Num rows: 11 Data size: 79 Basic stats: COMPLETE Column stats: NONE
+            Filter Operator
+              predicate: key is not null (type: boolean)
+              Statistics: Num rows: 6 Data size: 43 Basic stats: COMPLETE Column stats: NONE
+              Reduce Output Operator
+                key expressions: key (type: int)
+                sort order: +
+                Map-reduce partition columns: key (type: int)
+                Statistics: Num rows: 6 Data size: 43 Basic stats: COMPLETE Column stats: NONE
+                value expressions: value (type: string)
           TableScan
             alias: b
+            Statistics: Num rows: 11 Data size: 84 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
-              predicate:
-                  expr: (value < 'val_10')
-                  type: boolean
-              Filter Operator
-                predicate:
-                    expr: (value < 'val_10')
-                    type: boolean
-                Select Operator
-                  expressions:
-                        expr: key
-                        type: int
-                        expr: value
-                        type: string
-                  outputColumnNames: key, value
-                  Group By Operator
-                    bucketGroup: false
-                    keys:
-                          expr: key
-                          type: int
-                          expr: value
-                          type: string
-                    mode: hash
-                    outputColumnNames: _col0, _col1
-                    Reduce Output Operator
-                      key expressions:
-                            expr: _col0
-                            type: int
-                      sort order: +
-                      Map-reduce partition columns:
-                            expr: _col0
-                            type: int
-                      tag: 1
+              predicate: ((value < 'val_10') and key is not null) (type: boolean)
+              Statistics: Num rows: 2 Data size: 15 Basic stats: COMPLETE Column stats: NONE
+              Select Operator
+                expressions: key (type: int), value (type: string)
+                outputColumnNames: key, value
+                Statistics: Num rows: 2 Data size: 15 Basic stats: COMPLETE Column stats: NONE
+                Group By Operator
+                  keys: key (type: int), value (type: string)
+                  mode: hash
+                  outputColumnNames: _col0, _col1
+                  Statistics: Num rows: 2 Data size: 15 Basic stats: COMPLETE Column stats: NONE
+                  Reduce Output Operator
+                    key expressions: _col0 (type: int)
+                    sort order: +
+                    Map-reduce partition columns: _col0 (type: int)
+                    Statistics: Num rows: 2 Data size: 15 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
         Join Operator
           condition map:
                Left Semi Join 0 to 1
-          condition expressions:
-            0 {VALUE._col0} {VALUE._col1}
-            1 
-          handleSkewJoin: false
+          keys:
+            0 key (type: int)
+            1 _col0 (type: int)
           outputColumnNames: _col0, _col1
-          Select Operator
-            expressions:
-                  expr: _col0
-                  type: int
-                  expr: _col1
-                  type: string
-            outputColumnNames: _col0, _col1
-            File Output Operator
-              compressed: false
-              GlobalTableId: 0
-              table:
-                  input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-                  output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+          Statistics: Num rows: 6 Data size: 47 Basic stats: COMPLETE Column stats: NONE
+          File Output Operator
+            compressed: false
+            table:
+                input format: org.apache.hadoop.mapred.SequenceFileInputFormat
+                output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe
 
   Stage: Stage-2
     Map Reduce
-      Alias -> Map Operator Tree:
-        file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-02-15_938_7137978578832330282/-mr-10002 
+      Map Operator Tree:
+          TableScan
             Reduce Output Operator
-              key expressions:
-                    expr: _col0
-                    type: int
-                    expr: _col1
-                    type: string
+              key expressions: _col0 (type: int), _col1 (type: string)
               sort order: ++
-              tag: -1
-              value expressions:
-                    expr: _col0
-                    type: int
-                    expr: _col1
-                    type: string
+              Statistics: Num rows: 6 Data size: 47 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
-        Extract
+        Select Operator
+          expressions: KEY.reducesinkkey0 (type: int), KEY.reducesinkkey1 (type: string)
+          outputColumnNames: _col0, _col1
+          Statistics: Num rows: 6 Data size: 47 Basic stats: COMPLETE Column stats: NONE
           File Output Operator
             compressed: false
-            GlobalTableId: 0
+            Statistics: Num rows: 6 Data size: 47 Basic stats: COMPLETE Column stats: NONE
             table:
                 input format: org.apache.hadoop.mapred.TextInputFormat
                 output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select * from t1 a left semi join t2 b on a.key = b.key and b.value < "val_10" sort by a.key, a.value
 PREHOOK: type: QUERY
 PREHOOK: Input: default@t1
 PREHOOK: Input: default@t2
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-02-16_057_519725218464853726/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select * from t1 a left semi join t2 b on a.key = b.key and b.value < "val_10" sort by a.key, a.value
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@t1
 POSTHOOK: Input: default@t2
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-02-16_057_519725218464853726/-mr-10000
+#### A masked pattern was here ####
 0	val_0
 0	val_0
 0	val_0
@@ -753,128 +640,104 @@ PREHOOK: query: explain select a.value from t1 a left semi join (select key from
 PREHOOK: type: QUERY
 POSTHOOK: query: explain select a.value from t1 a left semi join (select key from t3 where key > 5) b on a.key = b.key sort by a.value
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_LEFTSEMIJOIN (TOK_TABREF t1 a) (TOK_SUBQUERY (TOK_QUERY (TOK_FROM (TOK_TABREF t3)) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_TABLE_OR_COL key))) (TOK_WHERE (> (TOK_TABLE_OR_COL key) 5)))) b) (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL b) key)))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (. (TOK_TABLE_OR_COL a) value))) (TOK_SORTBY (TOK_TABSORTCOLNAMEASC (. (TOK_TABLE_OR_COL a) value)))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
   Stage-2 depends on stages: Stage-1
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-2
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        a 
-          TableScan
-            alias: a
-            Reduce Output Operator
-              key expressions:
-                    expr: key
-                    type: int
-              sort order: +
-              Map-reduce partition columns:
-                    expr: key
-                    type: int
-              tag: 0
-              value expressions:
-                    expr: value
-                    type: string
-        b:t3 
+      Map Operator Tree:
           TableScan
             alias: t3
+            Statistics: Num rows: 22 Data size: 163 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
-              predicate:
-                  expr: (key > 5)
-                  type: boolean
-              Filter Operator
-                predicate:
-                    expr: (key > 5)
-                    type: boolean
-                Select Operator
-                  expressions:
-                        expr: key
-                        type: int
+              predicate: (key > 5) (type: boolean)
+              Statistics: Num rows: 7 Data size: 51 Basic stats: COMPLETE Column stats: NONE
+              Select Operator
+                expressions: key (type: int)
+                outputColumnNames: _col0
+                Statistics: Num rows: 7 Data size: 51 Basic stats: COMPLETE Column stats: NONE
+                Group By Operator
+                  keys: _col0 (type: int)
+                  mode: hash
                   outputColumnNames: _col0
-                  Select Operator
-                    expressions:
-                          expr: _col0
-                          type: int
-                    outputColumnNames: _col0
-                    Group By Operator
-                      bucketGroup: false
-                      keys:
-                            expr: _col0
-                            type: int
-                      mode: hash
-                      outputColumnNames: _col0
-                      Reduce Output Operator
-                        key expressions:
-                              expr: _col0
-                              type: int
-                        sort order: +
-                        Map-reduce partition columns:
-                              expr: _col0
-                              type: int
-                        tag: 1
+                  Statistics: Num rows: 7 Data size: 51 Basic stats: COMPLETE Column stats: NONE
+                  Reduce Output Operator
+                    key expressions: _col0 (type: int)
+                    sort order: +
+                    Map-reduce partition columns: _col0 (type: int)
+                    Statistics: Num rows: 7 Data size: 51 Basic stats: COMPLETE Column stats: NONE
+          TableScan
+            alias: a
+            Statistics: Num rows: 11 Data size: 79 Basic stats: COMPLETE Column stats: NONE
+            Filter Operator
+              predicate: key is not null (type: boolean)
+              Statistics: Num rows: 6 Data size: 43 Basic stats: COMPLETE Column stats: NONE
+              Reduce Output Operator
+                key expressions: key (type: int)
+                sort order: +
+                Map-reduce partition columns: key (type: int)
+                Statistics: Num rows: 6 Data size: 43 Basic stats: COMPLETE Column stats: NONE
+                value expressions: value (type: string)
       Reduce Operator Tree:
         Join Operator
           condition map:
                Left Semi Join 0 to 1
-          condition expressions:
-            0 {VALUE._col1}
-            1 
-          handleSkewJoin: false
+          keys:
+            0 key (type: int)
+            1 _col0 (type: int)
           outputColumnNames: _col1
+          Statistics: Num rows: 7 Data size: 56 Basic stats: COMPLETE Column stats: NONE
           Select Operator
-            expressions:
-                  expr: _col1
-                  type: string
+            expressions: _col1 (type: string)
             outputColumnNames: _col0
+            Statistics: Num rows: 7 Data size: 56 Basic stats: COMPLETE Column stats: NONE
             File Output Operator
               compressed: false
-              GlobalTableId: 0
               table:
                   input format: org.apache.hadoop.mapred.SequenceFileInputFormat
                   output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                  serde: org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe
 
   Stage: Stage-2
     Map Reduce
-      Alias -> Map Operator Tree:
-        file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-02-32_044_1882268558166284283/-mr-10002 
+      Map Operator Tree:
+          TableScan
             Reduce Output Operator
-              key expressions:
-                    expr: _col0
-                    type: string
+              key expressions: _col0 (type: string)
               sort order: +
-              tag: -1
-              value expressions:
-                    expr: _col0
-                    type: string
+              Statistics: Num rows: 7 Data size: 56 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
-        Extract
+        Select Operator
+          expressions: KEY.reducesinkkey0 (type: string)
+          outputColumnNames: _col0
+          Statistics: Num rows: 7 Data size: 56 Basic stats: COMPLETE Column stats: NONE
           File Output Operator
             compressed: false
-            GlobalTableId: 0
+            Statistics: Num rows: 7 Data size: 56 Basic stats: COMPLETE Column stats: NONE
             table:
                 input format: org.apache.hadoop.mapred.TextInputFormat
                 output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select a.value from t1 a left semi join (select key from t3 where key > 5) b on a.key = b.key sort by a.value
 PREHOOK: type: QUERY
 PREHOOK: Input: default@t1
 PREHOOK: Input: default@t3
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-02-32_201_5180642771512887111/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select a.value from t1 a left semi join (select key from t3 where key > 5) b on a.key = b.key sort by a.value
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@t1
 POSTHOOK: Input: default@t3
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-02-32_201_5180642771512887111/-mr-10000
+#### A masked pattern was here ####
 val_10
 val_8
 val_9
@@ -882,292 +745,218 @@ PREHOOK: query: explain select a.value from t1 a left semi join (select key , va
 PREHOOK: type: QUERY
 POSTHOOK: query: explain select a.value from t1 a left semi join (select key , value from t2 where key > 5) b on a.key = b.key and b.value <= 'val_20' sort by a.value
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_LEFTSEMIJOIN (TOK_TABREF t1 a) (TOK_SUBQUERY (TOK_QUERY (TOK_FROM (TOK_TABREF t2)) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_TABLE_OR_COL key)) (TOK_SELEXPR (TOK_TABLE_OR_COL value))) (TOK_WHERE (> (TOK_TABLE_OR_COL key) 5)))) b) (and (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL b) key)) (<= (. (TOK_TABLE_OR_COL b) value) 'val_20')))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (. (TOK_TABLE_OR_COL a) value))) (TOK_SORTBY (TOK_TABSORTCOLNAMEASC (. (TOK_TABLE_OR_COL a) value)))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
   Stage-2 depends on stages: Stage-1
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-2
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        a 
-          TableScan
-            alias: a
-            Reduce Output Operator
-              key expressions:
-                    expr: key
-                    type: int
-              sort order: +
-              Map-reduce partition columns:
-                    expr: key
-                    type: int
-              tag: 0
-              value expressions:
-                    expr: value
-                    type: string
-        b:t2 
+      Map Operator Tree:
           TableScan
             alias: t2
+            Statistics: Num rows: 11 Data size: 84 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
-              predicate:
-                  expr: ((key > 5) and (value <= 'val_20'))
-                  type: boolean
-              Filter Operator
-                predicate:
-                    expr: (key > 5)
-                    type: boolean
-                Select Operator
-                  expressions:
-                        expr: key
-                        type: int
-                        expr: value
-                        type: string
+              predicate: (((key > 5) and (value <= 'val_20')) and key is not null) (type: boolean)
+              Statistics: Num rows: 1 Data size: 7 Basic stats: COMPLETE Column stats: NONE
+              Select Operator
+                expressions: key (type: int), value (type: string)
+                outputColumnNames: _col0, _col1
+                Statistics: Num rows: 1 Data size: 7 Basic stats: COMPLETE Column stats: NONE
+                Group By Operator
+                  keys: _col0 (type: int), _col1 (type: string)
+                  mode: hash
                   outputColumnNames: _col0, _col1
-                  Filter Operator
-                    predicate:
-                        expr: (_col1 <= 'val_20')
-                        type: boolean
-                    Select Operator
-                      expressions:
-                            expr: _col0
-                            type: int
-                            expr: _col1
-                            type: string
-                      outputColumnNames: _col0, _col1
-                      Group By Operator
-                        bucketGroup: false
-                        keys:
-                              expr: _col0
-                              type: int
-                              expr: _col1
-                              type: string
-                        mode: hash
-                        outputColumnNames: _col0, _col1
-                        Reduce Output Operator
-                          key expressions:
-                                expr: _col0
-                                type: int
-                          sort order: +
-                          Map-reduce partition columns:
-                                expr: _col0
-                                type: int
-                          tag: 1
+                  Statistics: Num rows: 1 Data size: 7 Basic stats: COMPLETE Column stats: NONE
+                  Reduce Output Operator
+                    key expressions: _col0 (type: int)
+                    sort order: +
+                    Map-reduce partition columns: _col0 (type: int)
+                    Statistics: Num rows: 1 Data size: 7 Basic stats: COMPLETE Column stats: NONE
+          TableScan
+            alias: a
+            Statistics: Num rows: 11 Data size: 79 Basic stats: COMPLETE Column stats: NONE
+            Filter Operator
+              predicate: key is not null (type: boolean)
+              Statistics: Num rows: 6 Data size: 43 Basic stats: COMPLETE Column stats: NONE
+              Reduce Output Operator
+                key expressions: key (type: int)
+                sort order: +
+                Map-reduce partition columns: key (type: int)
+                Statistics: Num rows: 6 Data size: 43 Basic stats: COMPLETE Column stats: NONE
+                value expressions: value (type: string)
       Reduce Operator Tree:
         Join Operator
           condition map:
                Left Semi Join 0 to 1
-          condition expressions:
-            0 {VALUE._col1}
-            1 
-          handleSkewJoin: false
+          keys:
+            0 key (type: int)
+            1 _col0 (type: int)
           outputColumnNames: _col1
+          Statistics: Num rows: 6 Data size: 47 Basic stats: COMPLETE Column stats: NONE
           Select Operator
-            expressions:
-                  expr: _col1
-                  type: string
+            expressions: _col1 (type: string)
             outputColumnNames: _col0
+            Statistics: Num rows: 6 Data size: 47 Basic stats: COMPLETE Column stats: NONE
             File Output Operator
               compressed: false
-              GlobalTableId: 0
               table:
                   input format: org.apache.hadoop.mapred.SequenceFileInputFormat
                   output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                  serde: org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe
 
   Stage: Stage-2
     Map Reduce
-      Alias -> Map Operator Tree:
-        file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-02-47_618_6081419597528468690/-mr-10002 
+      Map Operator Tree:
+          TableScan
             Reduce Output Operator
-              key expressions:
-                    expr: _col0
-                    type: string
+              key expressions: _col0 (type: string)
               sort order: +
-              tag: -1
-              value expressions:
-                    expr: _col0
-                    type: string
+              Statistics: Num rows: 6 Data size: 47 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
-        Extract
+        Select Operator
+          expressions: KEY.reducesinkkey0 (type: string)
+          outputColumnNames: _col0
+          Statistics: Num rows: 6 Data size: 47 Basic stats: COMPLETE Column stats: NONE
           File Output Operator
             compressed: false
-            GlobalTableId: 0
+            Statistics: Num rows: 6 Data size: 47 Basic stats: COMPLETE Column stats: NONE
             table:
                 input format: org.apache.hadoop.mapred.TextInputFormat
                 output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select a.value from t1 a left semi join (select key , value from t2 where key > 5) b on a.key = b.key and b.value <= 'val_20' sort by a.value
 PREHOOK: type: QUERY
 PREHOOK: Input: default@t1
 PREHOOK: Input: default@t2
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-02-48_046_789670215385615891/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select a.value from t1 a left semi join (select key , value from t2 where key > 5) b on a.key = b.key and b.value <= 'val_20' sort by a.value
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@t1
 POSTHOOK: Input: default@t2
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-02-48_046_789670215385615891/-mr-10000
+#### A masked pattern was here ####
 PREHOOK: query: explain select * from t2 a left semi join (select key , value from t1 where key > 2) b on a.key = b.key sort by a.key, a.value
 PREHOOK: type: QUERY
 POSTHOOK: query: explain select * from t2 a left semi join (select key , value from t1 where key > 2) b on a.key = b.key sort by a.key, a.value
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_LEFTSEMIJOIN (TOK_TABREF t2 a) (TOK_SUBQUERY (TOK_QUERY (TOK_FROM (TOK_TABREF t1)) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_TABLE_OR_COL key)) (TOK_SELEXPR (TOK_TABLE_OR_COL value))) (TOK_WHERE (> (TOK_TABLE_OR_COL key) 2)))) b) (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL b) key)))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR TOK_ALLCOLREF)) (TOK_SORTBY (TOK_TABSORTCOLNAMEASC (. (TOK_TABLE_OR_COL a) key)) (TOK_TABSORTCOLNAMEASC (. (TOK_TABLE_OR_COL a) value)))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
   Stage-2 depends on stages: Stage-1
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-2
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        a 
-          TableScan
-            alias: a
-            Reduce Output Operator
-              key expressions:
-                    expr: key
-                    type: int
-              sort order: +
-              Map-reduce partition columns:
-                    expr: key
-                    type: int
-              tag: 0
-              value expressions:
-                    expr: key
-                    type: int
-                    expr: value
-                    type: string
-        b:t1 
+      Map Operator Tree:
           TableScan
             alias: t1
+            Statistics: Num rows: 11 Data size: 79 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
-              predicate:
-                  expr: (key > 2)
-                  type: boolean
-              Filter Operator
-                predicate:
-                    expr: (key > 2)
-                    type: boolean
-                Select Operator
-                  expressions:
-                        expr: key
-                        type: int
+              predicate: (key > 2) (type: boolean)
+              Statistics: Num rows: 3 Data size: 21 Basic stats: COMPLETE Column stats: NONE
+              Select Operator
+                expressions: key (type: int)
+                outputColumnNames: _col0
+                Statistics: Num rows: 3 Data size: 21 Basic stats: COMPLETE Column stats: NONE
+                Group By Operator
+                  keys: _col0 (type: int)
+                  mode: hash
                   outputColumnNames: _col0
-                  Select Operator
-                    expressions:
-                          expr: _col0
-                          type: int
-                    outputColumnNames: _col0
-                    Group By Operator
-                      bucketGroup: false
-                      keys:
-                            expr: _col0
-                            type: int
-                      mode: hash
-                      outputColumnNames: _col0
-                      Reduce Output Operator
-                        key expressions:
-                              expr: _col0
-                              type: int
-                        sort order: +
-                        Map-reduce partition columns:
-                              expr: _col0
-                              type: int
-                        tag: 1
+                  Statistics: Num rows: 3 Data size: 21 Basic stats: COMPLETE Column stats: NONE
+                  Reduce Output Operator
+                    key expressions: _col0 (type: int)
+                    sort order: +
+                    Map-reduce partition columns: _col0 (type: int)
+                    Statistics: Num rows: 3 Data size: 21 Basic stats: COMPLETE Column stats: NONE
+          TableScan
+            alias: a
+            Statistics: Num rows: 11 Data size: 84 Basic stats: COMPLETE Column stats: NONE
+            Filter Operator
+              predicate: key is not null (type: boolean)
+              Statistics: Num rows: 6 Data size: 45 Basic stats: COMPLETE Column stats: NONE
+              Reduce Output Operator
+                key expressions: key (type: int)
+                sort order: +
+                Map-reduce partition columns: key (type: int)
+                Statistics: Num rows: 6 Data size: 45 Basic stats: COMPLETE Column stats: NONE
+                value expressions: value (type: string)
       Reduce Operator Tree:
         Join Operator
           condition map:
                Left Semi Join 0 to 1
-          condition expressions:
-            0 {VALUE._col0} {VALUE._col1}
-            1 
-          handleSkewJoin: false
+          keys:
+            0 key (type: int)
+            1 _col0 (type: int)
           outputColumnNames: _col0, _col1
-          Select Operator
-            expressions:
-                  expr: _col0
-                  type: int
-                  expr: _col1
-                  type: string
-            outputColumnNames: _col0, _col1
-            File Output Operator
-              compressed: false
-              GlobalTableId: 0
-              table:
-                  input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-                  output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+          Statistics: Num rows: 6 Data size: 49 Basic stats: COMPLETE Column stats: NONE
+          File Output Operator
+            compressed: false
+            table:
+                input format: org.apache.hadoop.mapred.SequenceFileInputFormat
+                output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe
 
   Stage: Stage-2
     Map Reduce
-      Alias -> Map Operator Tree:
-        file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-03-05_112_1019830060466266544/-mr-10002 
+      Map Operator Tree:
+          TableScan
             Reduce Output Operator
-              key expressions:
-                    expr: _col0
-                    type: int
-                    expr: _col1
-                    type: string
+              key expressions: _col0 (type: int), _col1 (type: string)
               sort order: ++
-              tag: -1
-              value expressions:
-                    expr: _col0
-                    type: int
-                    expr: _col1
-                    type: string
+              Statistics: Num rows: 6 Data size: 49 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
-        Extract
+        Select Operator
+          expressions: KEY.reducesinkkey0 (type: int), KEY.reducesinkkey1 (type: string)
+          outputColumnNames: _col0, _col1
+          Statistics: Num rows: 6 Data size: 49 Basic stats: COMPLETE Column stats: NONE
           File Output Operator
             compressed: false
-            GlobalTableId: 0
+            Statistics: Num rows: 6 Data size: 49 Basic stats: COMPLETE Column stats: NONE
             table:
                 input format: org.apache.hadoop.mapred.TextInputFormat
                 output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select * from t2 a left semi join (select key , value from t1 where key > 2) b on a.key = b.key sort by a.key, a.value
 PREHOOK: type: QUERY
 PREHOOK: Input: default@t1
 PREHOOK: Input: default@t2
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-03-05_322_221151979084285496/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select * from t2 a left semi join (select key , value from t1 where key > 2) b on a.key = b.key sort by a.key, a.value
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@t1
 POSTHOOK: Input: default@t2
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-03-05_322_221151979084285496/-mr-10000
+#### A masked pattern was here ####
+10	val_5
+10	val_5
+10	val_5
 4	val_2
 8	val_4
-10	val_5
-10	val_5
-10	val_5
 PREHOOK: query: explain select /*+ mapjoin(b) */ a.key from t3 a left semi join t1 b on a.key = b.key sort by a.key
 PREHOOK: type: QUERY
 POSTHOOK: query: explain select /*+ mapjoin(b) */ a.key from t3 a left semi join t1 b on a.key = b.key sort by a.key
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_LEFTSEMIJOIN (TOK_TABREF t3 a) (TOK_TABREF t1 b) (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL b) key)))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_HINTLIST (TOK_HINT TOK_MAPJOIN (TOK_HINTARGLIST b))) (TOK_SELEXPR (. (TOK_TABLE_OR_COL a) key))) (TOK_SORTBY (TOK_TABSORTCOLNAMEASC (. (TOK_TABLE_OR_COL a) key)))))
-
 STAGE DEPENDENCIES:
-  Stage-4 is a root stage
-  Stage-1 depends on stages: Stage-4
-  Stage-2 depends on stages: Stage-1
-  Stage-0 is a root stage
+  Stage-3 is a root stage
+  Stage-1 depends on stages: Stage-3
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
-  Stage: Stage-4
+  Stage: Stage-3
     Map Reduce Local Work
       Alias -> Map Local Tables:
         b 
@@ -1177,108 +966,86 @@ STAGE PLANS:
         b 
           TableScan
             alias: b
-            Select Operator
-              expressions:
-                    expr: key
-                    type: int
-              outputColumnNames: key
-              Group By Operator
-                bucketGroup: false
-                keys:
-                      expr: key
-                      type: int
-                mode: hash
-                outputColumnNames: _col0
-                HashTable Sink Operator
-                  condition expressions:
-                    0 {key}
-                    1 
-                  handleSkewJoin: false
-                  keys:
-                    0 [Column[key]]
-                    1 [Column[_col0]]
-                  Position of Big Table: 0
+            Statistics: Num rows: 11 Data size: 79 Basic stats: COMPLETE Column stats: NONE
+            Filter Operator
+              predicate: key is not null (type: boolean)
+              Statistics: Num rows: 6 Data size: 43 Basic stats: COMPLETE Column stats: NONE
+              Select Operator
+                expressions: key (type: int)
+                outputColumnNames: key
+                Statistics: Num rows: 6 Data size: 43 Basic stats: COMPLETE Column stats: NONE
+                Group By Operator
+                  keys: key (type: int)
+                  mode: hash
+                  outputColumnNames: _col0
+                  Statistics: Num rows: 6 Data size: 43 Basic stats: COMPLETE Column stats: NONE
+                  HashTable Sink Operator
+                    keys:
+                      0 key (type: int)
+                      1 _col0 (type: int)
 
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        a 
+      Map Operator Tree:
           TableScan
             alias: a
-            Map Join Operator
-              condition map:
-                   Left Semi Join 0 to 1
-              condition expressions:
-                0 {key}
-                1 
-              handleSkewJoin: false
-              keys:
-                0 [Column[key]]
-                1 [Column[_col0]]
-              outputColumnNames: _col0
-              Position of Big Table: 0
-              File Output Operator
-                compressed: false
-                GlobalTableId: 0
-                table:
-                    input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-                    output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+            Statistics: Num rows: 22 Data size: 163 Basic stats: COMPLETE Column stats: NONE
+            Filter Operator
+              predicate: key is not null (type: boolean)
+              Statistics: Num rows: 11 Data size: 81 Basic stats: COMPLETE Column stats: NONE
+              Map Join Operator
+                condition map:
+                     Left Semi Join 0 to 1
+                keys:
+                  0 key (type: int)
+                  1 _col0 (type: int)
+                outputColumnNames: _col0
+                Statistics: Num rows: 12 Data size: 89 Basic stats: COMPLETE Column stats: NONE
+                Reduce Output Operator
+                  key expressions: _col0 (type: int)
+                  sort order: +
+                  Statistics: Num rows: 12 Data size: 89 Basic stats: COMPLETE Column stats: NONE
       Local Work:
         Map Reduce Local Work
-
-  Stage: Stage-2
-    Map Reduce
-      Alias -> Map Operator Tree:
-        file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-03-20_944_438303615610048165/-mr-10002 
-          Select Operator
-            expressions:
-                  expr: _col0
-                  type: int
-            outputColumnNames: _col0
-            Select Operator
-              expressions:
-                    expr: _col0
-                    type: int
-              outputColumnNames: _col0
-              Reduce Output Operator
-                key expressions:
-                      expr: _col0
-                      type: int
-                sort order: +
-                tag: -1
-                value expressions:
-                      expr: _col0
-                      type: int
       Reduce Operator Tree:
-        Extract
+        Select Operator
+          expressions: KEY.reducesinkkey0 (type: int)
+          outputColumnNames: _col0
+          Statistics: Num rows: 12 Data size: 89 Basic stats: COMPLETE Column stats: NONE
           File Output Operator
             compressed: false
-            GlobalTableId: 0
+            Statistics: Num rows: 12 Data size: 89 Basic stats: COMPLETE Column stats: NONE
             table:
                 input format: org.apache.hadoop.mapred.TextInputFormat
                 output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select /*+ mapjoin(b) */ a.key from t3 a left semi join t1 b on a.key = b.key sort by a.key
 PREHOOK: type: QUERY
 PREHOOK: Input: default@t1
 PREHOOK: Input: default@t3
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-03-21_127_8134172271972764419/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select /*+ mapjoin(b) */ a.key from t3 a left semi join t1 b on a.key = b.key sort by a.key
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@t1
 POSTHOOK: Input: default@t3
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-03-21_127_8134172271972764419/-mr-10000
+#### A masked pattern was here ####
 0
 0
 0
 0
 0
 0
+10
+10
+10
+10
 2
 4
 4
@@ -1288,131 +1055,104 @@ POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongq
 8
 8
 9
-10
-10
-10
-10
 PREHOOK: query: explain select * from t1 a left semi join t2 b on a.key = 2*b.key sort by a.key, a.value
 PREHOOK: type: QUERY
 POSTHOOK: query: explain select * from t1 a left semi join t2 b on a.key = 2*b.key sort by a.key, a.value
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_LEFTSEMIJOIN (TOK_TABREF t1 a) (TOK_TABREF t2 b) (= (. (TOK_TABLE_OR_COL a) key) (* 2 (. (TOK_TABLE_OR_COL b) key))))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR TOK_ALLCOLREF)) (TOK_SORTBY (TOK_TABSORTCOLNAMEASC (. (TOK_TABLE_OR_COL a) key)) (TOK_TABSORTCOLNAMEASC (. (TOK_TABLE_OR_COL a) value)))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
   Stage-2 depends on stages: Stage-1
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-2
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        a 
+      Map Operator Tree:
           TableScan
             alias: a
-            Reduce Output Operator
-              key expressions:
-                    expr: key
-                    type: int
-              sort order: +
-              Map-reduce partition columns:
-                    expr: key
-                    type: int
-              tag: 0
-              value expressions:
-                    expr: key
-                    type: int
-                    expr: value
-                    type: string
-        b 
+            Statistics: Num rows: 11 Data size: 79 Basic stats: COMPLETE Column stats: NONE
+            Filter Operator
+              predicate: key is not null (type: boolean)
+              Statistics: Num rows: 6 Data size: 43 Basic stats: COMPLETE Column stats: NONE
+              Reduce Output Operator
+                key expressions: key (type: int)
+                sort order: +
+                Map-reduce partition columns: key (type: int)
+                Statistics: Num rows: 6 Data size: 43 Basic stats: COMPLETE Column stats: NONE
+                value expressions: value (type: string)
           TableScan
             alias: b
-            Select Operator
-              expressions:
-                    expr: key
-                    type: int
-              outputColumnNames: key
-              Group By Operator
-                bucketGroup: false
-                keys:
-                      expr: key
-                      type: int
-                mode: hash
-                outputColumnNames: _col0
-                Reduce Output Operator
-                  key expressions:
-                        expr: (2 * _col0)
-                        type: int
-                  sort order: +
-                  Map-reduce partition columns:
-                        expr: (2 * _col0)
-                        type: int
-                  tag: 1
+            Statistics: Num rows: 11 Data size: 84 Basic stats: COMPLETE Column stats: NONE
+            Filter Operator
+              predicate: (2 * key) is not null (type: boolean)
+              Statistics: Num rows: 6 Data size: 45 Basic stats: COMPLETE Column stats: NONE
+              Select Operator
+                expressions: key (type: int)
+                outputColumnNames: key
+                Statistics: Num rows: 6 Data size: 45 Basic stats: COMPLETE Column stats: NONE
+                Group By Operator
+                  keys: key (type: int)
+                  mode: hash
+                  outputColumnNames: _col0
+                  Statistics: Num rows: 6 Data size: 45 Basic stats: COMPLETE Column stats: NONE
+                  Reduce Output Operator
+                    key expressions: (2 * _col0) (type: int)
+                    sort order: +
+                    Map-reduce partition columns: (2 * _col0) (type: int)
+                    Statistics: Num rows: 6 Data size: 45 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
         Join Operator
           condition map:
                Left Semi Join 0 to 1
-          condition expressions:
-            0 {VALUE._col0} {VALUE._col1}
-            1 
-          handleSkewJoin: false
+          keys:
+            0 key (type: int)
+            1 (2 * _col0) (type: int)
           outputColumnNames: _col0, _col1
-          Select Operator
-            expressions:
-                  expr: _col0
-                  type: int
-                  expr: _col1
-                  type: string
-            outputColumnNames: _col0, _col1
-            File Output Operator
-              compressed: false
-              GlobalTableId: 0
-              table:
-                  input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-                  output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+          Statistics: Num rows: 6 Data size: 47 Basic stats: COMPLETE Column stats: NONE
+          File Output Operator
+            compressed: false
+            table:
+                input format: org.apache.hadoop.mapred.SequenceFileInputFormat
+                output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe
 
   Stage: Stage-2
     Map Reduce
-      Alias -> Map Operator Tree:
-        file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-03-43_629_5752544729482637710/-mr-10002 
+      Map Operator Tree:
+          TableScan
             Reduce Output Operator
-              key expressions:
-                    expr: _col0
-                    type: int
-                    expr: _col1
-                    type: string
+              key expressions: _col0 (type: int), _col1 (type: string)
               sort order: ++
-              tag: -1
-              value expressions:
-                    expr: _col0
-                    type: int
-                    expr: _col1
-                    type: string
+              Statistics: Num rows: 6 Data size: 47 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
-        Extract
+        Select Operator
+          expressions: KEY.reducesinkkey0 (type: int), KEY.reducesinkkey1 (type: string)
+          outputColumnNames: _col0, _col1
+          Statistics: Num rows: 6 Data size: 47 Basic stats: COMPLETE Column stats: NONE
           File Output Operator
             compressed: false
-            GlobalTableId: 0
+            Statistics: Num rows: 6 Data size: 47 Basic stats: COMPLETE Column stats: NONE
             table:
                 input format: org.apache.hadoop.mapred.TextInputFormat
                 output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select * from t1 a left semi join t2 b on a.key = 2*b.key sort by a.key, a.value
 PREHOOK: type: QUERY
 PREHOOK: Input: default@t1
 PREHOOK: Input: default@t2
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-03-43_779_3560439419287948511/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select * from t1 a left semi join t2 b on a.key = 2*b.key sort by a.key, a.value
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@t1
 POSTHOOK: Input: default@t2
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-03-43_779_3560439419287948511/-mr-10000
+#### A masked pattern was here ####
 0	val_0
 0	val_0
 0	val_0
@@ -1421,152 +1161,121 @@ PREHOOK: query: explain select * from t1 a join t2 b on a.key = b.key left semi 
 PREHOOK: type: QUERY
 POSTHOOK: query: explain select * from t1 a join t2 b on a.key = b.key left semi join t3 c on b.key = c.key sort by a.key, a.value
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_LEFTSEMIJOIN (TOK_JOIN (TOK_TABREF t1 a) (TOK_TABREF t2 b) (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL b) key))) (TOK_TABREF t3 c) (= (. (TOK_TABLE_OR_COL b) key) (. (TOK_TABLE_OR_COL c) key)))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR TOK_ALLCOLREF)) (TOK_SORTBY (TOK_TABSORTCOLNAMEASC (. (TOK_TABLE_OR_COL a) key)) (TOK_TABSORTCOLNAMEASC (. (TOK_TABLE_OR_COL a) value)))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
   Stage-2 depends on stages: Stage-1
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-2
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        a 
+      Map Operator Tree:
           TableScan
             alias: a
-            Reduce Output Operator
-              key expressions:
-                    expr: key
-                    type: int
-              sort order: +
-              Map-reduce partition columns:
-                    expr: key
-                    type: int
-              tag: 0
-              value expressions:
-                    expr: key
-                    type: int
-                    expr: value
-                    type: string
-        b 
+            Statistics: Num rows: 11 Data size: 79 Basic stats: COMPLETE Column stats: NONE
+            Filter Operator
+              predicate: key is not null (type: boolean)
+              Statistics: Num rows: 6 Data size: 43 Basic stats: COMPLETE Column stats: NONE
+              Reduce Output Operator
+                key expressions: key (type: int)
+                sort order: +
+                Map-reduce partition columns: key (type: int)
+                Statistics: Num rows: 6 Data size: 43 Basic stats: COMPLETE Column stats: NONE
+                value expressions: value (type: string)
           TableScan
             alias: b
-            Reduce Output Operator
-              key expressions:
-                    expr: key
-                    type: int
-              sort order: +
-              Map-reduce partition columns:
-                    expr: key
-                    type: int
-              tag: 1
-              value expressions:
-                    expr: key
-                    type: int
-                    expr: value
-                    type: string
-        c 
+            Statistics: Num rows: 11 Data size: 84 Basic stats: COMPLETE Column stats: NONE
+            Filter Operator
+              predicate: key is not null (type: boolean)
+              Statistics: Num rows: 6 Data size: 45 Basic stats: COMPLETE Column stats: NONE
+              Reduce Output Operator
+                key expressions: key (type: int)
+                sort order: +
+                Map-reduce partition columns: key (type: int)
+                Statistics: Num rows: 6 Data size: 45 Basic stats: COMPLETE Column stats: NONE
+                value expressions: value (type: string)
           TableScan
             alias: c
-            Select Operator
-              expressions:
-                    expr: key
-                    type: int
-              outputColumnNames: key
-              Group By Operator
-                bucketGroup: false
-                keys:
-                      expr: key
-                      type: int
-                mode: hash
-                outputColumnNames: _col0
-                Reduce Output Operator
-                  key expressions:
-                        expr: _col0
-                        type: int
-                  sort order: +
-                  Map-reduce partition columns:
-                        expr: _col0
-                        type: int
-                  tag: 2
+            Statistics: Num rows: 22 Data size: 163 Basic stats: COMPLETE Column stats: NONE
+            Filter Operator
+              predicate: key is not null (type: boolean)
+              Statistics: Num rows: 11 Data size: 81 Basic stats: COMPLETE Column stats: NONE
+              Select Operator
+                expressions: key (type: int)
+                outputColumnNames: key
+                Statistics: Num rows: 11 Data size: 81 Basic stats: COMPLETE Column stats: NONE
+                Group By Operator
+                  keys: key (type: int)
+                  mode: hash
+                  outputColumnNames: _col0
+                  Statistics: Num rows: 11 Data size: 81 Basic stats: COMPLETE Column stats: NONE
+                  Reduce Output Operator
+                    key expressions: _col0 (type: int)
+                    sort order: +
+                    Map-reduce partition columns: _col0 (type: int)
+                    Statistics: Num rows: 11 Data size: 81 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
         Join Operator
           condition map:
                Inner Join 0 to 1
                Left Semi Join 1 to 2
-          condition expressions:
-            0 {VALUE._col0} {VALUE._col1}
-            1 {VALUE._col0} {VALUE._col1}
-            2 
-          handleSkewJoin: false
-          outputColumnNames: _col0, _col1, _col4, _col5
+          keys:
+            0 key (type: int)
+            1 key (type: int)
+            2 _col0 (type: int)
+          outputColumnNames: _col0, _col1, _col5, _col6
+          Statistics: Num rows: 24 Data size: 178 Basic stats: COMPLETE Column stats: NONE
           Select Operator
-            expressions:
-                  expr: _col0
-                  type: int
-                  expr: _col1
-                  type: string
-                  expr: _col4
-                  type: int
-                  expr: _col5
-                  type: string
+            expressions: _col0 (type: int), _col1 (type: string), _col5 (type: int), _col6 (type: string)
             outputColumnNames: _col0, _col1, _col2, _col3
+            Statistics: Num rows: 24 Data size: 178 Basic stats: COMPLETE Column stats: NONE
             File Output Operator
               compressed: false
-              GlobalTableId: 0
               table:
                   input format: org.apache.hadoop.mapred.SequenceFileInputFormat
                   output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                  serde: org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe
 
   Stage: Stage-2
     Map Reduce
-      Alias -> Map Operator Tree:
-        file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-04-00_648_373535142060359448/-mr-10002 
+      Map Operator Tree:
+          TableScan
             Reduce Output Operator
-              key expressions:
-                    expr: _col0
-                    type: int
-                    expr: _col1
-                    type: string
+              key expressions: _col0 (type: int), _col1 (type: string)
               sort order: ++
-              tag: -1
-              value expressions:
-                    expr: _col0
-                    type: int
-                    expr: _col1
-                    type: string
-                    expr: _col2
-                    type: int
-                    expr: _col3
-                    type: string
+              Statistics: Num rows: 24 Data size: 178 Basic stats: COMPLETE Column stats: NONE
+              value expressions: _col2 (type: int), _col3 (type: string)
       Reduce Operator Tree:
-        Extract
+        Select Operator
+          expressions: KEY.reducesinkkey0 (type: int), KEY.reducesinkkey1 (type: string), VALUE._col0 (type: int), VALUE._col1 (type: string)
+          outputColumnNames: _col0, _col1, _col2, _col3
+          Statistics: Num rows: 24 Data size: 178 Basic stats: COMPLETE Column stats: NONE
           File Output Operator
             compressed: false
-            GlobalTableId: 0
+            Statistics: Num rows: 24 Data size: 178 Basic stats: COMPLETE Column stats: NONE
             table:
                 input format: org.apache.hadoop.mapred.TextInputFormat
                 output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select * from t1 a join t2 b on a.key = b.key left semi join t3 c on b.key = c.key sort by a.key, a.value
 PREHOOK: type: QUERY
 PREHOOK: Input: default@t1
 PREHOOK: Input: default@t2
 PREHOOK: Input: default@t3
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-04-00_983_7977499042899650897/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select * from t1 a join t2 b on a.key = b.key left semi join t3 c on b.key = c.key sort by a.key, a.value
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@t1
 POSTHOOK: Input: default@t2
 POSTHOOK: Input: default@t3
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-04-00_983_7977499042899650897/-mr-10000
+#### A masked pattern was here ####
 0	val_0	0	val_0
 0	val_0	0	val_0
 0	val_0	0	val_0
@@ -1576,150 +1285,115 @@ POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongq
 0	val_0	0	val_0
 0	val_0	0	val_0
 0	val_0	0	val_0
+10	val_10	10	val_5
+10	val_10	10	val_5
+10	val_10	10	val_5
 4	val_4	4	val_2
 8	val_8	8	val_4
-10	val_10	10	val_5
-10	val_10	10	val_5
-10	val_10	10	val_5
 PREHOOK: query: explain select * from t3 a left semi join t1 b on a.key = b.key and a.value=b.value sort by a.key, a.value
 PREHOOK: type: QUERY
 POSTHOOK: query: explain select * from t3 a left semi join t1 b on a.key = b.key and a.value=b.value sort by a.key, a.value
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_LEFTSEMIJOIN (TOK_TABREF t3 a) (TOK_TABREF t1 b) (and (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL b) key)) (= (. (TOK_TABLE_OR_COL a) value) (. (TOK_TABLE_OR_COL b) value))))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR TOK_ALLCOLREF)) (TOK_SORTBY (TOK_TABSORTCOLNAMEASC (. (TOK_TABLE_OR_COL a) key)) (TOK_TABSORTCOLNAMEASC (. (TOK_TABLE_OR_COL a) value)))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
   Stage-2 depends on stages: Stage-1
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-2
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        a 
+      Map Operator Tree:
           TableScan
             alias: a
-            Reduce Output Operator
-              key expressions:
-                    expr: key
-                    type: int
-                    expr: value
-                    type: string
-              sort order: ++
-              Map-reduce partition columns:
-                    expr: key
-                    type: int
-                    expr: value
-                    type: string
-              tag: 0
-              value expressions:
-                    expr: key
-                    type: int
-                    expr: value
-                    type: string
-        b 
+            Statistics: Num rows: 22 Data size: 163 Basic stats: COMPLETE Column stats: NONE
+            Filter Operator
+              predicate: (key is not null and value is not null) (type: boolean)
+              Statistics: Num rows: 6 Data size: 44 Basic stats: COMPLETE Column stats: NONE
+              Reduce Output Operator
+                key expressions: key (type: int), value (type: string)
+                sort order: ++
+                Map-reduce partition columns: key (type: int), value (type: string)
+                Statistics: Num rows: 6 Data size: 44 Basic stats: COMPLETE Column stats: NONE
           TableScan
             alias: b
-            Select Operator
-              expressions:
-                    expr: key
-                    type: int
-                    expr: value
-                    type: string
-              outputColumnNames: key, value
-              Group By Operator
-                bucketGroup: false
-                keys:
-                      expr: key
-                      type: int
-                      expr: value
-                      type: string
-                mode: hash
-                outputColumnNames: _col0, _col1
-                Reduce Output Operator
-                  key expressions:
-                        expr: _col0
-                        type: int
-                        expr: _col1
-                        type: string
-                  sort order: ++
-                  Map-reduce partition columns:
-                        expr: _col0
-                        type: int
-                        expr: _col1
-                        type: string
-                  tag: 1
+            Statistics: Num rows: 11 Data size: 79 Basic stats: COMPLETE Column stats: NONE
+            Filter Operator
+              predicate: (key is not null and value is not null) (type: boolean)
+              Statistics: Num rows: 3 Data size: 21 Basic stats: COMPLETE Column stats: NONE
+              Select Operator
+                expressions: key (type: int), value (type: string)
+                outputColumnNames: key, value
+                Statistics: Num rows: 3 Data size: 21 Basic stats: COMPLETE Column stats: NONE
+                Group By Operator
+                  keys: key (type: int), value (type: string)
+                  mode: hash
+                  outputColumnNames: _col0, _col1
+                  Statistics: Num rows: 3 Data size: 21 Basic stats: COMPLETE Column stats: NONE
+                  Reduce Output Operator
+                    key expressions: _col0 (type: int), _col1 (type: string)
+                    sort order: ++
+                    Map-reduce partition columns: _col0 (type: int), _col1 (type: string)
+                    Statistics: Num rows: 3 Data size: 21 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
         Join Operator
           condition map:
                Left Semi Join 0 to 1
-          condition expressions:
-            0 {VALUE._col0} {VALUE._col1}
-            1 
-          handleSkewJoin: false
+          keys:
+            0 key (type: int), value (type: string)
+            1 _col0 (type: int), _col1 (type: string)
           outputColumnNames: _col0, _col1
-          Select Operator
-            expressions:
-                  expr: _col0
-                  type: int
-                  expr: _col1
-                  type: string
-            outputColumnNames: _col0, _col1
-            File Output Operator
-              compressed: false
-              GlobalTableId: 0
-              table:
-                  input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-                  output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+          Statistics: Num rows: 6 Data size: 48 Basic stats: COMPLETE Column stats: NONE
+          File Output Operator
+            compressed: false
+            table:
+                input format: org.apache.hadoop.mapred.SequenceFileInputFormat
+                output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe
 
   Stage: Stage-2
     Map Reduce
-      Alias -> Map Operator Tree:
-        file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-04-17_051_7474953441543543987/-mr-10002 
+      Map Operator Tree:
+          TableScan
             Reduce Output Operator
-              key expressions:
-                    expr: _col0
-                    type: int
-                    expr: _col1
-                    type: string
+              key expressions: _col0 (type: int), _col1 (type: string)
               sort order: ++
-              tag: -1
-              value expressions:
-                    expr: _col0
-                    type: int
-                    expr: _col1
-                    type: string
+              Statistics: Num rows: 6 Data size: 48 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
-        Extract
+        Select Operator
+          expressions: KEY.reducesinkkey0 (type: int), KEY.reducesinkkey1 (type: string)
+          outputColumnNames: _col0, _col1
+          Statistics: Num rows: 6 Data size: 48 Basic stats: COMPLETE Column stats: NONE
           File Output Operator
             compressed: false
-            GlobalTableId: 0
+            Statistics: Num rows: 6 Data size: 48 Basic stats: COMPLETE Column stats: NONE
             table:
                 input format: org.apache.hadoop.mapred.TextInputFormat
                 output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select * from t3 a left semi join t1 b on a.key = b.key and a.value=b.value sort by a.key, a.value
 PREHOOK: type: QUERY
 PREHOOK: Input: default@t1
 PREHOOK: Input: default@t3
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-04-17_231_2179425812915281444/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select * from t3 a left semi join t1 b on a.key = b.key and a.value=b.value sort by a.key, a.value
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@t1
 POSTHOOK: Input: default@t3
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-04-17_231_2179425812915281444/-mr-10000
+#### A masked pattern was here ####
 0	val_0
 0	val_0
 0	val_0
 0	val_0
 0	val_0
 0	val_0
+10	val_10
 2	val_2
 4	val_4
 5	val_5
@@ -1727,22 +1401,17 @@ POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongq
 5	val_5
 8	val_8
 9	val_9
-10	val_10
 PREHOOK: query: explain select /*+ mapjoin(b, c) */ a.key from t3 a left semi join t1 b on a.key = b.key left semi join t2 c on a.key = c.key sort by a.key
 PREHOOK: type: QUERY
 POSTHOOK: query: explain select /*+ mapjoin(b, c) */ a.key from t3 a left semi join t1 b on a.key = b.key left semi join t2 c on a.key = c.key sort by a.key
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_LEFTSEMIJOIN (TOK_LEFTSEMIJOIN (TOK_TABREF t3 a) (TOK_TABREF t1 b) (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL b) key))) (TOK_TABREF t2 c) (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL c) key)))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_HINTLIST (TOK_HINT TOK_MAPJOIN (TOK_HINTARGLIST b c))) (TOK_SELEXPR (. (TOK_TABLE_OR_COL a) key))) (TOK_SORTBY (TOK_TABSORTCOLNAMEASC (. (TOK_TABLE_OR_COL a) key)))))
-
 STAGE DEPENDENCIES:
-  Stage-5 is a root stage
-  Stage-1 depends on stages: Stage-5
-  Stage-2 depends on stages: Stage-1
-  Stage-0 is a root stage
+  Stage-4 is a root stage
+  Stage-1 depends on stages: Stage-4
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
-  Stage: Stage-5
+  Stage: Stage-4
     Map Reduce Local Work
       Alias -> Map Local Tables:
         b 
@@ -1755,278 +1424,219 @@ STAGE PLANS:
         b 
           TableScan
             alias: b
-            Select Operator
-              expressions:
-                    expr: key
-                    type: int
-              outputColumnNames: key
-              Group By Operator
-                bucketGroup: false
-                keys:
-                      expr: key
-                      type: int
-                mode: hash
-                outputColumnNames: _col0
-                HashTable Sink Operator
-                  condition expressions:
-                    0 {key}
-                    1 
-                    2 
-                  handleSkewJoin: false
-                  keys:
-                    0 [Column[key]]
-                    1 [Column[_col0]]
-                    2 [Column[_col0]]
-                  Position of Big Table: 0
+            Statistics: Num rows: 11 Data size: 79 Basic stats: COMPLETE Column stats: NONE
+            Filter Operator
+              predicate: key is not null (type: boolean)
+              Statistics: Num rows: 6 Data size: 43 Basic stats: COMPLETE Column stats: NONE
+              Select Operator
+                expressions: key (type: int)
+                outputColumnNames: key
+                Statistics: Num rows: 6 Data size: 43 Basic stats: COMPLETE Column stats: NONE
+                Group By Operator
+                  keys: key (type: int)
+                  mode: hash
+                  outputColumnNames: _col0
+                  Statistics: Num rows: 6 Data size: 43 Basic stats: COMPLETE Column stats: NONE
+                  HashTable Sink Operator
+                    keys:
+                      0 key (type: int)
+                      1 _col0 (type: int)
+                      2 _col0 (type: int)
         c 
           TableScan
             alias: c
-            Select Operator
-              expressions:
-                    expr: key
-                    type: int
-              outputColumnNames: key
-              Group By Operator
-                bucketGroup: false
-                keys:
-                      expr: key
-                      type: int
-                mode: hash
-                outputColumnNames: _col0
-                HashTable Sink Operator
-                  condition expressions:
-                    0 {key}
-                    1 
-                    2 
-                  handleSkewJoin: false
-                  keys:
-                    0 [Column[key]]
-                    1 [Column[_col0]]
-                    2 [Column[_col0]]
-                  Position of Big Table: 0
+            Statistics: Num rows: 11 Data size: 84 Basic stats: COMPLETE Column stats: NONE
+            Filter Operator
+              predicate: key is not null (type: boolean)
+              Statistics: Num rows: 6 Data size: 45 Basic stats: COMPLETE Column stats: NONE
+              Select Operator
+                expressions: key (type: int)
+                outputColumnNames: key
+                Statistics: Num rows: 6 Data size: 45 Basic stats: COMPLETE Column stats: NONE
+                Group By Operator
+                  keys: key (type: int)
+                  mode: hash
+                  outputColumnNames: _col0
+                  Statistics: Num rows: 6 Data size: 45 Basic stats: COMPLETE Column stats: NONE
+                  HashTable Sink Operator
+                    keys:
+                      0 key (type: int)
+                      1 _col0 (type: int)
+                      2 _col0 (type: int)
 
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        a 
+      Map Operator Tree:
           TableScan
             alias: a
-            Map Join Operator
-              condition map:
-                   Left Semi Join 0 to 1
-                   Left Semi Join 0 to 2
-              condition expressions:
-                0 {key}
-                1 
-                2 
-              handleSkewJoin: false
-              keys:
-                0 [Column[key]]
-                1 [Column[_col0]]
-                2 [Column[_col0]]
-              outputColumnNames: _col0
-              Position of Big Table: 0
-              File Output Operator
-                compressed: false
-                GlobalTableId: 0
-                table:
-                    input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-                    output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+            Statistics: Num rows: 22 Data size: 163 Basic stats: COMPLETE Column stats: NONE
+            Filter Operator
+              predicate: key is not null (type: boolean)
+              Statistics: Num rows: 11 Data size: 81 Basic stats: COMPLETE Column stats: NONE
+              Map Join Operator
+                condition map:
+                     Left Semi Join 0 to 1
+                     Left Semi Join 0 to 2
+                keys:
+                  0 key (type: int)
+                  1 _col0 (type: int)
+                  2 _col0 (type: int)
+                outputColumnNames: _col0
+                Statistics: Num rows: 24 Data size: 178 Basic stats: COMPLETE Column stats: NONE
+                Reduce Output Operator
+                  key expressions: _col0 (type: int)
+                  sort order: +
+                  Statistics: Num rows: 24 Data size: 178 Basic stats: COMPLETE Column stats: NONE
       Local Work:
         Map Reduce Local Work
-
-  Stage: Stage-2
-    Map Reduce
-      Alias -> Map Operator Tree:
-        file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-04-33_573_6260564714806927759/-mr-10002 
-          Select Operator
-            expressions:
-                  expr: _col0
-                  type: int
-            outputColumnNames: _col0
-            Select Operator
-              expressions:
-                    expr: _col0
-                    type: int
-              outputColumnNames: _col0
-              Reduce Output Operator
-                key expressions:
-                      expr: _col0
-                      type: int
-                sort order: +
-                tag: -1
-                value expressions:
-                      expr: _col0
-                      type: int
       Reduce Operator Tree:
-        Extract
+        Select Operator
+          expressions: KEY.reducesinkkey0 (type: int)
+          outputColumnNames: _col0
+          Statistics: Num rows: 24 Data size: 178 Basic stats: COMPLETE Column stats: NONE
           File Output Operator
             compressed: false
-            GlobalTableId: 0
+            Statistics: Num rows: 24 Data size: 178 Basic stats: COMPLETE Column stats: NONE
             table:
                 input format: org.apache.hadoop.mapred.TextInputFormat
                 output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select /*+ mapjoin(b, c) */ a.key from t3 a left semi join t1 b on a.key = b.key left semi join t2 c on a.key = c.key sort by a.key
 PREHOOK: type: QUERY
 PREHOOK: Input: default@t1
 PREHOOK: Input: default@t2
 PREHOOK: Input: default@t3
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-04-33_826_3229491168132326963/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select /*+ mapjoin(b, c) */ a.key from t3 a left semi join t1 b on a.key = b.key left semi join t2 c on a.key = c.key sort by a.key
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@t1
 POSTHOOK: Input: default@t2
 POSTHOOK: Input: default@t3
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-04-33_826_3229491168132326963/-mr-10000
+#### A masked pattern was here ####
 0
 0
 0
 0
 0
 0
+10
+10
+10
+10
 4
 4
 8
 8
-10
-10
-10
-10
 PREHOOK: query: explain select a.key from t3 a left outer join t1 b on a.key = b.key left semi join t2 c on b.key = c.key sort by a.key
 PREHOOK: type: QUERY
 POSTHOOK: query: explain select a.key from t3 a left outer join t1 b on a.key = b.key left semi join t2 c on b.key = c.key sort by a.key
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_LEFTSEMIJOIN (TOK_LEFTOUTERJOIN (TOK_TABREF t3 a) (TOK_TABREF t1 b) (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL b) key))) (TOK_TABREF t2 c) (= (. (TOK_TABLE_OR_COL b) key) (. (TOK_TABLE_OR_COL c) key)))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (. (TOK_TABLE_OR_COL a) key))) (TOK_SORTBY (TOK_TABSORTCOLNAMEASC (. (TOK_TABLE_OR_COL a) key)))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
   Stage-2 depends on stages: Stage-1
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-2
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        a 
+      Map Operator Tree:
           TableScan
             alias: a
+            Statistics: Num rows: 22 Data size: 163 Basic stats: COMPLETE Column stats: NONE
             Reduce Output Operator
-              key expressions:
-                    expr: key
-                    type: int
+              key expressions: key (type: int)
               sort order: +
-              Map-reduce partition columns:
-                    expr: key
-                    type: int
-              tag: 0
-              value expressions:
-                    expr: key
-                    type: int
-        b 
+              Map-reduce partition columns: key (type: int)
+              Statistics: Num rows: 22 Data size: 163 Basic stats: COMPLETE Column stats: NONE
           TableScan
             alias: b
+            Statistics: Num rows: 11 Data size: 79 Basic stats: COMPLETE Column stats: NONE
             Reduce Output Operator
-              key expressions:
-                    expr: key
-                    type: int
+              key expressions: key (type: int)
               sort order: +
-              Map-reduce partition columns:
-                    expr: key
-                    type: int
-              tag: 1
-        c 
+              Map-reduce partition columns: key (type: int)
+              Statistics: Num rows: 11 Data size: 79 Basic stats: COMPLETE Column stats: NONE
           TableScan
             alias: c
+            Statistics: Num rows: 11 Data size: 84 Basic stats: COMPLETE Column stats: NONE
             Select Operator
-              expressions:
-                    expr: key
-                    type: int
+              expressions: key (type: int)
               outputColumnNames: key
+              Statistics: Num rows: 11 Data size: 84 Basic stats: COMPLETE Column stats: NONE
               Group By Operator
-                bucketGroup: false
-                keys:
-                      expr: key
-                      type: int
+                keys: key (type: int)
                 mode: hash
                 outputColumnNames: _col0
+                Statistics: Num rows: 11 Data size: 84 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
-                  key expressions:
-                        expr: _col0
-                        type: int
+                  key expressions: _col0 (type: int)
                   sort order: +
-                  Map-reduce partition columns:
-                        expr: _col0
-                        type: int
-                  tag: 2
+                  Map-reduce partition columns: _col0 (type: int)
+                  Statistics: Num rows: 11 Data size: 84 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
         Join Operator
           condition map:
                Left Outer Join0 to 1
                Left Semi Join 1 to 2
-          condition expressions:
-            0 {VALUE._col0}
-            1 
-            2 
-          handleSkewJoin: false
+          keys:
+            0 key (type: int)
+            1 key (type: int)
+            2 _col0 (type: int)
           outputColumnNames: _col0
-          Select Operator
-            expressions:
-                  expr: _col0
-                  type: int
-            outputColumnNames: _col0
-            File Output Operator
-              compressed: false
-              GlobalTableId: 0
-              table:
-                  input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-                  output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+          Statistics: Num rows: 48 Data size: 358 Basic stats: COMPLETE Column stats: NONE
+          File Output Operator
+            compressed: false
+            table:
+                input format: org.apache.hadoop.mapred.SequenceFileInputFormat
+                output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe
 
   Stage: Stage-2
     Map Reduce
-      Alias -> Map Operator Tree:
-        file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-04-55_240_4472382832724150377/-mr-10002 
+      Map Operator Tree:
+          TableScan
             Reduce Output Operator
-              key expressions:
-                    expr: _col0
-                    type: int
+              key expressions: _col0 (type: int)
               sort order: +
-              tag: -1
-              value expressions:
-                    expr: _col0
-                    type: int
+              Statistics: Num rows: 48 Data size: 358 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
-        Extract
+        Select Operator
+          expressions: KEY.reducesinkkey0 (type: int)
+          outputColumnNames: _col0
+          Statistics: Num rows: 48 Data size: 358 Basic stats: COMPLETE Column stats: NONE
           File Output Operator
             compressed: false
-            GlobalTableId: 0
+            Statistics: Num rows: 48 Data size: 358 Basic stats: COMPLETE Column stats: NONE
             table:
                 input format: org.apache.hadoop.mapred.TextInputFormat
                 output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select a.key from t3 a left outer join t1 b on a.key = b.key left semi join t2 c on b.key = c.key sort by a.key
 PREHOOK: type: QUERY
 PREHOOK: Input: default@t1
 PREHOOK: Input: default@t2
 PREHOOK: Input: default@t3
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-04-55_429_8454721176911576485/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select a.key from t3 a left outer join t1 b on a.key = b.key left semi join t2 c on b.key = c.key sort by a.key
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@t1
 POSTHOOK: Input: default@t2
 POSTHOOK: Input: default@t3
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-04-55_429_8454721176911576485/-mr-10000
+#### A masked pattern was here ####
 0
 0
 0
@@ -2045,146 +1655,117 @@ POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongq
 0
 0
 0
+10
+10
+10
+10
 4
 4
 8
 8
-10
-10
-10
-10
 PREHOOK: query: explain select a.key from t1 a right outer join t3 b on a.key = b.key left semi join t2 c on b.key = c.key sort by a.key
 PREHOOK: type: QUERY
 POSTHOOK: query: explain select a.key from t1 a right outer join t3 b on a.key = b.key left semi join t2 c on b.key = c.key sort by a.key
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_LEFTSEMIJOIN (TOK_RIGHTOUTERJOIN (TOK_TABREF t1 a) (TOK_TABREF t3 b) (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL b) key))) (TOK_TABREF t2 c) (= (. (TOK_TABLE_OR_COL b) key) (. (TOK_TABLE_OR_COL c) key)))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (. (TOK_TABLE_OR_COL a) key))) (TOK_SORTBY (TOK_TABSORTCOLNAMEASC (. (TOK_TABLE_OR_COL a) key)))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
   Stage-2 depends on stages: Stage-1
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-2
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        a 
+      Map Operator Tree:
           TableScan
             alias: a
+            Statistics: Num rows: 11 Data size: 79 Basic stats: COMPLETE Column stats: NONE
             Reduce Output Operator
-              key expressions:
-                    expr: key
-                    type: int
+              key expressions: key (type: int)
               sort order: +
-              Map-reduce partition columns:
-                    expr: key
-                    type: int
-              tag: 0
-              value expressions:
-                    expr: key
-                    type: int
-        b 
+              Map-reduce partition columns: key (type: int)
+              Statistics: Num rows: 11 Data size: 79 Basic stats: COMPLETE Column stats: NONE
           TableScan
             alias: b
+            Statistics: Num rows: 22 Data size: 163 Basic stats: COMPLETE Column stats: NONE
             Reduce Output Operator
-              key expressions:
-                    expr: key
-                    type: int
+              key expressions: key (type: int)
               sort order: +
-              Map-reduce partition columns:
-                    expr: key
-                    type: int
-              tag: 1
-        c 
+              Map-reduce partition columns: key (type: int)
+              Statistics: Num rows: 22 Data size: 163 Basic stats: COMPLETE Column stats: NONE
           TableScan
             alias: c
+            Statistics: Num rows: 11 Data size: 84 Basic stats: COMPLETE Column stats: NONE
             Select Operator
-              expressions:
-                    expr: key
-                    type: int
+              expressions: key (type: int)
               outputColumnNames: key
+              Statistics: Num rows: 11 Data size: 84 Basic stats: COMPLETE Column stats: NONE
               Group By Operator
-                bucketGroup: false
-                keys:
-                      expr: key
-                      type: int
+                keys: key (type: int)
                 mode: hash
                 outputColumnNames: _col0
+                Statistics: Num rows: 11 Data size: 84 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
-                  key expressions:
-                        expr: _col0
-                        type: int
+                  key expressions: _col0 (type: int)
                   sort order: +
-                  Map-reduce partition columns:
-                        expr: _col0
-                        type: int
-                  tag: 2
+                  Map-reduce partition columns: _col0 (type: int)
+                  Statistics: Num rows: 11 Data size: 84 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
         Join Operator
           condition map:
                Right Outer Join0 to 1
                Left Semi Join 1 to 2
-          condition expressions:
-            0 {VALUE._col0}
-            1 
-            2 
-          handleSkewJoin: false
+          keys:
+            0 key (type: int)
+            1 key (type: int)
+            2 _col0 (type: int)
           outputColumnNames: _col0
-          Select Operator
-            expressions:
-                  expr: _col0
-                  type: int
-            outputColumnNames: _col0
-            File Output Operator
-              compressed: false
-              GlobalTableId: 0
-              table:
-                  input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-                  output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+          Statistics: Num rows: 48 Data size: 358 Basic stats: COMPLETE Column stats: NONE
+          File Output Operator
+            compressed: false
+            table:
+                input format: org.apache.hadoop.mapred.SequenceFileInputFormat
+                output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe
 
   Stage: Stage-2
     Map Reduce
-      Alias -> Map Operator Tree:
-        file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-05-12_866_4359353511062609004/-mr-10002 
+      Map Operator Tree:
+          TableScan
             Reduce Output Operator
-              key expressions:
-                    expr: _col0
-                    type: int
+              key expressions: _col0 (type: int)
               sort order: +
-              tag: -1
-              value expressions:
-                    expr: _col0
-                    type: int
+              Statistics: Num rows: 48 Data size: 358 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
-        Extract
+        Select Operator
+          expressions: KEY.reducesinkkey0 (type: int)
+          outputColumnNames: _col0
+          Statistics: Num rows: 48 Data size: 358 Basic stats: COMPLETE Column stats: NONE
           File Output Operator
             compressed: false
-            GlobalTableId: 0
+            Statistics: Num rows: 48 Data size: 358 Basic stats: COMPLETE Column stats: NONE
             table:
                 input format: org.apache.hadoop.mapred.TextInputFormat
                 output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select a.key from t1 a right outer join t3 b on a.key = b.key left semi join t2 c on b.key = c.key sort by a.key
 PREHOOK: type: QUERY
 PREHOOK: Input: default@t1
 PREHOOK: Input: default@t2
 PREHOOK: Input: default@t3
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-05-13_034_2999962254990000638/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select a.key from t1 a right outer join t3 b on a.key = b.key left semi join t2 c on b.key = c.key sort by a.key
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@t1
 POSTHOOK: Input: default@t2
 POSTHOOK: Input: default@t3
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-05-13_034_2999962254990000638/-mr-10000
-NULL
-NULL
-NULL
+#### A masked pattern was here ####
 0
 0
 0
@@ -2203,146 +1784,120 @@ NULL
 0
 0
 0
+10
+10
+10
+10
 4
 4
 8
 8
-10
-10
-10
-10
+NULL
+NULL
+NULL
 PREHOOK: query: explain select a.key from t1 a full outer join t3 b on a.key = b.key left semi join t2 c on b.key = c.key sort by a.key
 PREHOOK: type: QUERY
 POSTHOOK: query: explain select a.key from t1 a full outer join t3 b on a.key = b.key left semi join t2 c on b.key = c.key sort by a.key
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_LEFTSEMIJOIN (TOK_FULLOUTERJOIN (TOK_TABREF t1 a) (TOK_TABREF t3 b) (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL b) key))) (TOK_TABREF t2 c) (= (. (TOK_TABLE_OR_COL b) key) (. (TOK_TABLE_OR_COL c) key)))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (. (TOK_TABLE_OR_COL a) key))) (TOK_SORTBY (TOK_TABSORTCOLNAMEASC (. (TOK_TABLE_OR_COL a) key)))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
   Stage-2 depends on stages: Stage-1
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-2
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        a 
+      Map Operator Tree:
           TableScan
             alias: a
+            Statistics: Num rows: 11 Data size: 79 Basic stats: COMPLETE Column stats: NONE
             Reduce Output Operator
-              key expressions:
-                    expr: key
-                    type: int
+              key expressions: key (type: int)
               sort order: +
-              Map-reduce partition columns:
-                    expr: key
-                    type: int
-              tag: 0
-              value expressions:
-                    expr: key
-                    type: int
-        b 
+              Map-reduce partition columns: key (type: int)
+              Statistics: Num rows: 11 Data size: 79 Basic stats: COMPLETE Column stats: NONE
           TableScan
             alias: b
+            Statistics: Num rows: 22 Data size: 163 Basic stats: COMPLETE Column stats: NONE
             Reduce Output Operator
-              key expressions:
-                    expr: key
-                    type: int
+              key expressions: key (type: int)
               sort order: +
-              Map-reduce partition columns:
-                    expr: key
-                    type: int
-              tag: 1
-        c 
+              Map-reduce partition columns: key (type: int)
+              Statistics: Num rows: 22 Data size: 163 Basic stats: COMPLETE Column stats: NONE
           TableScan
             alias: c
+            Statistics: Num rows: 11 Data size: 84 Basic stats: COMPLETE Column stats: NONE
             Select Operator
-              expressions:
-                    expr: key
-                    type: int
+              expressions: key (type: int)
               outputColumnNames: key
+              Statistics: Num rows: 11 Data size: 84 Basic stats: COMPLETE Column stats: NONE
               Group By Operator
-                bucketGroup: false
-                keys:
-                      expr: key
-                      type: int
+                keys: key (type: int)
                 mode: hash
                 outputColumnNames: _col0
+                Statistics: Num rows: 11 Data size: 84 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
-                  key expressions:
-                        expr: _col0
-                        type: int
+                  key expressions: _col0 (type: int)
                   sort order: +
-                  Map-reduce partition columns:
-                        expr: _col0
-                        type: int
-                  tag: 2
+                  Map-reduce partition columns: _col0 (type: int)
+                  Statistics: Num rows: 11 Data size: 84 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
         Join Operator
           condition map:
                Outer Join 0 to 1
                Left Semi Join 1 to 2
-          condition expressions:
-            0 {VALUE._col0}
-            1 
-            2 
-          handleSkewJoin: false
+          keys:
+            0 key (type: int)
+            1 key (type: int)
+            2 _col0 (type: int)
           outputColumnNames: _col0
-          Select Operator
-            expressions:
-                  expr: _col0
-                  type: int
-            outputColumnNames: _col0
-            File Output Operator
-              compressed: false
-              GlobalTableId: 0
-              table:
-                  input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-                  output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+          Statistics: Num rows: 48 Data size: 358 Basic stats: COMPLETE Column stats: NONE
+          File Output Operator
+            compressed: false
+            table:
+                input format: org.apache.hadoop.mapred.SequenceFileInputFormat
+                output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe
 
   Stage: Stage-2
     Map Reduce
-      Alias -> Map Operator Tree:
-        file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-05-27_311_4743482924605624788/-mr-10002 
+      Map Operator Tree:
+          TableScan
             Reduce Output Operator
-              key expressions:
-                    expr: _col0
-                    type: int
+              key expressions: _col0 (type: int)
               sort order: +
-              tag: -1
-              value expressions:
-                    expr: _col0
-                    type: int
+              Statistics: Num rows: 48 Data size: 358 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
-        Extract
+        Select Operator
+          expressions: KEY.reducesinkkey0 (type: int)
+          outputColumnNames: _col0
+          Statistics: Num rows: 48 Data size: 358 Basic stats: COMPLETE Column stats: NONE
           File Output Operator
             compressed: false
-            GlobalTableId: 0
+            Statistics: Num rows: 48 Data size: 358 Basic stats: COMPLETE Column stats: NONE
             table:
                 input format: org.apache.hadoop.mapred.TextInputFormat
                 output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select a.key from t1 a full outer join t3 b on a.key = b.key left semi join t2 c on b.key = c.key sort by a.key
 PREHOOK: type: QUERY
 PREHOOK: Input: default@t1
 PREHOOK: Input: default@t2
 PREHOOK: Input: default@t3
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-05-27_421_7482213301780796952/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select a.key from t1 a full outer join t3 b on a.key = b.key left semi join t2 c on b.key = c.key sort by a.key
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@t1
 POSTHOOK: Input: default@t2
 POSTHOOK: Input: default@t3
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-05-27_421_7482213301780796952/-mr-10000
-NULL
-NULL
-NULL
+#### A masked pattern was here ####
 0
 0
 0
@@ -2361,143 +1916,120 @@ NULL
 0
 0
 0
+10
+10
+10
+10
 4
 4
 8
 8
-10
-10
-10
-10
+NULL
+NULL
+NULL
 PREHOOK: query: explain select a.key from t3 a left semi join t2 b on a.key = b.key left outer join t1 c on a.key = c.key sort by a.key
 PREHOOK: type: QUERY
 POSTHOOK: query: explain select a.key from t3 a left semi join t2 b on a.key = b.key left outer join t1 c on a.key = c.key sort by a.key
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_LEFTOUTERJOIN (TOK_LEFTSEMIJOIN (TOK_TABREF t3 a) (TOK_TABREF t2 b) (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL b) key))) (TOK_TABREF t1 c) (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL c) key)))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (. (TOK_TABLE_OR_COL a) key))) (TOK_SORTBY (TOK_TABSORTCOLNAMEASC (. (TOK_TABLE_OR_COL a) key)))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
   Stage-2 depends on stages: Stage-1
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-2
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        a 
+      Map Operator Tree:
           TableScan
             alias: a
+            Statistics: Num rows: 22 Data size: 163 Basic stats: COMPLETE Column stats: NONE
             Reduce Output Operator
-              key expressions:
-                    expr: key
-                    type: int
+              key expressions: key (type: int)
               sort order: +
-              Map-reduce partition columns:
-                    expr: key
-                    type: int
-              tag: 0
-              value expressions:
-                    expr: key
-                    type: int
-        b 
+              Map-reduce partition columns: key (type: int)
+              Statistics: Num rows: 22 Data size: 163 Basic stats: COMPLETE Column stats: NONE
           TableScan
             alias: b
+            Statistics: Num rows: 11 Data size: 84 Basic stats: COMPLETE Column stats: NONE
             Select Operator
-              expressions:
-                    expr: key
-                    type: int
+              expressions: key (type: int)
               outputColumnNames: key
+              Statistics: Num rows: 11 Data size: 84 Basic stats: COMPLETE Column stats: NONE
               Group By Operator
-                bucketGroup: false
-                keys:
-                      expr: key
-                      type: int
+                keys: key (type: int)
                 mode: hash
                 outputColumnNames: _col0
+                Statistics: Num rows: 11 Data size: 84 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
-                  key expressions:
-                        expr: _col0
-                        type: int
+                  key expressions: _col0 (type: int)
                   sort order: +
-                  Map-reduce partition columns:
-                        expr: _col0
-                        type: int
-                  tag: 1
-        c 
+                  Map-reduce partition columns: _col0 (type: int)
+                  Statistics: Num rows: 11 Data size: 84 Basic stats: COMPLETE Column stats: NONE
           TableScan
             alias: c
+            Statistics: Num rows: 11 Data size: 79 Basic stats: COMPLETE Column stats: NONE
             Reduce Output Operator
-              key expressions:
-                    expr: key
-                    type: int
+              key expressions: key (type: int)
               sort order: +
-              Map-reduce partition columns:
-                    expr: key
-                    type: int
-              tag: 2
+              Map-reduce partition columns: key (type: int)
+              Statistics: Num rows: 11 Data size: 79 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
         Join Operator
           condition map:
                Left Semi Join 0 to 1
                Left Outer Join0 to 2
-          condition expressions:
-            0 {VALUE._col0}
-            1 
-            2 
-          handleSkewJoin: false
+          keys:
+            0 key (type: int)
+            1 _col0 (type: int)
+            2 key (type: int)
           outputColumnNames: _col0
-          Select Operator
-            expressions:
-                  expr: _col0
-                  type: int
-            outputColumnNames: _col0
-            File Output Operator
-              compressed: false
-              GlobalTableId: 0
-              table:
-                  input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-                  output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+          Statistics: Num rows: 48 Data size: 358 Basic stats: COMPLETE Column stats: NONE
+          File Output Operator
+            compressed: false
+            table:
+                input format: org.apache.hadoop.mapred.SequenceFileInputFormat
+                output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe
 
   Stage: Stage-2
     Map Reduce
-      Alias -> Map Operator Tree:
-        file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-05-43_118_4112077673076844815/-mr-10002 
+      Map Operator Tree:
+          TableScan
             Reduce Output Operator
-              key expressions:
-                    expr: _col0
-                    type: int
+              key expressions: _col0 (type: int)
               sort order: +
-              tag: -1
-              value expressions:
-                    expr: _col0
-                    type: int
+              Statistics: Num rows: 48 Data size: 358 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
-        Extract
+        Select Operator
+          expressions: KEY.reducesinkkey0 (type: int)
+          outputColumnNames: _col0
+          Statistics: Num rows: 48 Data size: 358 Basic stats: COMPLETE Column stats: NONE
           File Output Operator
             compressed: false
-            GlobalTableId: 0
+            Statistics: Num rows: 48 Data size: 358 Basic stats: COMPLETE Column stats: NONE
             table:
                 input format: org.apache.hadoop.mapred.TextInputFormat
                 output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select a.key from t3 a left semi join t2 b on a.key = b.key left outer join t1 c on a.key = c.key sort by a.key
 PREHOOK: type: QUERY
 PREHOOK: Input: default@t1
 PREHOOK: Input: default@t2
 PREHOOK: Input: default@t3
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-05-43_554_6913778118057933477/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select a.key from t3 a left semi join t2 b on a.key = b.key left outer join t1 c on a.key = c.key sort by a.key
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@t1
 POSTHOOK: Input: default@t2
 POSTHOOK: Input: default@t3
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-05-43_554_6913778118057933477/-mr-10000
+#### A masked pattern was here ####
 0
 0
 0
@@ -2516,10 +2048,6 @@ POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongq
 0
 0
 0
-4
-4
-8
-8
 10
 10
 10
@@ -2527,140 +2055,113 @@ POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongq
 16
 18
 20
+4
+4
+8
+8
 PREHOOK: query: explain select a.key from t3 a left semi join t2 b on a.key = b.key right outer join t1 c on a.key = c.key sort by a.key
 PREHOOK: type: QUERY
 POSTHOOK: query: explain select a.key from t3 a left semi join t2 b on a.key = b.key right outer join t1 c on a.key = c.key sort by a.key
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_RIGHTOUTERJOIN (TOK_LEFTSEMIJOIN (TOK_TABREF t3 a) (TOK_TABREF t2 b) (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL b) key))) (TOK_TABREF t1 c) (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL c) key)))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (. (TOK_TABLE_OR_COL a) key))) (TOK_SORTBY (TOK_TABSORTCOLNAMEASC (. (TOK_TABLE_OR_COL a) key)))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
   Stage-2 depends on stages: Stage-1
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-2
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        a 
+      Map Operator Tree:
           TableScan
             alias: a
+            Statistics: Num rows: 22 Data size: 163 Basic stats: COMPLETE Column stats: NONE
             Reduce Output Operator
-              key expressions:
-                    expr: key
-                    type: int
+              key expressions: key (type: int)
               sort order: +
-              Map-reduce partition columns:
-                    expr: key
-                    type: int
-              tag: 0
-              value expressions:
-                    expr: key
-                    type: int
-        b 
+              Map-reduce partition columns: key (type: int)
+              Statistics: Num rows: 22 Data size: 163 Basic stats: COMPLETE Column stats: NONE
           TableScan
             alias: b
+            Statistics: Num rows: 11 Data size: 84 Basic stats: COMPLETE Column stats: NONE
             Select Operator
-              expressions:
-                    expr: key
-                    type: int
+              expressions: key (type: int)
               outputColumnNames: key
+              Statistics: Num rows: 11 Data size: 84 Basic stats: COMPLETE Column stats: NONE
               Group By Operator
-                bucketGroup: false
-                keys:
-                      expr: key
-                      type: int
+                keys: key (type: int)
                 mode: hash
                 outputColumnNames: _col0
+                Statistics: Num rows: 11 Data size: 84 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
-                  key expressions:
-                        expr: _col0
-                        type: int
+                  key expressions: _col0 (type: int)
                   sort order: +
-                  Map-reduce partition columns:
-                        expr: _col0
-                        type: int
-                  tag: 1
-        c 
+                  Map-reduce partition columns: _col0 (type: int)
+                  Statistics: Num rows: 11 Data size: 84 Basic stats: COMPLETE Column stats: NONE
           TableScan
             alias: c
+            Statistics: Num rows: 11 Data size: 79 Basic stats: COMPLETE Column stats: NONE
             Reduce Output Operator
-              key expressions:
-                    expr: key
-                    type: int
+              key expressions: key (type: int)
               sort order: +
-              Map-reduce partition columns:
-                    expr: key
-                    type: int
-              tag: 2
+              Map-reduce partition columns: key (type: int)
+              Statistics: Num rows: 11 Data size: 79 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
         Join Operator
           condition map:
                Left Semi Join 0 to 1
                Right Outer Join0 to 2
-          condition expressions:
-            0 {VALUE._col0}
-            1 
-            2 
-          handleSkewJoin: false
+          keys:
+            0 key (type: int)
+            1 _col0 (type: int)
+            2 key (type: int)
           outputColumnNames: _col0
-          Select Operator
-            expressions:
-                  expr: _col0
-                  type: int
-            outputColumnNames: _col0
-            File Output Operator
-              compressed: false
-              GlobalTableId: 0
-              table:
-                  input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-                  output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+          Statistics: Num rows: 48 Data size: 358 Basic stats: COMPLETE Column stats: NONE
+          File Output Operator
+            compressed: false
+            table:
+                input format: org.apache.hadoop.mapred.SequenceFileInputFormat
+                output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe
 
   Stage: Stage-2
     Map Reduce
-      Alias -> Map Operator Tree:
-        file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-05-59_032_4567135017384415264/-mr-10002 
+      Map Operator Tree:
+          TableScan
             Reduce Output Operator
-              key expressions:
-                    expr: _col0
-                    type: int
+              key expressions: _col0 (type: int)
               sort order: +
-              tag: -1
-              value expressions:
-                    expr: _col0
-                    type: int
+              Statistics: Num rows: 48 Data size: 358 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
-        Extract
+        Select Operator
+          expressions: KEY.reducesinkkey0 (type: int)
+          outputColumnNames: _col0
+          Statistics: Num rows: 48 Data size: 358 Basic stats: COMPLETE Column stats: NONE
           File Output Operator
             compressed: false
-            GlobalTableId: 0
+            Statistics: Num rows: 48 Data size: 358 Basic stats: COMPLETE Column stats: NONE
             table:
                 input format: org.apache.hadoop.mapred.TextInputFormat
                 output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select a.key from t3 a left semi join t2 b on a.key = b.key right outer join t1 c on a.key = c.key sort by a.key
 PREHOOK: type: QUERY
 PREHOOK: Input: default@t1
 PREHOOK: Input: default@t2
 PREHOOK: Input: default@t3
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-05-59_146_932092442279199935/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select a.key from t3 a left semi join t2 b on a.key = b.key right outer join t1 c on a.key = c.key sort by a.key
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@t1
 POSTHOOK: Input: default@t2
 POSTHOOK: Input: default@t3
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-05-59_146_932092442279199935/-mr-10000
-NULL
-NULL
-NULL
-NULL
-NULL
+#### A masked pattern was here ####
 0
 0
 0
@@ -2679,146 +2180,122 @@ NULL
 0
 0
 0
+10
+10
+10
+10
 4
 4
 8
 8
-10
-10
-10
-10
+NULL
+NULL
+NULL
+NULL
+NULL
 PREHOOK: query: explain select a.key from t3 a left semi join t1 b on a.key = b.key full outer join t2 c on a.key = c.key sort by a.key
 PREHOOK: type: QUERY
 POSTHOOK: query: explain select a.key from t3 a left semi join t1 b on a.key = b.key full outer join t2 c on a.key = c.key sort by a.key
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_FULLOUTERJOIN (TOK_LEFTSEMIJOIN (TOK_TABREF t3 a) (TOK_TABREF t1 b) (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL b) key))) (TOK_TABREF t2 c) (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL c) key)))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (. (TOK_TABLE_OR_COL a) key))) (TOK_SORTBY (TOK_TABSORTCOLNAMEASC (. (TOK_TABLE_OR_COL a) key)))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
   Stage-2 depends on stages: Stage-1
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-2
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        a 
+      Map Operator Tree:
           TableScan
             alias: a
+            Statistics: Num rows: 22 Data size: 163 Basic stats: COMPLETE Column stats: NONE
             Reduce Output Operator
-              key expressions:
-                    expr: key
-                    type: int
+              key expressions: key (type: int)
               sort order: +
-              Map-reduce partition columns:
-                    expr: key
-                    type: int
-              tag: 0
-              value expressions:
-                    expr: key
-                    type: int
-        b 
+              Map-reduce partition columns: key (type: int)
+              Statistics: Num rows: 22 Data size: 163 Basic stats: COMPLETE Column stats: NONE
           TableScan
             alias: b
+            Statistics: Num rows: 11 Data size: 79 Basic stats: COMPLETE Column stats: NONE
             Select Operator
-              expressions:
-                    expr: key
-                    type: int
+              expressions: key (type: int)
               outputColumnNames: key
+              Statistics: Num rows: 11 Data size: 79 Basic stats: COMPLETE Column stats: NONE
               Group By Operator
-                bucketGroup: false
-                keys:
-                      expr: key
-                      type: int
+                keys: key (type: int)
                 mode: hash
                 outputColumnNames: _col0
+                Statistics: Num rows: 11 Data size: 79 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
-                  key expressions:
-                        expr: _col0
-                        type: int
+                  key expressions: _col0 (type: int)
                   sort order: +
-                  Map-reduce partition columns:
-                        expr: _col0
-                        type: int
-                  tag: 1
-        c 
+                  Map-reduce partition columns: _col0 (type: int)
+                  Statistics: Num rows: 11 Data size: 79 Basic stats: COMPLETE Column stats: NONE
           TableScan
             alias: c
+            Statistics: Num rows: 11 Data size: 84 Basic stats: COMPLETE Column stats: NONE
             Reduce Output Operator
-              key expressions:
-                    expr: key
-                    type: int
+              key expressions: key (type: int)
               sort order: +
-              Map-reduce partition columns:
-                    expr: key
-                    type: int
-              tag: 2
+              Map-reduce partition columns: key (type: int)
+              Statistics: Num rows: 11 Data size: 84 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
         Join Operator
           condition map:
                Left Semi Join 0 to 1
                Outer Join 0 to 2
-          condition expressions:
-            0 {VALUE._col0}
-            1 
-            2 
-          handleSkewJoin: false
+          keys:
+            0 key (type: int)
+            1 _col0 (type: int)
+            2 key (type: int)
           outputColumnNames: _col0
-          Select Operator
-            expressions:
-                  expr: _col0
-                  type: int
-            outputColumnNames: _col0
-            File Output Operator
-              compressed: false
-              GlobalTableId: 0
-              table:
-                  input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-                  output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+          Statistics: Num rows: 48 Data size: 358 Basic stats: COMPLETE Column stats: NONE
+          File Output Operator
+            compressed: false
+            table:
+                input format: org.apache.hadoop.mapred.SequenceFileInputFormat
+                output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe
 
   Stage: Stage-2
     Map Reduce
-      Alias -> Map Operator Tree:
-        file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-06-15_877_648799003197473512/-mr-10002 
+      Map Operator Tree:
+          TableScan
             Reduce Output Operator
-              key expressions:
-                    expr: _col0
-                    type: int
+              key expressions: _col0 (type: int)
               sort order: +
-              tag: -1
-              value expressions:
-                    expr: _col0
-                    type: int
+              Statistics: Num rows: 48 Data size: 358 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
-        Extract
+        Select Operator
+          expressions: KEY.reducesinkkey0 (type: int)
+          outputColumnNames: _col0
+          Statistics: Num rows: 48 Data size: 358 Basic stats: COMPLETE Column stats: NONE
           File Output Operator
             compressed: false
-            GlobalTableId: 0
+            Statistics: Num rows: 48 Data size: 358 Basic stats: COMPLETE Column stats: NONE
             table:
                 input format: org.apache.hadoop.mapred.TextInputFormat
                 output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select a.key from t3 a left semi join t1 b on a.key = b.key full outer join t2 c on a.key = c.key sort by a.key
 PREHOOK: type: QUERY
 PREHOOK: Input: default@t1
 PREHOOK: Input: default@t2
 PREHOOK: Input: default@t3
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-06-15_976_6198373402363644273/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select a.key from t3 a left semi join t1 b on a.key = b.key full outer join t2 c on a.key = c.key sort by a.key
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@t1
 POSTHOOK: Input: default@t2
 POSTHOOK: Input: default@t3
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-06-15_976_6198373402363644273/-mr-10000
-NULL
-NULL
-NULL
+#### A masked pattern was here ####
 0
 0
 0
@@ -2837,6 +2314,18 @@ NULL
 0
 0
 0
+10
+10
+10
+10
+10
+10
+10
+10
+10
+10
+10
+10
 2
 4
 4
@@ -2846,180 +2335,144 @@ NULL
 8
 8
 9
-10
-10
-10
-10
-10
-10
-10
-10
-10
-10
-10
-10
+NULL
+NULL
+NULL
 PREHOOK: query: explain select a.key from t3 a left semi join t2 b on a.key = b.key left outer join t1 c on a.value = c.value sort by a.key
 PREHOOK: type: QUERY
 POSTHOOK: query: explain select a.key from t3 a left semi join t2 b on a.key = b.key left outer join t1 c on a.value = c.value sort by a.key
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_LEFTOUTERJOIN (TOK_LEFTSEMIJOIN (TOK_TABREF t3 a) (TOK_TABREF t2 b) (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL b) key))) (TOK_TABREF t1 c) (= (. (TOK_TABLE_OR_COL a) value) (. (TOK_TABLE_OR_COL c) value)))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (. (TOK_TABLE_OR_COL a) key))) (TOK_SORTBY (TOK_TABSORTCOLNAMEASC (. (TOK_TABLE_OR_COL a) key)))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
   Stage-2 depends on stages: Stage-1
   Stage-3 depends on stages: Stage-2
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-3
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        a 
+      Map Operator Tree:
           TableScan
             alias: a
-            Reduce Output Operator
-              key expressions:
-                    expr: key
-                    type: int
-              sort order: +
-              Map-reduce partition columns:
-                    expr: key
-                    type: int
-              tag: 0
-              value expressions:
-                    expr: key
-                    type: int
-                    expr: value
-                    type: string
-        b 
+            Statistics: Num rows: 22 Data size: 163 Basic stats: COMPLETE Column stats: NONE
+            Filter Operator
+              predicate: key is not null (type: boolean)
+              Statistics: Num rows: 11 Data size: 81 Basic stats: COMPLETE Column stats: NONE
+              Reduce Output Operator
+                key expressions: key (type: int)
+                sort order: +
+                Map-reduce partition columns: key (type: int)
+                Statistics: Num rows: 11 Data size: 81 Basic stats: COMPLETE Column stats: NONE
+                value expressions: value (type: string)
           TableScan
             alias: b
-            Select Operator
-              expressions:
-                    expr: key
-                    type: int
-              outputColumnNames: key
-              Group By Operator
-                bucketGroup: false
-                keys:
-                      expr: key
-                      type: int
-                mode: hash
-                outputColumnNames: _col0
-                Reduce Output Operator
-                  key expressions:
-                        expr: _col0
-                        type: int
-                  sort order: +
-                  Map-reduce partition columns:
-                        expr: _col0
-                        type: int
-                  tag: 1
+            Statistics: Num rows: 11 Data size: 84 Basic stats: COMPLETE Column stats: NONE
+            Filter Operator
+              predicate: key is not null (type: boolean)
+              Statistics: Num rows: 6 Data size: 45 Basic stats: COMPLETE Column stats: NONE
+              Select Operator
+                expressions: key (type: int)
+                outputColumnNames: key
+                Statistics: Num rows: 6 Data size: 45 Basic stats: COMPLETE Column stats: NONE
+                Group By Operator
+                  keys: key (type: int)
+                  mode: hash
+                  outputColumnNames: _col0
+                  Statistics: Num rows: 6 Data size: 45 Basic stats: COMPLETE Column stats: NONE
+                  Reduce Output Operator
+                    key expressions: _col0 (type: int)
+                    sort order: +
+                    Map-reduce partition columns: _col0 (type: int)
+                    Statistics: Num rows: 6 Data size: 45 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
         Join Operator
           condition map:
                Left Semi Join 0 to 1
-          condition expressions:
-            0 {VALUE._col0} {VALUE._col1}
-            1 
-          handleSkewJoin: false
+          keys:
+            0 key (type: int)
+            1 _col0 (type: int)
           outputColumnNames: _col0, _col1
+          Statistics: Num rows: 12 Data size: 89 Basic stats: COMPLETE Column stats: NONE
           File Output Operator
             compressed: false
-            GlobalTableId: 0
             table:
                 input format: org.apache.hadoop.mapred.SequenceFileInputFormat
                 output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe
 
   Stage: Stage-2
     Map Reduce
-      Alias -> Map Operator Tree:
-        $INTNAME 
+      Map Operator Tree:
+          TableScan
             Reduce Output Operator
-              key expressions:
-                    expr: _col1
-                    type: string
+              key expressions: _col1 (type: string)
               sort order: +
-              Map-reduce partition columns:
-                    expr: _col1
-                    type: string
-              tag: 0
-              value expressions:
-                    expr: _col0
-                    type: int
-        c 
+              Map-reduce partition columns: _col1 (type: string)
+              Statistics: Num rows: 12 Data size: 89 Basic stats: COMPLETE Column stats: NONE
+              value expressions: _col0 (type: int)
           TableScan
             alias: c
+            Statistics: Num rows: 11 Data size: 79 Basic stats: COMPLETE Column stats: NONE
             Reduce Output Operator
-              key expressions:
-                    expr: value
-                    type: string
+              key expressions: value (type: string)
               sort order: +
-              Map-reduce partition columns:
-                    expr: value
-                    type: string
-              tag: 1
+              Map-reduce partition columns: value (type: string)
+              Statistics: Num rows: 11 Data size: 79 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
         Join Operator
           condition map:
                Left Outer Join0 to 1
-          condition expressions:
-            0 {VALUE._col0}
-            1 
-          handleSkewJoin: false
+          keys:
+            0 _col1 (type: string)
+            1 value (type: string)
           outputColumnNames: _col0
-          Select Operator
-            expressions:
-                  expr: _col0
-                  type: int
-            outputColumnNames: _col0
-            File Output Operator
-              compressed: false
-              GlobalTableId: 0
-              table:
-                  input format: org.apache.hadoop.mapred.SequenceFileInputFormat
-                  output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+          Statistics: Num rows: 13 Data size: 97 Basic stats: COMPLETE Column stats: NONE
+          File Output Operator
+            compressed: false
+            table:
+                input format: org.apache.hadoop.mapred.SequenceFileInputFormat
+                output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe
 
   Stage: Stage-3
     Map Reduce
-      Alias -> Map Operator Tree:
-        file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-06-33_848_5227894741694043284/-mr-10003 
+      Map Operator Tree:
+          TableScan
             Reduce Output Operator
-              key expressions:
-                    expr: _col0
-                    type: int
+              key expressions: _col0 (type: int)
               sort order: +
-              tag: -1
-              value expressions:
-                    expr: _col0
-                    type: int
+              Statistics: Num rows: 13 Data size: 97 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
-        Extract
+        Select Operator
+          expressions: KEY.reducesinkkey0 (type: int)
+          outputColumnNames: _col0
+          Statistics: Num rows: 13 Data size: 97 Basic stats: COMPLETE Column stats: NONE
           File Output Operator
             compressed: false
-            GlobalTableId: 0
+            Statistics: Num rows: 13 Data size: 97 Basic stats: COMPLETE Column stats: NONE
             table:
                 input format: org.apache.hadoop.mapred.TextInputFormat
                 output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select a.key from t3 a left semi join t2 b on a.key = b.key left outer join t1 c on a.value = c.value sort by a.key
 PREHOOK: type: QUERY
 PREHOOK: Input: default@t1
 PREHOOK: Input: default@t2
 PREHOOK: Input: default@t3
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-06-34_080_237734989555410900/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select a.key from t3 a left semi join t2 b on a.key = b.key left outer join t1 c on a.value = c.value sort by a.key
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@t1
 POSTHOOK: Input: default@t2
 POSTHOOK: Input: default@t3
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-06-34_080_237734989555410900/-mr-10000
+#### A masked pattern was here ####
 0
 0
 0
@@ -3038,10 +2491,6 @@ POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongq
 0
 0
 0
-4
-4
-8
-8
 10
 10
 10
@@ -3055,3 +2504,88 @@ POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongq
 16
 18
 20
+4
+4
+8
+8
+PREHOOK: query: explain select a.key from t3 a left semi join t2 b on a.value = b.value where a.key > 100
+PREHOOK: type: QUERY
+POSTHOOK: query: explain select a.key from t3 a left semi join t2 b on a.value = b.value where a.key > 100
+POSTHOOK: type: QUERY
+STAGE DEPENDENCIES:
+  Stage-1 is a root stage
+  Stage-0 depends on stages: Stage-1
+
+STAGE PLANS:
+  Stage: Stage-1
+    Map Reduce
+      Map Operator Tree:
+          TableScan
+            alias: a
+            Statistics: Num rows: 22 Data size: 163 Basic stats: COMPLETE Column stats: NONE
+            Filter Operator
+              predicate: ((key > 100) and value is not null) (type: boolean)
+              Statistics: Num rows: 4 Data size: 29 Basic stats: COMPLETE Column stats: NONE
+              Select Operator
+                expressions: key (type: int), value (type: string)
+                outputColumnNames: _col0, _col1
+                Statistics: Num rows: 4 Data size: 29 Basic stats: COMPLETE Column stats: NONE
+                Reduce Output Operator
+                  key expressions: _col1 (type: string)
+                  sort order: +
+                  Map-reduce partition columns: _col1 (type: string)
+                  Statistics: Num rows: 4 Data size: 29 Basic stats: COMPLETE Column stats: NONE
+                  value expressions: _col0 (type: int)
+          TableScan
+            alias: b
+            Statistics: Num rows: 11 Data size: 84 Basic stats: COMPLETE Column stats: NONE
+            Filter Operator
+              predicate: value is not null (type: boolean)
+              Statistics: Num rows: 6 Data size: 45 Basic stats: COMPLETE Column stats: NONE
+              Select Operator
+                expressions: value (type: string)
+                outputColumnNames: _col0
+                Statistics: Num rows: 6 Data size: 45 Basic stats: COMPLETE Column stats: NONE
+                Group By Operator
+                  keys: _col0 (type: string)
+                  mode: hash
+                  outputColumnNames: _col0
+                  Statistics: Num rows: 6 Data size: 45 Basic stats: COMPLETE Column stats: NONE
+                  Reduce Output Operator
+                    key expressions: _col0 (type: string)
+                    sort order: +
+                    Map-reduce partition columns: _col0 (type: string)
+                    Statistics: Num rows: 6 Data size: 45 Basic stats: COMPLETE Column stats: NONE
+      Reduce Operator Tree:
+        Join Operator
+          condition map:
+               Left Semi Join 0 to 1
+          keys:
+            0 _col1 (type: string)
+            1 _col0 (type: string)
+          outputColumnNames: _col0
+          Statistics: Num rows: 6 Data size: 49 Basic stats: COMPLETE Column stats: NONE
+          File Output Operator
+            compressed: false
+            Statistics: Num rows: 6 Data size: 49 Basic stats: COMPLETE Column stats: NONE
+            table:
+                input format: org.apache.hadoop.mapred.TextInputFormat
+                output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+
+  Stage: Stage-0
+    Fetch Operator
+      limit: -1
+      Processor Tree:
+        ListSink
+
+PREHOOK: query: select a.key from t3 a left semi join t2 b on a.value = b.value where a.key > 100
+PREHOOK: type: QUERY
+PREHOOK: Input: default@t2
+PREHOOK: Input: default@t3
+#### A masked pattern was here ####
+POSTHOOK: query: select a.key from t3 a left semi join t2 b on a.value = b.value where a.key > 100
+POSTHOOK: type: QUERY
+POSTHOOK: Input: default@t2
+POSTHOOK: Input: default@t3
+#### A masked pattern was here ####

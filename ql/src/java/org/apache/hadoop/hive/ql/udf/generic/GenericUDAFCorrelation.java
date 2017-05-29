@@ -19,12 +19,11 @@ package org.apache.hadoop.hive.ql.udf.generic;
 
 import java.util.ArrayList;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.ql.exec.Description;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentTypeException;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
+import org.apache.hadoop.hive.ql.util.JavaDataModel;
 import org.apache.hadoop.hive.serde2.io.DoubleWritable;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
@@ -73,8 +72,6 @@ import org.apache.hadoop.io.LongWritable;
         + "and STDDEV_POP is the population standard deviation.")
 public class GenericUDAFCorrelation extends AbstractGenericUDAFResolver {
 
-  static final Log LOG = LogFactory.getLog(GenericUDAFCorrelation.class.getName());
-
   @Override
   public GenericUDAFEvaluator getEvaluator(TypeInfo[] parameters) throws SemanticException {
     if (parameters.length != 2) {
@@ -101,6 +98,8 @@ public class GenericUDAFCorrelation extends AbstractGenericUDAFResolver {
     case LONG:
     case FLOAT:
     case DOUBLE:
+    case TIMESTAMP:
+    case DECIMAL:
       switch (((PrimitiveTypeInfo) parameters[1]).getPrimitiveCategory()) {
       case BYTE:
       case SHORT:
@@ -108,9 +107,12 @@ public class GenericUDAFCorrelation extends AbstractGenericUDAFResolver {
       case LONG:
       case FLOAT:
       case DOUBLE:
+      case TIMESTAMP:
+      case DECIMAL:
         return new GenericUDAFCorrelationEvaluator();
       case STRING:
       case BOOLEAN:
+      case DATE:
       default:
         throw new UDFArgumentTypeException(1,
             "Only numeric type arguments are accepted but "
@@ -118,6 +120,7 @@ public class GenericUDAFCorrelation extends AbstractGenericUDAFResolver {
       }
     case STRING:
     case BOOLEAN:
+    case DATE:
     default:
       throw new UDFArgumentTypeException(0,
           "Only numeric type arguments are accepted but "
@@ -150,13 +153,13 @@ public class GenericUDAFCorrelation extends AbstractGenericUDAFResolver {
     private PrimitiveObjectInspector yInputOI;
 
     // For PARTIAL2 and FINAL
-    private StructObjectInspector soi;
-    private StructField countField;
-    private StructField xavgField;
-    private StructField yavgField;
-    private StructField xvarField;
-    private StructField yvarField;
-    private StructField covarField;
+    private transient StructObjectInspector soi;
+    private transient StructField countField;
+    private transient StructField xavgField;
+    private transient StructField yavgField;
+    private transient StructField xvarField;
+    private transient StructField yvarField;
+    private transient StructField covarField;
     private LongObjectInspector countFieldOI;
     private DoubleObjectInspector xavgFieldOI;
     private DoubleObjectInspector yavgFieldOI;
@@ -243,13 +246,16 @@ public class GenericUDAFCorrelation extends AbstractGenericUDAFResolver {
       }
     }
 
-    static class StdAgg implements AggregationBuffer {
+    @AggregationType(estimable = true)
+    static class StdAgg extends AbstractAggregationBuffer {
       long count; // number n of elements
       double xavg; // average of x elements
       double yavg; // average of y elements
       double xvar; // n times the variance of x elements
       double yvar; // n times the variance of y elements
       double covar; // n times the covariance
+      @Override
+      public int estimate() { return JavaDataModel.PRIMITIVES2 * 6; }
     };
 
     @Override
@@ -279,15 +285,15 @@ public class GenericUDAFCorrelation extends AbstractGenericUDAFResolver {
         StdAgg myagg = (StdAgg) agg;
         double vx = PrimitiveObjectInspectorUtils.getDouble(px, xInputOI);
         double vy = PrimitiveObjectInspectorUtils.getDouble(py, yInputOI);
-        double xavgOld = myagg.xavg;
-        double yavgOld = myagg.yavg;
+        double deltaX = vx - myagg.xavg;
+        double deltaY = vy - myagg.yavg;
         myagg.count++;
-        myagg.xavg += (vx - xavgOld) / myagg.count;
-        myagg.yavg += (vy - yavgOld) / myagg.count;
+        myagg.xavg += deltaX / myagg.count;
+        myagg.yavg += deltaY / myagg.count;
         if (myagg.count > 1) {
-            myagg.covar += (vx - xavgOld) * (vy - myagg.yavg);
-            myagg.xvar += (vx - xavgOld) * (vx - myagg.xavg);
-            myagg.yvar += (vy - yavgOld) * (vy - myagg.yavg);
+          myagg.covar += deltaX * (vy - myagg.yavg);
+          myagg.xvar += deltaX * (vx - myagg.xavg);
+          myagg.yvar += deltaY * (vy - myagg.yavg);
         }
       }
     }
@@ -342,8 +348,8 @@ public class GenericUDAFCorrelation extends AbstractGenericUDAFResolver {
           myagg.count += nB;
           myagg.xavg = (xavgA * nA + xavgB * nB) / myagg.count;
           myagg.yavg = (yavgA * nA + yavgB * nB) / myagg.count;
-          myagg.xvar += xvarB + (xavgA - xavgB) * (xavgA - xavgB) * myagg.count;
-          myagg.yvar += yvarB + (yavgA - yavgB) * (yavgA - yavgB) * myagg.count;
+          myagg.xvar += xvarB + (xavgA - xavgB) * (xavgA - xavgB) * nA * nB / myagg.count;
+          myagg.yvar += yvarB + (yavgA - yavgB) * (yavgA - yavgB) * nA * nB / myagg.count;
           myagg.covar +=
               covarB + (xavgA - xavgB) * (yavgA - yavgB) * ((double) (nA * nB) / myagg.count);
         }

@@ -21,11 +21,17 @@ package org.apache.hadoop.hive.ql.plan;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Order;
 import org.apache.hadoop.hive.ql.exec.Utilities;
+import org.apache.hadoop.hive.ql.metadata.Table;
+import org.apache.hadoop.hive.ql.parse.ParseUtils;
+import org.apache.hadoop.hive.ql.parse.SemanticException;
 
 /**
  * AlterTableDesc.
@@ -40,15 +46,41 @@ public class AlterTableDesc extends DDLDesc implements Serializable {
    *
    */
   public static enum AlterTableTypes {
-    RENAME, ADDCOLS, REPLACECOLS, ADDPROPS, ADDSERDE, ADDSERDEPROPS,
-    ADDFILEFORMAT, ADDCLUSTERSORTCOLUMN, RENAMECOLUMN, ADDPARTITION,
-    TOUCH, ARCHIVE, UNARCHIVE, ALTERPROTECTMODE, ALTERPARTITIONPROTECTMODE, ALTERLOCATION,
-  };
+    RENAME("rename"), ADDCOLS("add columns"), REPLACECOLS("replace columns"),
+    ADDPROPS("add props"), DROPPROPS("drop props"), ADDSERDE("add serde"), ADDSERDEPROPS("add serde props"),
+    ADDFILEFORMAT("add fileformat"), ADDCLUSTERSORTCOLUMN("add cluster sort column"),
+    RENAMECOLUMN("rename column"), ADDPARTITION("add partition"), TOUCH("touch"), ARCHIVE("archieve"),
+    UNARCHIVE("unarchieve"), ALTERPROTECTMODE("alter protect mode"),
+    ALTERPARTITIONPROTECTMODE("alter partition protect mode"), ALTERLOCATION("alter location"),
+    DROPPARTITION("drop partition"), RENAMEPARTITION("rename partition"), ADDSKEWEDBY("add skew column"),
+    ALTERSKEWEDLOCATION("alter skew location"), ALTERBUCKETNUM("alter bucket number"),
+    ALTERPARTITION("alter partition"), COMPACT("compact"),
+    TRUNCATE("truncate"), MERGEFILES("merge files");
+    ;
+
+    private final String name;
+    private AlterTableTypes(String name) { this.name = name; }
+    public String getName() { return name; }
+  }
 
   public static enum ProtectModeType {
-    NO_DROP, OFFLINE, READ_ONLY
-  };
+    NO_DROP, OFFLINE, READ_ONLY, NO_DROP_CASCADE
+  }
 
+  public static final Set<AlterTableTypes> alterTableTypesWithPartialSpec =
+      new HashSet<AlterTableDesc.AlterTableTypes>();
+
+  static {
+    alterTableTypesWithPartialSpec.add(AlterTableDesc.AlterTableTypes.ALTERPROTECTMODE);
+    alterTableTypesWithPartialSpec.add(AlterTableDesc.AlterTableTypes.ADDCOLS);
+    alterTableTypesWithPartialSpec.add(AlterTableDesc.AlterTableTypes.REPLACECOLS);
+    alterTableTypesWithPartialSpec.add(AlterTableDesc.AlterTableTypes.RENAMECOLUMN);
+    alterTableTypesWithPartialSpec.add(AlterTableDesc.AlterTableTypes.ADDPROPS);
+    alterTableTypesWithPartialSpec.add(AlterTableDesc.AlterTableTypes.DROPPROPS);
+    alterTableTypesWithPartialSpec.add(AlterTableDesc.AlterTableTypes.ADDSERDE);
+    alterTableTypesWithPartialSpec.add(AlterTableDesc.AlterTableTypes.ADDSERDEPROPS);
+    alterTableTypesWithPartialSpec.add(AlterTableDesc.AlterTableTypes.ADDFILEFORMAT);
+  }
 
   AlterTableTypes op;
   String oldName;
@@ -74,6 +106,15 @@ public class AlterTableDesc extends DDLDesc implements Serializable {
   private String newLocation;
   boolean protectModeEnable;
   ProtectModeType protectModeType;
+  Map<List<String>, String> skewedLocations;
+  boolean isTurnOffSkewed = false;
+  boolean isStoredAsSubDirectories = false;
+  List<String> skewedColNames;
+  List<List<String>> skewedColValues;
+  Table table;
+  boolean isDropIfExists = false;
+  boolean isTurnOffSorting = false;
+  boolean isCascade = false;
 
   public AlterTableDesc() {
   }
@@ -88,10 +129,12 @@ public class AlterTableDesc extends DDLDesc implements Serializable {
    * @param newComment
    * @param newType
    */
-  public AlterTableDesc(String tblName, String oldColName, String newColName,
-      String newType, String newComment, boolean first, String afterCol) {
+  public AlterTableDesc(String tblName, HashMap<String, String> partSpec,
+      String oldColName, String newColName, String newType, String newComment,
+      boolean first, String afterCol, boolean isCascade) {
     super();
     oldName = tblName;
+    this.partSpec = partSpec;
     this.oldColName = oldColName;
     this.newColName = newColName;
     newColType = newType;
@@ -99,6 +142,7 @@ public class AlterTableDesc extends DDLDesc implements Serializable {
     this.first = first;
     this.afterCol = afterCol;
     op = AlterTableTypes.RENAMECOLUMN;
+    this.isCascade = isCascade;
   }
 
   /**
@@ -107,10 +151,11 @@ public class AlterTableDesc extends DDLDesc implements Serializable {
    * @param newName
    *          new name of the table
    */
-  public AlterTableDesc(String oldName, String newName) {
+  public AlterTableDesc(String oldName, String newName, boolean expectView) {
     op = AlterTableTypes.RENAME;
     this.oldName = oldName;
     this.newName = newName;
+    this.expectView = expectView;
   }
 
   /**
@@ -119,11 +164,13 @@ public class AlterTableDesc extends DDLDesc implements Serializable {
    * @param newCols
    *          new columns to be added
    */
-  public AlterTableDesc(String name, List<FieldSchema> newCols,
-      AlterTableTypes alterType) {
+  public AlterTableDesc(String name, HashMap<String, String> partSpec, List<FieldSchema> newCols,
+      AlterTableTypes alterType, boolean isCascade) {
     op = alterType;
     oldName = name;
     this.newCols = new ArrayList<FieldSchema>(newCols);
+    this.partSpec = partSpec;
+    this.isCascade = isCascade;
   }
 
   /**
@@ -151,7 +198,7 @@ public class AlterTableDesc extends DDLDesc implements Serializable {
    *          new table input format
    * @param outputFormat
    *          new table output format
-   * @param partSpec 
+   * @param partSpec
    */
   public AlterTableDesc(String name, String inputFormat, String outputFormat,
       String serdeName, String storageHandler, HashMap<String, String> partSpec) {
@@ -166,12 +213,20 @@ public class AlterTableDesc extends DDLDesc implements Serializable {
   }
 
   public AlterTableDesc(String tableName, int numBuckets,
-      List<String> bucketCols, List<Order> sortCols) {
+      List<String> bucketCols, List<Order> sortCols, HashMap<String, String> partSpec) {
     oldName = tableName;
     op = AlterTableTypes.ADDCLUSTERSORTCOLUMN;
     numberBuckets = numBuckets;
     bucketColumns = new ArrayList<String>(bucketCols);
     sortColumns = new ArrayList<Order>(sortCols);
+    this.partSpec = partSpec;
+  }
+
+  public AlterTableDesc(String tableName, boolean sortingOff, HashMap<String, String> partSpec) {
+    oldName = tableName;
+    op = AlterTableTypes.ADDCLUSTERSORTCOLUMN;
+    isTurnOffSorting = sortingOff;
+    this.partSpec = partSpec;
   }
 
   public AlterTableDesc(String tableName, String newLocation,
@@ -182,6 +237,30 @@ public class AlterTableDesc extends DDLDesc implements Serializable {
     this.partSpec = partSpec;
   }
 
+  public AlterTableDesc(String tableName, Map<List<String>, String> locations,
+      HashMap<String, String> partSpec) {
+    op = AlterTableTypes.ALTERSKEWEDLOCATION;
+    this.oldName = tableName;
+    this.skewedLocations = locations;
+    this.partSpec = partSpec;
+  }
+
+  public AlterTableDesc(String tableName, boolean turnOffSkewed,
+      List<String> skewedColNames, List<List<String>> skewedColValues) {
+    oldName = tableName;
+    op = AlterTableTypes.ADDSKEWEDBY;
+    this.isTurnOffSkewed = turnOffSkewed;
+    this.skewedColNames = new ArrayList<String>(skewedColNames);
+    this.skewedColValues = new ArrayList<List<String>>(skewedColValues);
+  }
+
+  public AlterTableDesc(String tableName, HashMap<String, String> partSpec, int numBuckets) {
+    op = AlterTableTypes.ALTERBUCKETNUM;
+    this.oldName = tableName;
+    this.partSpec = partSpec;
+    this.numberBuckets = numBuckets;
+  }
+
   @Explain(displayName = "new columns")
   public List<String> getNewColsString() {
     return Utilities.getFieldSchemaString(getNewCols());
@@ -189,16 +268,7 @@ public class AlterTableDesc extends DDLDesc implements Serializable {
 
   @Explain(displayName = "type")
   public String getAlterTableTypeString() {
-    switch (op) {
-    case RENAME:
-      return "rename";
-    case ADDCOLS:
-      return "add columns";
-    case REPLACECOLS:
-      return "replace columns";
-    }
-
-    return "unknown";
+    return op.getName();
   }
 
   /**
@@ -536,4 +606,134 @@ public class AlterTableDesc extends DDLDesc implements Serializable {
   public void setProtectModeType(ProtectModeType protectModeType) {
     this.protectModeType = protectModeType;
   }
+  /**
+   * @return the skewedLocations
+   */
+  public Map<List<String>, String> getSkewedLocations() {
+    return skewedLocations;
+  }
+
+  /**
+   * @param skewedLocations the skewedLocations to set
+   */
+  public void setSkewedLocations(Map<List<String>, String> skewedLocations) {
+    this.skewedLocations = skewedLocations;
+  }
+
+  /**
+   * @return isTurnOffSorting
+   */
+  public boolean isTurnOffSorting() {
+    return isTurnOffSorting;
+  }
+
+  /**
+   * @return the turnOffSkewed
+   */
+  public boolean isTurnOffSkewed() {
+    return isTurnOffSkewed;
+  }
+
+  /**
+   * @param turnOffSkewed the turnOffSkewed to set
+   */
+  public void setTurnOffSkewed(boolean turnOffSkewed) {
+    this.isTurnOffSkewed = turnOffSkewed;
+  }
+
+  /**
+   * @return the skewedColNames
+   */
+  public List<String> getSkewedColNames() {
+    return skewedColNames;
+  }
+
+  /**
+   * @param skewedColNames the skewedColNames to set
+   */
+  public void setSkewedColNames(List<String> skewedColNames) {
+    this.skewedColNames = skewedColNames;
+  }
+
+  /**
+   * @return the skewedColValues
+   */
+  public List<List<String>> getSkewedColValues() {
+    return skewedColValues;
+  }
+
+  /**
+   * @param skewedColValues the skewedColValues to set
+   */
+  public void setSkewedColValues(List<List<String>> skewedColValues) {
+    this.skewedColValues = skewedColValues;
+  }
+
+  /**
+   * Validate alter table description.
+   *
+   * @throws SemanticException
+   */
+  public void validate() throws SemanticException {
+    if (null != table) {
+      /* Validate skewed information. */
+      ValidationUtility.validateSkewedInformation(
+          ParseUtils.validateColumnNameUniqueness(table.getCols()), this.getSkewedColNames(),
+          this.getSkewedColValues());
+    }
+  }
+
+  /**
+   * @return the table
+   */
+  public Table getTable() {
+    return table;
+  }
+
+  /**
+   * @param table the table to set
+   */
+  public void setTable(Table table) {
+    this.table = table;
+  }
+
+  /**
+   * @return the isStoredAsSubDirectories
+   */
+  public boolean isStoredAsSubDirectories() {
+    return isStoredAsSubDirectories;
+  }
+
+  /**
+   * @param isStoredAsSubDirectories the isStoredAsSubDirectories to set
+   */
+  public void setStoredAsSubDirectories(boolean isStoredAsSubDirectories) {
+    this.isStoredAsSubDirectories = isStoredAsSubDirectories;
+  }
+
+  /**
+   * @param isDropIfExists the isDropIfExists to set
+   */
+  public void setDropIfExists(boolean isDropIfExists) {
+    this.isDropIfExists = isDropIfExists;
+  }
+
+  /**
+   * @return isDropIfExists
+   */
+  public boolean getIsDropIfExists() {
+    return isDropIfExists;
+  }
+
+  /**
+   * @return isCascade
+   */
+  public boolean getIsCascade() {
+    return isCascade;
+  }
+
+  public static boolean doesAlterTableTypeSupportPartialPartitionSpec(AlterTableTypes type) {
+    return alterTableTypesWithPartialSpec.contains(type);
+  }
+
 }

@@ -20,16 +20,18 @@ package org.apache.hadoop.hive.ql.exec;
 
 import java.io.Serializable;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.FileUtil;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hive.ql.Context;
+import org.apache.hadoop.hive.common.FileUtils;
+import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.ql.DriverContext;
 import org.apache.hadoop.hive.ql.parse.LoadSemanticAnalyzer;
 import org.apache.hadoop.hive.ql.plan.CopyWork;
 import org.apache.hadoop.hive.ql.plan.api.StageType;
 import org.apache.hadoop.util.StringUtils;
-import org.apache.hadoop.hive.ql.DriverContext;
 
 /**
  * CopyTask implementation.
@@ -37,6 +39,8 @@ import org.apache.hadoop.hive.ql.DriverContext;
 public class CopyTask extends Task<CopyWork> implements Serializable {
 
   private static final long serialVersionUID = 1L;
+
+  private static transient final Log LOG = LogFactory.getLog(CopyTask.class);
 
   public CopyTask() {
     super();
@@ -47,8 +51,8 @@ public class CopyTask extends Task<CopyWork> implements Serializable {
     FileSystem dstFs = null;
     Path toPath = null;
     try {
-      Path fromPath = new Path(work.getFromPath());
-      toPath = new Path(work.getToPath());
+      Path fromPath = work.getFromPath();
+      toPath = work.getToPath();
 
       console.printInfo("Copying data from " + fromPath.toString(), " to "
           + toPath.toString());
@@ -57,22 +61,26 @@ public class CopyTask extends Task<CopyWork> implements Serializable {
       dstFs = toPath.getFileSystem(conf);
 
       FileStatus[] srcs = LoadSemanticAnalyzer.matchFilesOrDir(srcFs, fromPath);
-
       if (srcs == null || srcs.length == 0) {
-        console.printError("No files matching path: " + fromPath.toString());
-        return 3;
+        if (work.isErrorOnSrcEmpty()) {
+          console.printError("No files matching path: " + fromPath.toString());
+          return 3;
+        } else {
+          return 0;
+        }
       }
 
-      if (!dstFs.mkdirs(toPath)) {
-        console
-            .printError("Cannot make target directory: " + toPath.toString());
+      boolean inheritPerms = conf.getBoolVar(HiveConf.ConfVars.HIVE_WAREHOUSE_SUBDIR_INHERIT_PERMS);
+      if (!FileUtils.mkdir(dstFs, toPath, inheritPerms, conf)) {
+        console.printError("Cannot make target directory: " + toPath.toString());
         return 2;
       }
 
       for (FileStatus oneSrc : srcs) {
+        console.printInfo("Copying file: " + oneSrc.getPath().toString());
         LOG.debug("Copying file: " + oneSrc.getPath().toString());
-        if (!FileUtil.copy(srcFs, oneSrc.getPath(), dstFs, toPath, false, // delete
-            // source
+        if (!FileUtils.copy(srcFs, oneSrc.getPath(), dstFs, toPath,
+            false, // delete source
             true, // overwrite destination
             conf)) {
           console.printError("Failed to copy: '" + oneSrc.getPath().toString()
@@ -97,13 +105,5 @@ public class CopyTask extends Task<CopyWork> implements Serializable {
   @Override
   public String getName() {
     return "COPY";
-  }
-
-  @Override
-  protected void localizeMRTmpFilesImpl(Context ctx) {
-    // copy task is only used by the load command and 
-    // does not use any map-reduce tmp files
-    // we don't expect to enter this code path at all
-    throw new RuntimeException ("Unexpected call");
   }
 }

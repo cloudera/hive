@@ -1,0 +1,414 @@
+PREHOOK: query: create database vt
+PREHOOK: type: CREATEDATABASE
+PREHOOK: Output: database:vt
+POSTHOOK: query: create database vt
+POSTHOOK: type: CREATEDATABASE
+POSTHOOK: Output: database:vt
+PREHOOK: query: create view vt.v as select * from srcpart
+PREHOOK: type: CREATEVIEW
+PREHOOK: Input: default@srcpart
+PREHOOK: Output: database:vt
+PREHOOK: Output: vt@v
+POSTHOOK: query: create view vt.v as select * from srcpart
+POSTHOOK: type: CREATEVIEW
+POSTHOOK: Input: default@srcpart
+POSTHOOK: Output: database:vt
+POSTHOOK: Output: vt@v
+PREHOOK: query: describe formatted vt.v
+PREHOOK: type: DESCTABLE
+PREHOOK: Input: vt@v
+POSTHOOK: query: describe formatted vt.v
+POSTHOOK: type: DESCTABLE
+POSTHOOK: Input: vt@v
+# col_name            	data_type           	comment             
+	 	 
+key                 	string              	                    
+value               	string              	                    
+ds                  	string              	                    
+hr                  	string              	                    
+	 	 
+# Detailed Table Information	 	 
+Database:           	vt                  	 
+#### A masked pattern was here ####
+Protect Mode:       	None                	 
+Retention:          	0                   	 
+Table Type:         	VIRTUAL_VIEW        	 
+Table Parameters:	 	 
+#### A masked pattern was here ####
+	 	 
+# Storage Information	 	 
+SerDe Library:      	null                	 
+InputFormat:        	org.apache.hadoop.mapred.SequenceFileInputFormat	 
+OutputFormat:       	org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat	 
+Compressed:         	No                  	 
+Num Buckets:        	-1                  	 
+Bucket Columns:     	[]                  	 
+Sort Columns:       	[]                  	 
+	 	 
+# View Information	 	 
+View Original Text: 	select * from srcpart	 
+View Expanded Text: 	select `srcpart`.`key`, `srcpart`.`value`, `srcpart`.`ds`, `srcpart`.`hr` from `default`.`srcpart`	 
+PREHOOK: query: -- modifying definition of unpartitioned view
+create or replace view vt.v partitioned on (ds, hr) as select * from srcpart
+PREHOOK: type: CREATEVIEW
+PREHOOK: Input: default@srcpart
+PREHOOK: Output: database:vt
+PREHOOK: Output: vt@v
+POSTHOOK: query: -- modifying definition of unpartitioned view
+create or replace view vt.v partitioned on (ds, hr) as select * from srcpart
+POSTHOOK: type: CREATEVIEW
+POSTHOOK: Input: default@srcpart
+POSTHOOK: Output: database:vt
+POSTHOOK: Output: vt@v
+PREHOOK: query: alter view vt.v add partition (ds='2008-04-08',hr='11')
+PREHOOK: type: ALTERTABLE_ADDPARTS
+PREHOOK: Input: default@srcpart
+PREHOOK: Input: default@srcpart@ds=2008-04-08/hr=11
+PREHOOK: Input: vt@v
+PREHOOK: Output: vt@v
+POSTHOOK: query: alter view vt.v add partition (ds='2008-04-08',hr='11')
+POSTHOOK: type: ALTERTABLE_ADDPARTS
+POSTHOOK: Input: default@srcpart
+POSTHOOK: Input: default@srcpart@ds=2008-04-08/hr=11
+POSTHOOK: Input: vt@v
+POSTHOOK: Output: vt@v
+POSTHOOK: Output: vt@v@ds=2008-04-08/hr=11
+PREHOOK: query: alter view vt.v add partition (ds='2008-04-08',hr='12')
+PREHOOK: type: ALTERTABLE_ADDPARTS
+PREHOOK: Input: default@srcpart
+PREHOOK: Input: default@srcpart@ds=2008-04-08/hr=12
+PREHOOK: Input: vt@v
+PREHOOK: Output: vt@v
+POSTHOOK: query: alter view vt.v add partition (ds='2008-04-08',hr='12')
+POSTHOOK: type: ALTERTABLE_ADDPARTS
+POSTHOOK: Input: default@srcpart
+POSTHOOK: Input: default@srcpart@ds=2008-04-08/hr=12
+POSTHOOK: Input: vt@v
+POSTHOOK: Output: vt@v
+POSTHOOK: Output: vt@v@ds=2008-04-08/hr=12
+PREHOOK: query: select * from vt.v where value='val_409' and ds='2008-04-08' and hr='11'
+PREHOOK: type: QUERY
+PREHOOK: Input: default@srcpart
+PREHOOK: Input: default@srcpart@ds=2008-04-08/hr=11
+PREHOOK: Input: vt@v
+#### A masked pattern was here ####
+POSTHOOK: query: select * from vt.v where value='val_409' and ds='2008-04-08' and hr='11'
+POSTHOOK: type: QUERY
+POSTHOOK: Input: default@srcpart
+POSTHOOK: Input: default@srcpart@ds=2008-04-08/hr=11
+POSTHOOK: Input: vt@v
+#### A masked pattern was here ####
+409	val_409	2008-04-08	11
+409	val_409	2008-04-08	11
+409	val_409	2008-04-08	11
+PREHOOK: query: describe formatted vt.v
+PREHOOK: type: DESCTABLE
+PREHOOK: Input: vt@v
+POSTHOOK: query: describe formatted vt.v
+POSTHOOK: type: DESCTABLE
+POSTHOOK: Input: vt@v
+# col_name            	data_type           	comment             
+	 	 
+key                 	string              	                    
+value               	string              	                    
+	 	 
+# Partition Information	 	 
+# col_name            	data_type           	comment             
+	 	 
+ds                  	string              	                    
+hr                  	string              	                    
+	 	 
+# Detailed Table Information	 	 
+Database:           	vt                  	 
+#### A masked pattern was here ####
+Protect Mode:       	None                	 
+Retention:          	0                   	 
+Table Type:         	VIRTUAL_VIEW        	 
+Table Parameters:	 	 
+#### A masked pattern was here ####
+	 	 
+# Storage Information	 	 
+SerDe Library:      	null                	 
+InputFormat:        	org.apache.hadoop.mapred.SequenceFileInputFormat	 
+OutputFormat:       	org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat	 
+Compressed:         	No                  	 
+Num Buckets:        	-1                  	 
+Bucket Columns:     	[]                  	 
+Sort Columns:       	[]                  	 
+	 	 
+# View Information	 	 
+View Original Text: 	select * from srcpart	 
+View Expanded Text: 	select `srcpart`.`key`, `srcpart`.`value`, `srcpart`.`ds`, `srcpart`.`hr` from `default`.`srcpart`	 
+PREHOOK: query: show partitions vt.v
+PREHOOK: type: SHOWPARTITIONS
+PREHOOK: Input: vt@v
+POSTHOOK: query: show partitions vt.v
+POSTHOOK: type: SHOWPARTITIONS
+POSTHOOK: Input: vt@v
+ds=2008-04-08/hr=11
+ds=2008-04-08/hr=12
+PREHOOK: query: alter view vt.v drop partition (ds='2008-04-08',hr='11')
+PREHOOK: type: ALTERTABLE_DROPPARTS
+PREHOOK: Input: vt@v
+PREHOOK: Output: vt@v@ds=2008-04-08/hr=11
+POSTHOOK: query: alter view vt.v drop partition (ds='2008-04-08',hr='11')
+POSTHOOK: type: ALTERTABLE_DROPPARTS
+POSTHOOK: Input: vt@v
+POSTHOOK: Output: vt@v@ds=2008-04-08/hr=11
+PREHOOK: query: alter view vt.v drop partition (ds='2008-04-08',hr='12')
+PREHOOK: type: ALTERTABLE_DROPPARTS
+PREHOOK: Input: vt@v
+PREHOOK: Output: vt@v@ds=2008-04-08/hr=12
+POSTHOOK: query: alter view vt.v drop partition (ds='2008-04-08',hr='12')
+POSTHOOK: type: ALTERTABLE_DROPPARTS
+POSTHOOK: Input: vt@v
+POSTHOOK: Output: vt@v@ds=2008-04-08/hr=12
+PREHOOK: query: show partitions vt.v
+PREHOOK: type: SHOWPARTITIONS
+PREHOOK: Input: vt@v
+POSTHOOK: query: show partitions vt.v
+POSTHOOK: type: SHOWPARTITIONS
+POSTHOOK: Input: vt@v
+PREHOOK: query: -- altering partitioned view 1
+create or replace view vt.v partitioned on (ds, hr) as select value, ds, hr from srcpart
+PREHOOK: type: CREATEVIEW
+PREHOOK: Input: default@srcpart
+PREHOOK: Output: database:vt
+PREHOOK: Output: vt@v
+POSTHOOK: query: -- altering partitioned view 1
+create or replace view vt.v partitioned on (ds, hr) as select value, ds, hr from srcpart
+POSTHOOK: type: CREATEVIEW
+POSTHOOK: Input: default@srcpart
+POSTHOOK: Output: database:vt
+POSTHOOK: Output: vt@v
+PREHOOK: query: select * from vt.v where value='val_409' and ds='2008-04-08' and hr='11'
+PREHOOK: type: QUERY
+PREHOOK: Input: default@srcpart
+PREHOOK: Input: default@srcpart@ds=2008-04-08/hr=11
+PREHOOK: Input: vt@v
+#### A masked pattern was here ####
+POSTHOOK: query: select * from vt.v where value='val_409' and ds='2008-04-08' and hr='11'
+POSTHOOK: type: QUERY
+POSTHOOK: Input: default@srcpart
+POSTHOOK: Input: default@srcpart@ds=2008-04-08/hr=11
+POSTHOOK: Input: vt@v
+#### A masked pattern was here ####
+val_409	2008-04-08	11
+val_409	2008-04-08	11
+val_409	2008-04-08	11
+PREHOOK: query: describe formatted vt.v
+PREHOOK: type: DESCTABLE
+PREHOOK: Input: vt@v
+POSTHOOK: query: describe formatted vt.v
+POSTHOOK: type: DESCTABLE
+POSTHOOK: Input: vt@v
+# col_name            	data_type           	comment             
+	 	 
+value               	string              	                    
+	 	 
+# Partition Information	 	 
+# col_name            	data_type           	comment             
+	 	 
+ds                  	string              	                    
+hr                  	string              	                    
+	 	 
+# Detailed Table Information	 	 
+Database:           	vt                  	 
+#### A masked pattern was here ####
+Protect Mode:       	None                	 
+Retention:          	0                   	 
+Table Type:         	VIRTUAL_VIEW        	 
+Table Parameters:	 	 
+#### A masked pattern was here ####
+	 	 
+# Storage Information	 	 
+SerDe Library:      	null                	 
+InputFormat:        	org.apache.hadoop.mapred.SequenceFileInputFormat	 
+OutputFormat:       	org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat	 
+Compressed:         	No                  	 
+Num Buckets:        	-1                  	 
+Bucket Columns:     	[]                  	 
+Sort Columns:       	[]                  	 
+	 	 
+# View Information	 	 
+View Original Text: 	select value, ds, hr from srcpart	 
+View Expanded Text: 	select `srcpart`.`value`, `srcpart`.`ds`, `srcpart`.`hr` from `default`.`srcpart`	 
+PREHOOK: query: show partitions vt.v
+PREHOOK: type: SHOWPARTITIONS
+PREHOOK: Input: vt@v
+POSTHOOK: query: show partitions vt.v
+POSTHOOK: type: SHOWPARTITIONS
+POSTHOOK: Input: vt@v
+PREHOOK: query: -- altering partitioned view 2
+create or replace view vt.v partitioned on (ds, hr) as select key, value, ds, hr from srcpart
+PREHOOK: type: CREATEVIEW
+PREHOOK: Input: default@srcpart
+PREHOOK: Output: database:vt
+PREHOOK: Output: vt@v
+POSTHOOK: query: -- altering partitioned view 2
+create or replace view vt.v partitioned on (ds, hr) as select key, value, ds, hr from srcpart
+POSTHOOK: type: CREATEVIEW
+POSTHOOK: Input: default@srcpart
+POSTHOOK: Output: database:vt
+POSTHOOK: Output: vt@v
+PREHOOK: query: select * from vt.v where value='val_409' and ds='2008-04-08' and hr='11'
+PREHOOK: type: QUERY
+PREHOOK: Input: default@srcpart
+PREHOOK: Input: default@srcpart@ds=2008-04-08/hr=11
+PREHOOK: Input: vt@v
+#### A masked pattern was here ####
+POSTHOOK: query: select * from vt.v where value='val_409' and ds='2008-04-08' and hr='11'
+POSTHOOK: type: QUERY
+POSTHOOK: Input: default@srcpart
+POSTHOOK: Input: default@srcpart@ds=2008-04-08/hr=11
+POSTHOOK: Input: vt@v
+#### A masked pattern was here ####
+409	val_409	2008-04-08	11
+409	val_409	2008-04-08	11
+409	val_409	2008-04-08	11
+PREHOOK: query: describe formatted vt.v
+PREHOOK: type: DESCTABLE
+PREHOOK: Input: vt@v
+POSTHOOK: query: describe formatted vt.v
+POSTHOOK: type: DESCTABLE
+POSTHOOK: Input: vt@v
+# col_name            	data_type           	comment             
+	 	 
+key                 	string              	                    
+value               	string              	                    
+	 	 
+# Partition Information	 	 
+# col_name            	data_type           	comment             
+	 	 
+ds                  	string              	                    
+hr                  	string              	                    
+	 	 
+# Detailed Table Information	 	 
+Database:           	vt                  	 
+#### A masked pattern was here ####
+Protect Mode:       	None                	 
+Retention:          	0                   	 
+Table Type:         	VIRTUAL_VIEW        	 
+Table Parameters:	 	 
+#### A masked pattern was here ####
+	 	 
+# Storage Information	 	 
+SerDe Library:      	null                	 
+InputFormat:        	org.apache.hadoop.mapred.SequenceFileInputFormat	 
+OutputFormat:       	org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat	 
+Compressed:         	No                  	 
+Num Buckets:        	-1                  	 
+Bucket Columns:     	[]                  	 
+Sort Columns:       	[]                  	 
+	 	 
+# View Information	 	 
+View Original Text: 	select key, value, ds, hr from srcpart	 
+View Expanded Text: 	select `srcpart`.`key`, `srcpart`.`value`, `srcpart`.`ds`, `srcpart`.`hr` from `default`.`srcpart`	 
+PREHOOK: query: show partitions vt.v
+PREHOOK: type: SHOWPARTITIONS
+PREHOOK: Input: vt@v
+POSTHOOK: query: show partitions vt.v
+POSTHOOK: type: SHOWPARTITIONS
+POSTHOOK: Input: vt@v
+PREHOOK: query: drop view vt.v
+PREHOOK: type: DROPVIEW
+PREHOOK: Input: vt@v
+PREHOOK: Output: vt@v
+POSTHOOK: query: drop view vt.v
+POSTHOOK: type: DROPVIEW
+POSTHOOK: Input: vt@v
+POSTHOOK: Output: vt@v
+PREHOOK: query: -- updating to fix view with invalid definition
+create table srcpart_temp like srcpart
+PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:default
+PREHOOK: Output: default@srcpart_temp
+POSTHOOK: query: -- updating to fix view with invalid definition
+create table srcpart_temp like srcpart
+POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:default
+POSTHOOK: Output: default@srcpart_temp
+PREHOOK: query: create view vt.v partitioned on (ds, hr) as select * from srcpart_temp
+PREHOOK: type: CREATEVIEW
+PREHOOK: Input: default@srcpart_temp
+PREHOOK: Output: database:vt
+PREHOOK: Output: vt@v
+POSTHOOK: query: create view vt.v partitioned on (ds, hr) as select * from srcpart_temp
+POSTHOOK: type: CREATEVIEW
+POSTHOOK: Input: default@srcpart_temp
+POSTHOOK: Output: database:vt
+POSTHOOK: Output: vt@v
+PREHOOK: query: drop table srcpart_temp
+PREHOOK: type: DROPTABLE
+PREHOOK: Input: default@srcpart_temp
+PREHOOK: Output: default@srcpart_temp
+POSTHOOK: query: drop table srcpart_temp
+POSTHOOK: type: DROPTABLE
+POSTHOOK: Input: default@srcpart_temp
+POSTHOOK: Output: default@srcpart_temp
+PREHOOK: query: -- vt.v is now invalid
+create or replace view vt.v partitioned on (ds, hr) as select * from srcpart
+PREHOOK: type: CREATEVIEW
+PREHOOK: Input: default@srcpart
+PREHOOK: Output: database:vt
+PREHOOK: Output: vt@v
+POSTHOOK: query: -- vt.v is now invalid
+create or replace view vt.v partitioned on (ds, hr) as select * from srcpart
+POSTHOOK: type: CREATEVIEW
+POSTHOOK: Input: default@srcpart
+POSTHOOK: Output: database:vt
+POSTHOOK: Output: vt@v
+PREHOOK: query: describe formatted vt.v
+PREHOOK: type: DESCTABLE
+PREHOOK: Input: vt@v
+POSTHOOK: query: describe formatted vt.v
+POSTHOOK: type: DESCTABLE
+POSTHOOK: Input: vt@v
+# col_name            	data_type           	comment             
+	 	 
+key                 	string              	                    
+value               	string              	                    
+	 	 
+# Partition Information	 	 
+# col_name            	data_type           	comment             
+	 	 
+ds                  	string              	                    
+hr                  	string              	                    
+	 	 
+# Detailed Table Information	 	 
+Database:           	vt                  	 
+#### A masked pattern was here ####
+Protect Mode:       	None                	 
+Retention:          	0                   	 
+Table Type:         	VIRTUAL_VIEW        	 
+Table Parameters:	 	 
+#### A masked pattern was here ####
+	 	 
+# Storage Information	 	 
+SerDe Library:      	null                	 
+InputFormat:        	org.apache.hadoop.mapred.SequenceFileInputFormat	 
+OutputFormat:       	org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat	 
+Compressed:         	No                  	 
+Num Buckets:        	-1                  	 
+Bucket Columns:     	[]                  	 
+Sort Columns:       	[]                  	 
+	 	 
+# View Information	 	 
+View Original Text: 	select * from srcpart	 
+View Expanded Text: 	select `srcpart`.`key`, `srcpart`.`value`, `srcpart`.`ds`, `srcpart`.`hr` from `default`.`srcpart`	 
+PREHOOK: query: drop view vt.v
+PREHOOK: type: DROPVIEW
+PREHOOK: Input: vt@v
+PREHOOK: Output: vt@v
+POSTHOOK: query: drop view vt.v
+POSTHOOK: type: DROPVIEW
+POSTHOOK: Input: vt@v
+POSTHOOK: Output: vt@v
+PREHOOK: query: drop database vt
+PREHOOK: type: DROPDATABASE
+PREHOOK: Input: database:vt
+PREHOOK: Output: database:vt
+POSTHOOK: query: drop database vt
+POSTHOOK: type: DROPDATABASE
+POSTHOOK: Input: database:vt
+POSTHOOK: Output: database:vt

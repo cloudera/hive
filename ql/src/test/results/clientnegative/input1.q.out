@@ -1,1 +1,1 @@
-FAILED: Error in semantic analysis: line 1:7 Invalid Table Alias a
+FAILED: SemanticException [Error 10009]: Line 1:7 Invalid table alias 'a'

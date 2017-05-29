@@ -1,7 +1,10 @@
 PREHOOK: query: CREATE TABLE dest1(key INT, value STRING) STORED AS TEXTFILE
 PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:default
+PREHOOK: Output: default@dest1
 POSTHOOK: query: CREATE TABLE dest1(key INT, value STRING) STORED AS TEXTFILE
 POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@dest1
 PREHOOK: query: FROM src
 INSERT OVERWRITE TABLE dest1 SELECT '1234', concat(src.key) WHERE src.key < 100 group by src.key
@@ -18,13 +21,11 @@ POSTHOOK: Lineage: dest1.value EXPRESSION [(src)src.FieldSchema(name:key, type:s
 PREHOOK: query: SELECT dest1.* FROM dest1
 PREHOOK: type: QUERY
 PREHOOK: Input: default@dest1
-PREHOOK: Output: file:/tmp/jssarma/hive_2010-07-21_12-07-54_012_5077477385110287333/10000
+#### A masked pattern was here ####
 POSTHOOK: query: SELECT dest1.* FROM dest1
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@dest1
-POSTHOOK: Output: file:/tmp/jssarma/hive_2010-07-21_12-07-54_012_5077477385110287333/10000
-POSTHOOK: Lineage: dest1.key EXPRESSION []
-POSTHOOK: Lineage: dest1.value EXPRESSION [(src)src.FieldSchema(name:key, type:string, comment:default), ]
+#### A masked pattern was here ####
 1234	0
 1234	10
 1234	11

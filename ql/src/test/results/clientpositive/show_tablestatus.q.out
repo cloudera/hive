@@ -4,12 +4,9 @@ PREHOOK: type: SHOW_TABLESTATUS
 POSTHOOK: query: EXPLAIN 
 SHOW TABLE EXTENDED IN default LIKE `src`
 POSTHOOK: type: SHOW_TABLESTATUS
-ABSTRACT SYNTAX TREE:
-  (TOK_SHOW_TABLESTATUS `src` default)
-
 STAGE DEPENDENCIES:
   Stage-0 is a root stage
-  Stage-1 is a root stage
+  Stage-1 depends on stages: Stage-0
 
 STAGE PLANS:
   Stage: Stage-0
@@ -17,15 +14,15 @@ STAGE PLANS:
   Stage: Stage-1
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: SHOW TABLE EXTENDED IN default LIKE `src`
 PREHOOK: type: SHOW_TABLESTATUS
 POSTHOOK: query: SHOW TABLE EXTENDED IN default LIKE `src`
 POSTHOOK: type: SHOW_TABLESTATUS
 tableName:src
-owner:null
-location:file:/data/users/njain/hive5/hive5/build/ql/test/data/warehouse/src
+#### A masked pattern was here ####
 inputformat:org.apache.hadoop.mapred.TextInputFormat
 outputformat:org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
 columns:struct columns { string key, string value}
@@ -35,16 +32,14 @@ totalNumberFiles:1
 totalFileSize:5812
 maxFileSize:5812
 minFileSize:5812
-lastAccessTime:0
-lastUpdateTime:1253759351000
+#### A masked pattern was here ####
 
 PREHOOK: query: SHOW TABLE EXTENDED from default LIKE `src`
 PREHOOK: type: SHOW_TABLESTATUS
 POSTHOOK: query: SHOW TABLE EXTENDED from default LIKE `src`
 POSTHOOK: type: SHOW_TABLESTATUS
 tableName:src
-owner:null
-location:file:/data/users/njain/hive5/hive5/build/ql/test/data/warehouse/src
+#### A masked pattern was here ####
 inputformat:org.apache.hadoop.mapred.TextInputFormat
 outputformat:org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
 columns:struct columns { string key, string value}
@@ -54,16 +49,14 @@ totalNumberFiles:1
 totalFileSize:5812
 maxFileSize:5812
 minFileSize:5812
-lastAccessTime:0
-lastUpdateTime:1253759351000
+#### A masked pattern was here ####
 
 PREHOOK: query: SHOW TABLE EXTENDED LIKE `src`
 PREHOOK: type: SHOW_TABLESTATUS
 POSTHOOK: query: SHOW TABLE EXTENDED LIKE `src`
 POSTHOOK: type: SHOW_TABLESTATUS
 tableName:src
-owner:null
-location:file:/data/users/njain/hive5/hive5/build/ql/test/data/warehouse/src
+#### A masked pattern was here ####
 inputformat:org.apache.hadoop.mapred.TextInputFormat
 outputformat:org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
 columns:struct columns { string key, string value}
@@ -73,8 +66,7 @@ totalNumberFiles:1
 totalFileSize:5812
 maxFileSize:5812
 minFileSize:5812
-lastAccessTime:0
-lastUpdateTime:1253759351000
+#### A masked pattern was here ####
 
 PREHOOK: query: SHOW TABLE EXTENDED LIKE `src.?`
 PREHOOK: type: SHOW_TABLESTATUS
@@ -97,8 +89,7 @@ PREHOOK: type: SHOW_TABLESTATUS
 POSTHOOK: query: SHOW TABLE EXTENDED LIKE `srcpart` PARTITION(ds='2008-04-08', hr=11)
 POSTHOOK: type: SHOW_TABLESTATUS
 tableName:srcpart
-owner:null
-location:file:/data/users/njain/hive5/hive5/build/ql/test/data/warehouse/srcpart
+#### A masked pattern was here ####
 inputformat:org.apache.hadoop.mapred.TextInputFormat
 outputformat:org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
 columns:struct columns { string key, string value}
@@ -108,16 +99,14 @@ totalNumberFiles:1
 totalFileSize:5812
 maxFileSize:5812
 minFileSize:5812
-lastAccessTime:0
-lastUpdateTime:1253759351000
+#### A masked pattern was here ####
 
 PREHOOK: query: SHOW TABLE EXTENDED from default LIKE src
 PREHOOK: type: SHOW_TABLESTATUS
 POSTHOOK: query: SHOW TABLE EXTENDED from default LIKE src
 POSTHOOK: type: SHOW_TABLESTATUS
 tableName:src
-owner:null
-location:file:/data/users/njain/hive5/hive5/build/ql/test/data/warehouse/src
+#### A masked pattern was here ####
 inputformat:org.apache.hadoop.mapred.TextInputFormat
 outputformat:org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
 columns:struct columns { string key, string value}
@@ -127,6 +116,5 @@ totalNumberFiles:1
 totalFileSize:5812
 maxFileSize:5812
 minFileSize:5812
-lastAccessTime:0
-lastUpdateTime:1253759351000
+#### A masked pattern was here ####
 

@@ -22,6 +22,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.commons.lang.builder.HashCodeBuilder;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 
@@ -86,7 +87,6 @@ public class ExprNodeFieldDesc extends ExprNodeDesc implements Serializable {
     return desc.toString() + "." + fieldName;
   }
 
-  @Explain(displayName = "expr")
   @Override
   public String getExprString() {
     return desc.getExprString() + "." + fieldName;
@@ -103,7 +103,7 @@ public class ExprNodeFieldDesc extends ExprNodeDesc implements Serializable {
 
   @Override
   public ExprNodeDesc clone() {
-    return new ExprNodeFieldDesc(typeInfo, desc, fieldName, isList);
+    return new ExprNodeFieldDesc(typeInfo, desc.clone(), fieldName, isList);
   }
 
   @Override
@@ -121,5 +121,16 @@ public class ExprNodeFieldDesc extends ExprNodeDesc implements Serializable {
     }
 
     return true;
+  }
+
+  @Override
+  public int hashCode() {
+    int superHashCode = super.hashCode();
+    HashCodeBuilder builder = new HashCodeBuilder();
+    builder.appendSuper(superHashCode);
+    builder.append(desc);
+    builder.append(fieldName);
+    builder.append(isList);
+    return builder.toHashCode();
   }
 }

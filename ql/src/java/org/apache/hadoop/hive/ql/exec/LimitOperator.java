@@ -32,13 +32,17 @@ public class LimitOperator extends Operator<LimitDesc> implements Serializable {
   private static final long serialVersionUID = 1L;
 
   protected transient int limit;
+  protected transient int leastRow;
   protected transient int currCount;
+  protected transient boolean isMap;
 
   @Override
   protected void initializeOp(Configuration hconf) throws HiveException {
     super.initializeOp(hconf);
     limit = conf.getLimit();
+    leastRow = conf.getLeastRows();
     currCount = 0;
+    isMap = hconf.getBoolean("mapred.task.is.map", true);
   }
 
   @Override
@@ -53,12 +57,23 @@ public class LimitOperator extends Operator<LimitDesc> implements Serializable {
 
   @Override
   public String getName() {
+    return getOperatorName();
+  }
+
+  static public String getOperatorName() {
     return "LIM";
   }
 
   @Override
   public OperatorType getType() {
     return OperatorType.LIMIT;
+  }
+
+  @Override
+  public void closeOp(boolean abort) throws HiveException {
+    if (!isMap && currCount < leastRow) {
+      throw new HiveException("No sufficient row found");
+    }
   }
 
 }

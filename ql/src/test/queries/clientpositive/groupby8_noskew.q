@@ -3,6 +3,8 @@ set hive.map.aggr=false;
 set hive.groupby.skewindata=false;
 set mapred.reduce.tasks=31;
 
+-- SORT_QUERY_RESULTS
+
 CREATE TABLE DEST1(key INT, value STRING) STORED AS TEXTFILE;
 CREATE TABLE DEST2(key INT, value STRING) STORED AS TEXTFILE;
 
@@ -17,4 +19,3 @@ INSERT OVERWRITE TABLE DEST2 SELECT SRC.key, COUNT(DISTINCT SUBSTR(SRC.value,5))
 
 SELECT DEST1.* FROM DEST1;
 SELECT DEST2.* FROM DEST2;
-

@@ -17,7 +17,7 @@
  */
 package org.apache.hadoop.hive.serde2.objectinspector.primitive;
 
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorUtils.PrimitiveTypeEntry;
+import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 
 /**
  * An AbstractJavaPrimitiveObjectInspector for a Java object.
@@ -25,8 +25,11 @@ import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectIn
 public abstract class AbstractPrimitiveJavaObjectInspector extends
     AbstractPrimitiveObjectInspector {
 
-  protected AbstractPrimitiveJavaObjectInspector(PrimitiveTypeEntry typeEntry) {
-    super(typeEntry);
+  protected AbstractPrimitiveJavaObjectInspector() {
+    super();
+  }
+  protected AbstractPrimitiveJavaObjectInspector(PrimitiveTypeInfo typeInfo) {
+    super(typeInfo);
   }
 
   @Override

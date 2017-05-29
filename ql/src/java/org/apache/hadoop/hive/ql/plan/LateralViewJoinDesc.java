@@ -18,23 +18,25 @@
 
 package org.apache.hadoop.hive.ql.plan;
 
-import java.io.Serializable;
 import java.util.ArrayList;
+
 
 /**
  * LateralViewJoinDesc.
  *
  */
 @Explain(displayName = "Lateral View Join Operator")
-public class LateralViewJoinDesc implements Serializable {
+public class LateralViewJoinDesc extends AbstractOperatorDesc {
   private static final long serialVersionUID = 1L;
 
+  private int numSelColumns;
   private ArrayList<String> outputInternalColNames;
 
   public LateralViewJoinDesc() {
   }
 
-  public LateralViewJoinDesc(ArrayList<String> outputInternalColNames) {
+  public LateralViewJoinDesc(int numSelColumns, ArrayList<String> outputInternalColNames) {
+    this.numSelColumns = numSelColumns;
     this.outputInternalColNames = outputInternalColNames;
   }
 
@@ -45,5 +47,13 @@ public class LateralViewJoinDesc implements Serializable {
   @Explain(displayName = "outputColumnNames")
   public ArrayList<String> getOutputInternalColNames() {
     return outputInternalColNames;
+  }
+
+  public int getNumSelColumns() {
+    return numSelColumns;
+  }
+
+  public void setNumSelColumns(int numSelColumns) {
+    this.numSelColumns = numSelColumns;
   }
 }

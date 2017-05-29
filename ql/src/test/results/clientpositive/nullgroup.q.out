@@ -4,73 +4,59 @@ PREHOOK: type: QUERY
 POSTHOOK: query: explain
 select count(1) from src x where x.key > 9999
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF src x)) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_FUNCTION count 1))) (TOK_WHERE (> (. (TOK_TABLE_OR_COL x) key) 9999))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        x 
+      Map Operator Tree:
           TableScan
             alias: x
+            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
-              predicate:
-                  expr: (key > 9999)
-                  type: boolean
-              Filter Operator
-                predicate:
-                    expr: (key > 9999)
-                    type: boolean
-                Select Operator
-                  Group By Operator
-                    aggregations:
-                          expr: count(1)
-                    bucketGroup: false
-                    mode: hash
-                    outputColumnNames: _col0
-                    Reduce Output Operator
-                      sort order: 
-                      tag: -1
-                      value expressions:
-                            expr: _col0
-                            type: bigint
+              predicate: (UDFToDouble(key) > 9999.0) (type: boolean)
+              Statistics: Num rows: 166 Data size: 1763 Basic stats: COMPLETE Column stats: NONE
+              Select Operator
+                Statistics: Num rows: 166 Data size: 1763 Basic stats: COMPLETE Column stats: NONE
+                Group By Operator
+                  aggregations: count(1)
+                  mode: hash
+                  outputColumnNames: _col0
+                  Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
+                  Reduce Output Operator
+                    sort order: 
+                    Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
+                    value expressions: _col0 (type: bigint)
       Reduce Operator Tree:
         Group By Operator
-          aggregations:
-                expr: count(VALUE._col0)
-          bucketGroup: false
+          aggregations: count(VALUE._col0)
           mode: final
           outputColumnNames: _col0
-          Select Operator
-            expressions:
-                  expr: _col0
-                  type: bigint
-            outputColumnNames: _col0
-            File Output Operator
-              compressed: false
-              GlobalTableId: 0
-              table:
-                  input format: org.apache.hadoop.mapred.TextInputFormat
-                  output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+          Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
+          File Output Operator
+            compressed: false
+            Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
+            table:
+                input format: org.apache.hadoop.mapred.TextInputFormat
+                output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select count(1) from src x where x.key > 9999
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src
-PREHOOK: Output: file:/data/users/heyongqiang/hive-trunk-commit/build/ql/tmp/833754505/10000
+#### A masked pattern was here ####
 POSTHOOK: query: select count(1) from src x where x.key > 9999
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@src
-POSTHOOK: Output: file:/data/users/heyongqiang/hive-trunk-commit/build/ql/tmp/833754505/10000
+#### A masked pattern was here ####
 0
 PREHOOK: query: explain
 select count(1) from src x where x.key > 9999
@@ -78,73 +64,59 @@ PREHOOK: type: QUERY
 POSTHOOK: query: explain
 select count(1) from src x where x.key > 9999
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF src x)) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_FUNCTION count 1))) (TOK_WHERE (> (. (TOK_TABLE_OR_COL x) key) 9999))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        x 
+      Map Operator Tree:
           TableScan
             alias: x
+            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
-              predicate:
-                  expr: (key > 9999)
-                  type: boolean
-              Filter Operator
-                predicate:
-                    expr: (key > 9999)
-                    type: boolean
-                Select Operator
-                  Group By Operator
-                    aggregations:
-                          expr: count(1)
-                    bucketGroup: false
-                    mode: hash
-                    outputColumnNames: _col0
-                    Reduce Output Operator
-                      sort order: 
-                      tag: -1
-                      value expressions:
-                            expr: _col0
-                            type: bigint
+              predicate: (UDFToDouble(key) > 9999.0) (type: boolean)
+              Statistics: Num rows: 166 Data size: 1763 Basic stats: COMPLETE Column stats: NONE
+              Select Operator
+                Statistics: Num rows: 166 Data size: 1763 Basic stats: COMPLETE Column stats: NONE
+                Group By Operator
+                  aggregations: count(1)
+                  mode: hash
+                  outputColumnNames: _col0
+                  Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
+                  Reduce Output Operator
+                    sort order: 
+                    Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
+                    value expressions: _col0 (type: bigint)
       Reduce Operator Tree:
         Group By Operator
-          aggregations:
-                expr: count(VALUE._col0)
-          bucketGroup: false
+          aggregations: count(VALUE._col0)
           mode: mergepartial
           outputColumnNames: _col0
-          Select Operator
-            expressions:
-                  expr: _col0
-                  type: bigint
-            outputColumnNames: _col0
-            File Output Operator
-              compressed: false
-              GlobalTableId: 0
-              table:
-                  input format: org.apache.hadoop.mapred.TextInputFormat
-                  output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+          Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
+          File Output Operator
+            compressed: false
+            Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
+            table:
+                input format: org.apache.hadoop.mapred.TextInputFormat
+                output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select count(1) from src x where x.key > 9999
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src
-PREHOOK: Output: file:/data/users/heyongqiang/hive-trunk-commit/build/ql/tmp/1463633983/10000
+#### A masked pattern was here ####
 POSTHOOK: query: select count(1) from src x where x.key > 9999
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@src
-POSTHOOK: Output: file:/data/users/heyongqiang/hive-trunk-commit/build/ql/tmp/1463633983/10000
+#### A masked pattern was here ####
 0
 PREHOOK: query: explain
 select count(1) from src x where x.key > 9999
@@ -152,95 +124,76 @@ PREHOOK: type: QUERY
 POSTHOOK: query: explain
 select count(1) from src x where x.key > 9999
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF src x)) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_FUNCTION count 1))) (TOK_WHERE (> (. (TOK_TABLE_OR_COL x) key) 9999))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
   Stage-2 depends on stages: Stage-1
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-2
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        x 
+      Map Operator Tree:
           TableScan
             alias: x
+            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
-              predicate:
-                  expr: (key > 9999)
-                  type: boolean
-              Filter Operator
-                predicate:
-                    expr: (key > 9999)
-                    type: boolean
-                Select Operator
-                  Reduce Output Operator
-                    sort order: 
-                    Map-reduce partition columns:
-                          expr: rand()
-                          type: double
-                    tag: -1
-                    value expressions:
-                          expr: 1
-                          type: int
+              predicate: (UDFToDouble(key) > 9999.0) (type: boolean)
+              Statistics: Num rows: 166 Data size: 1763 Basic stats: COMPLETE Column stats: NONE
+              Select Operator
+                Statistics: Num rows: 166 Data size: 1763 Basic stats: COMPLETE Column stats: NONE
+                Reduce Output Operator
+                  sort order: 
+                  Map-reduce partition columns: rand() (type: double)
+                  Statistics: Num rows: 166 Data size: 1763 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
         Group By Operator
-          aggregations:
-                expr: count(VALUE._col0)
-          bucketGroup: false
+          aggregations: count(1)
           mode: partial1
           outputColumnNames: _col0
+          Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
           File Output Operator
             compressed: false
-            GlobalTableId: 0
             table:
                 input format: org.apache.hadoop.mapred.SequenceFileInputFormat
                 output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe
 
   Stage: Stage-2
     Map Reduce
-      Alias -> Map Operator Tree:
-        file:/data/users/heyongqiang/hive-trunk-commit/build/ql/tmp/1175734472/10002 
+      Map Operator Tree:
+          TableScan
             Reduce Output Operator
               sort order: 
-              tag: -1
-              value expressions:
-                    expr: _col0
-                    type: bigint
+              Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
+              value expressions: _col0 (type: bigint)
       Reduce Operator Tree:
         Group By Operator
-          aggregations:
-                expr: count(VALUE._col0)
-          bucketGroup: false
+          aggregations: count(VALUE._col0)
           mode: final
           outputColumnNames: _col0
-          Select Operator
-            expressions:
-                  expr: _col0
-                  type: bigint
-            outputColumnNames: _col0
-            File Output Operator
-              compressed: false
-              GlobalTableId: 0
-              table:
-                  input format: org.apache.hadoop.mapred.TextInputFormat
-                  output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+          Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
+          File Output Operator
+            compressed: false
+            Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
+            table:
+                input format: org.apache.hadoop.mapred.TextInputFormat
+                output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select count(1) from src x where x.key > 9999
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src
-PREHOOK: Output: file:/data/users/heyongqiang/hive-trunk-commit/build/ql/tmp/1110622860/10000
+#### A masked pattern was here ####
 POSTHOOK: query: select count(1) from src x where x.key > 9999
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@src
-POSTHOOK: Output: file:/data/users/heyongqiang/hive-trunk-commit/build/ql/tmp/1110622860/10000
+#### A masked pattern was here ####
 0
 PREHOOK: query: explain
 select count(1) from src x where x.key > 9999
@@ -248,65 +201,51 @@ PREHOOK: type: QUERY
 POSTHOOK: query: explain
 select count(1) from src x where x.key > 9999
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF src x)) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_FUNCTION count 1))) (TOK_WHERE (> (. (TOK_TABLE_OR_COL x) key) 9999))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        x 
+      Map Operator Tree:
           TableScan
             alias: x
+            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
-              predicate:
-                  expr: (key > 9999)
-                  type: boolean
-              Filter Operator
-                predicate:
-                    expr: (key > 9999)
-                    type: boolean
-                Select Operator
-                  Reduce Output Operator
-                    sort order: 
-                    tag: -1
-                    value expressions:
-                          expr: 1
-                          type: int
+              predicate: (UDFToDouble(key) > 9999.0) (type: boolean)
+              Statistics: Num rows: 166 Data size: 1763 Basic stats: COMPLETE Column stats: NONE
+              Select Operator
+                Statistics: Num rows: 166 Data size: 1763 Basic stats: COMPLETE Column stats: NONE
+                Reduce Output Operator
+                  sort order: 
+                  Statistics: Num rows: 166 Data size: 1763 Basic stats: COMPLETE Column stats: NONE
       Reduce Operator Tree:
         Group By Operator
-          aggregations:
-                expr: count(VALUE._col0)
-          bucketGroup: false
+          aggregations: count(1)
           mode: complete
           outputColumnNames: _col0
-          Select Operator
-            expressions:
-                  expr: _col0
-                  type: bigint
-            outputColumnNames: _col0
-            File Output Operator
-              compressed: false
-              GlobalTableId: 0
-              table:
-                  input format: org.apache.hadoop.mapred.TextInputFormat
-                  output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+          Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
+          File Output Operator
+            compressed: false
+            Statistics: Num rows: 1 Data size: 8 Basic stats: COMPLETE Column stats: NONE
+            table:
+                input format: org.apache.hadoop.mapred.TextInputFormat
+                output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select count(1) from src x where x.key > 9999
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src
-PREHOOK: Output: file:/data/users/heyongqiang/hive-trunk-commit/build/ql/tmp/1442417263/10000
+#### A masked pattern was here ####
 POSTHOOK: query: select count(1) from src x where x.key > 9999
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@src
-POSTHOOK: Output: file:/data/users/heyongqiang/hive-trunk-commit/build/ql/tmp/1442417263/10000
+#### A masked pattern was here ####
 0

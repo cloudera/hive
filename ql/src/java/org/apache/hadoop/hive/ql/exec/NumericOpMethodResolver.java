@@ -30,7 +30,7 @@ import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
 /**
  * The class implements the method resolution for operators like (+, -, *, %).
  * The resolution logic is as follows:
- * 
+ *
  * 1. If one of the parameters is a string, then it resolves to evaluate(double,
  * double) 2. If one of the parameters is null, then it resolves to evaluate(T,
  * T) where T is the other non-null parameter type. 3. If both of the parameters
@@ -54,7 +54,7 @@ public class NumericOpMethodResolver implements UDFMethodResolver {
 
   /*
    * (non-Javadoc)
-   * 
+   *
    * @see
    * org.apache.hadoop.hive.ql.exec.UDFMethodResolver#getEvalMethod(java.util
    * .List)
@@ -66,12 +66,21 @@ public class NumericOpMethodResolver implements UDFMethodResolver {
     List<TypeInfo> pTypeInfos = null;
     List<TypeInfo> modArgTypeInfos = new ArrayList<TypeInfo>();
 
-    // If either argument is a string, we convert to a double because a number
-    // in string form should always be convertible into a double
+    // If either argument is a string, we convert to a double or decimal because a number
+    // in string form should always be convertible into either of those
     if (argTypeInfos.get(0).equals(TypeInfoFactory.stringTypeInfo)
         || argTypeInfos.get(1).equals(TypeInfoFactory.stringTypeInfo)) {
-      modArgTypeInfos.add(TypeInfoFactory.doubleTypeInfo);
-      modArgTypeInfos.add(TypeInfoFactory.doubleTypeInfo);
+
+      // Default is double, but if one of the sides is already in decimal we
+      // complete the operation in that type.
+      if (argTypeInfos.get(0).equals(TypeInfoFactory.decimalTypeInfo)
+          || argTypeInfos.get(1).equals(TypeInfoFactory.decimalTypeInfo)) {
+        modArgTypeInfos.add(TypeInfoFactory.decimalTypeInfo);
+        modArgTypeInfos.add(TypeInfoFactory.decimalTypeInfo);
+      } else {
+        modArgTypeInfos.add(TypeInfoFactory.doubleTypeInfo);
+        modArgTypeInfos.add(TypeInfoFactory.doubleTypeInfo);
+      }
     } else {
       // If it's a void, we change the type to a byte because once the types
       // are run through getCommonClass(), a byte and any other type T will
@@ -114,14 +123,14 @@ public class NumericOpMethodResolver implements UDFMethodResolver {
 
         for (int i = 0; i < pTypeInfos.size() && match; i++) {
           TypeInfo accepted = argumentTypeInfos.get(i);
-          if (!accepted.equals(pTypeInfos.get(i))) {
+          if (!accepted.accept(pTypeInfos.get(i))) {
             match = false;
           }
         }
 
         if (match) {
           if (udfMethod != null) {
-            throw new AmbiguousMethodException(udfClass, argTypeInfos, 
+            throw new AmbiguousMethodException(udfClass, argTypeInfos,
                 Arrays.asList(new Method[]{udfMethod, m}));
           } else {
             udfMethod = m;
@@ -129,6 +138,11 @@ public class NumericOpMethodResolver implements UDFMethodResolver {
         }
       }
     }
+
+    if (udfMethod == null) {
+      throw new NoMatchingMethodException(udfClass, argTypeInfos, null);
+    }
+
     return udfMethod;
   }
 }

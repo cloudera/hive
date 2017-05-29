@@ -19,13 +19,16 @@
 package org.apache.hadoop.hive.ql.udf.generic;
 
 import org.apache.hadoop.hive.ql.exec.Description;
+import org.apache.hadoop.hive.ql.exec.FunctionRegistry;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentException;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentTypeException;
+import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFUtils.ReturnObjectInspectorResolver;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorConverters;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Category;
+import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorConverters;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorConverters.Converter;
+import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorUtils;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.BooleanObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.ByteObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.IntObjectInspector;
@@ -53,17 +56,17 @@ public abstract class GenericUDFBaseCompare extends GenericUDF {
   protected String opName;
   protected String opDisplayName;
 
-  protected ObjectInspector[] argumentOIs;
+  protected transient ObjectInspector[] argumentOIs;
 
-  protected ReturnObjectInspectorResolver conversionHelper = null;
+  protected transient ReturnObjectInspectorResolver conversionHelper = null;
   protected ObjectInspector compareOI;
   protected CompareType compareType;
-  protected Converter converter0, converter1;
-  protected StringObjectInspector soi0, soi1;
-  protected IntObjectInspector ioi0, ioi1;
-  protected LongObjectInspector loi0, loi1;
-  protected ByteObjectInspector byoi0, byoi1;
-  protected BooleanObjectInspector boi0,boi1;
+  protected transient Converter converter0, converter1;
+  protected transient StringObjectInspector soi0, soi1;
+  protected transient IntObjectInspector ioi0, ioi1;
+  protected transient LongObjectInspector loi0, loi1;
+  protected transient ByteObjectInspector byoi0, byoi1;
+  protected transient BooleanObjectInspector boi0,boi1;
   protected final BooleanWritable result = new BooleanWritable();
 
   @Override
@@ -130,20 +133,55 @@ public abstract class GenericUDFBaseCompare extends GenericUDF {
       TypeInfo oiTypeInfo0 = TypeInfoUtils.getTypeInfoFromObjectInspector(arguments[0]);
       TypeInfo oiTypeInfo1 = TypeInfoUtils.getTypeInfoFromObjectInspector(arguments[1]);
 
-      if (oiTypeInfo0 != oiTypeInfo1) {
+      if (oiTypeInfo0 == oiTypeInfo1
+          || TypeInfoUtils.doPrimitiveCategoriesMatch(oiTypeInfo0, oiTypeInfo1)) {
+        compareType = CompareType.SAME_TYPE;
+      } else {
         compareType = CompareType.NEED_CONVERT;
+        TypeInfo compareType = FunctionRegistry.getCommonClassForComparison(
+            oiTypeInfo0, oiTypeInfo1);
+
+        // For now, we always convert to double if we can't find a common type
         compareOI = TypeInfoUtils.getStandardWritableObjectInspectorFromTypeInfo(
-            TypeInfoFactory.doubleTypeInfo);
+            (compareType == null) ?
+            TypeInfoFactory.doubleTypeInfo : compareType);
+
         converter0 = ObjectInspectorConverters.getConverter(arguments[0], compareOI);
         converter1 = ObjectInspectorConverters.getConverter(arguments[1], compareOI);
-      } else {
-        compareType = CompareType.SAME_TYPE;
       }
     }
     return PrimitiveObjectInspectorFactory.writableBooleanObjectInspector;
 
   }
 
+  public Integer compare(DeferredObject[] arguments) throws HiveException {
+    Object o0,o1;
+    o0 = arguments[0].get();
+    if (o0 == null) {
+      return null;
+    }
+    o1 = arguments[1].get();
+    if (o1 == null) {
+      return null;
+    }
+
+    if (compareType == CompareType.NEED_CONVERT) {
+      Object converted_o0 = converter0.convert(o0);
+      if (converted_o0 == null) {
+        return null;
+      }
+      Object converted_o1 = converter1.convert(o1);
+      if (converted_o1 == null) {
+        return null;
+      }
+      return ObjectInspectorUtils.compare(
+          converted_o0, compareOI,
+          converted_o1, compareOI);
+    } else {
+      return ObjectInspectorUtils.compare(
+          o0, argumentOIs[0], o1, argumentOIs[1]);
+    }
+  }
 
   @Override
   public String getDisplayString(String[] children) {

@@ -26,9 +26,9 @@ import org.apache.hadoop.hive.metastore.api.PrincipalType;
 public class PrincipalDesc implements Serializable, Cloneable {
 
   private static final long serialVersionUID = 1L;
-  
+
   private String name;
-  
+
   private PrincipalType type;
 
   public PrincipalDesc(String name, PrincipalType type) {
@@ -50,7 +50,7 @@ public class PrincipalDesc implements Serializable, Cloneable {
     this.name = name;
   }
 
-  @Explain(displayName="type")
+  @Explain(displayName="type", normalExplain = false)
   public PrincipalType getType() {
     return type;
   }

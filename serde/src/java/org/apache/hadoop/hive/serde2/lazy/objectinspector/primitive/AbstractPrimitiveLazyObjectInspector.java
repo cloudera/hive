@@ -19,7 +19,7 @@ package org.apache.hadoop.hive.serde2.lazy.objectinspector.primitive;
 
 import org.apache.hadoop.hive.serde2.lazy.LazyPrimitive;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.AbstractPrimitiveObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorUtils.PrimitiveTypeEntry;
+import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.io.Writable;
 
 /**
@@ -28,8 +28,11 @@ import org.apache.hadoop.io.Writable;
 public abstract class AbstractPrimitiveLazyObjectInspector<T extends Writable>
     extends AbstractPrimitiveObjectInspector {
 
-  protected AbstractPrimitiveLazyObjectInspector(PrimitiveTypeEntry typeEntry) {
-    super(typeEntry);
+  protected AbstractPrimitiveLazyObjectInspector() {
+    super();
+  }
+  protected AbstractPrimitiveLazyObjectInspector(PrimitiveTypeInfo typeInfo) {
+    super(typeInfo);
   }
 
   @Override

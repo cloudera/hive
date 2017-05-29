@@ -18,12 +18,14 @@
 
 package org.apache.hadoop.hive.ql.plan;
 
+import org.apache.commons.lang.builder.HashCodeBuilder;
+import org.apache.hadoop.hive.ql.exec.ColumnInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
+
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
-
-import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
-import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
 
 /**
  * ExprNodeColumnDesc.
@@ -47,7 +49,16 @@ public class ExprNodeColumnDesc extends ExprNodeDesc implements Serializable {
    */
   private boolean isPartitionColOrVirtualCol;
 
+  /**
+   * Is the column a skewed column
+   */
+  private boolean isSkewedCol;
+
   public ExprNodeColumnDesc() {
+  }
+
+  public ExprNodeColumnDesc(ColumnInfo ci) {
+    this(ci.getType(), ci.getInternalName(), ci.getTabAlias(), ci.getIsVirtualCol());
   }
 
   public ExprNodeColumnDesc(TypeInfo typeInfo, String column, String tabAlias,
@@ -64,6 +75,15 @@ public class ExprNodeColumnDesc extends ExprNodeDesc implements Serializable {
     this.column = column;
     this.tabAlias = tabAlias;
     this.isPartitionColOrVirtualCol = isPartitionColOrVirtualCol;
+  }
+
+  public ExprNodeColumnDesc(TypeInfo typeInfo, String column, String tabAlias,
+      boolean isPartitionColOrVirtualCol, boolean isSkewedCol) {
+    super(typeInfo);
+    this.column = column;
+    this.tabAlias = tabAlias;
+    this.isPartitionColOrVirtualCol = isPartitionColOrVirtualCol;
+    this.isSkewedCol = isSkewedCol;
   }
 
   public String getColumn() {
@@ -95,7 +115,6 @@ public class ExprNodeColumnDesc extends ExprNodeDesc implements Serializable {
     return "Column[" + column + "]";
   }
 
-  @Explain(displayName = "expr")
   @Override
   public String getExprString() {
     return getColumn();
@@ -110,7 +129,8 @@ public class ExprNodeColumnDesc extends ExprNodeDesc implements Serializable {
 
   @Override
   public ExprNodeDesc clone() {
-    return new ExprNodeColumnDesc(typeInfo, column, tabAlias, isPartitionColOrVirtualCol);
+    return new ExprNodeColumnDesc(typeInfo, column, tabAlias, isPartitionColOrVirtualCol,
+        isSkewedCol);
   }
 
   @Override
@@ -125,6 +145,35 @@ public class ExprNodeColumnDesc extends ExprNodeDesc implements Serializable {
     if (!typeInfo.equals(dest.getTypeInfo())) {
       return false;
     }
+    if ( tabAlias != null && dest.tabAlias != null ) {
+      if ( !tabAlias.equals(dest.tabAlias) ) {
+        return false;
+      }
+    }
     return true;
+  }
+
+  /**
+   * @return the isSkewedCol
+   */
+  public boolean isSkewedCol() {
+    return isSkewedCol;
+  }
+
+  /**
+   * @param isSkewedCol the isSkewedCol to set
+   */
+  public void setSkewedCol(boolean isSkewedCol) {
+    this.isSkewedCol = isSkewedCol;
+  }
+
+  @Override
+  public int hashCode() {
+    int superHashCode = super.hashCode();
+    HashCodeBuilder builder = new HashCodeBuilder();
+    builder.appendSuper(superHashCode);
+    builder.append(column);
+    builder.append(tabAlias);
+    return builder.toHashCode();
   }
 }

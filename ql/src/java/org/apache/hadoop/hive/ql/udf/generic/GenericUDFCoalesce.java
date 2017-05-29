@@ -34,15 +34,15 @@ import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
     extended = "Example:\n"
     + "  > SELECT _FUNC_(NULL, 1, NULL) FROM src LIMIT 1;\n" + "  1")
 public class GenericUDFCoalesce extends GenericUDF {
-  private ObjectInspector[] argumentOIs;
-  private GenericUDFUtils.ReturnObjectInspectorResolver returnOIResolver;
+  private transient ObjectInspector[] argumentOIs;
+  private transient GenericUDFUtils.ReturnObjectInspectorResolver returnOIResolver;
 
   @Override
   public ObjectInspector initialize(ObjectInspector[] arguments) throws UDFArgumentTypeException {
 
     argumentOIs = arguments;
 
-    returnOIResolver = new GenericUDFUtils.ReturnObjectInspectorResolver();
+    returnOIResolver = new GenericUDFUtils.ReturnObjectInspectorResolver(true);
     for (int i = 0; i < arguments.length; i++) {
       if (!returnOIResolver.update(arguments[i])) {
         throw new UDFArgumentTypeException(i,

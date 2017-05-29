@@ -19,9 +19,11 @@
 package org.apache.hadoop.hive.serde2.objectinspector;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.hadoop.util.ReflectionUtils;
 
@@ -42,10 +44,17 @@ public class ReflectionStructObjectInspector extends
    *
    */
   public static class MyField implements StructField {
+    protected int fieldID;
     protected Field field;
+
     protected ObjectInspector fieldObjectInspector;
 
-    public MyField(Field field, ObjectInspector fieldObjectInspector) {
+    protected MyField() {
+      super();
+    }
+
+    public MyField(int fieldID, Field field, ObjectInspector fieldObjectInspector) {
+      this.fieldID = fieldID;
       this.field = field;
       this.fieldObjectInspector = fieldObjectInspector;
     }
@@ -58,6 +67,14 @@ public class ReflectionStructObjectInspector extends
       return fieldObjectInspector;
     }
 
+    public int getFieldID() {
+      return fieldID;
+    }
+
+    public String getFieldComment() {
+      return null;
+    }
+
     @Override
     public String toString() {
       return field.toString();
@@ -66,13 +83,27 @@ public class ReflectionStructObjectInspector extends
 
   Class<?> objectClass;
   List<MyField> fields;
+  volatile boolean inited = false;
+  volatile Type type;
 
   public Category getCategory() {
     return Category.STRUCT;
   }
 
   public String getTypeName() {
-    return objectClass.getName();
+    StringBuilder sb = new StringBuilder("struct<");
+    boolean first = true;
+    for (StructField structField : getAllStructFieldRefs()) {
+      if (first) {
+        first = false;
+      } else {
+        sb.append(",");
+      }
+      sb.append(structField.getFieldName()).append(":")
+          .append(structField.getFieldObjectInspector().getTypeName());
+    }
+    sb.append(">");
+    return sb.toString();
   }
 
   /**
@@ -86,28 +117,65 @@ public class ReflectionStructObjectInspector extends
   }
 
   /**
+   * Check if this inspector and all its field inspectors are initialized.
+   */
+  protected boolean isFullyInited(Set<Type> checkedTypes) {
+    if (type != null && // when type is not set, init hasn't been called yet
+        ObjectInspectorFactory.objectInspectorCache.get(type) != this) {
+      // This object should be the same as in cache, otherwise, it must be removed due to init error
+      throw new RuntimeException("Cached object inspector is gone while waiting for it to initialize");
+    }
+
+    if (!inited) {
+      return false;
+    }
+
+    // We don't want to check types already checked
+    checkedTypes.add(type);
+
+    // This inspector is initialized, we still need
+    // to check if all field inspectors are initialized
+    for (StructField field: getAllStructFieldRefs()) {
+      ObjectInspector oi = field.getFieldObjectInspector();
+      if (oi instanceof ReflectionStructObjectInspector) {
+        ReflectionStructObjectInspector soi = (ReflectionStructObjectInspector) oi;
+        if (!checkedTypes.contains(soi.type) && !soi.isFullyInited(checkedTypes)) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  /**
    * This method is only intended to be used by Utilities class in this package.
    * The reason that this method is not recursive by itself is because we want
    * to allow recursive types.
    */
-  void init(Class<?> objectClass,
-      List<ObjectInspector> structFieldObjectInspectors) {
-    assert (!List.class.isAssignableFrom(objectClass));
-    assert (!Map.class.isAssignableFrom(objectClass));
+  protected void init(Type type, Class<?> objectClass,
+      ObjectInspectorFactory.ObjectInspectorOptions options) {
+    this.type = type;
 
+    verifyObjectClassType(objectClass);
     this.objectClass = objectClass;
+    final List<? extends ObjectInspector> structFieldObjectInspectors = extractFieldObjectInspectors(objectClass, options);
+
     Field[] reflectionFields = ObjectInspectorUtils
         .getDeclaredNonStaticFields(objectClass);
-    fields = new ArrayList<MyField>(structFieldObjectInspectors.size());
-    int used = 0;
-    for (int i = 0; i < reflectionFields.length; i++) {
-      if (!shouldIgnoreField(reflectionFields[i].getName())) {
-        reflectionFields[i].setAccessible(true);
-        fields.add(new MyField(reflectionFields[i], structFieldObjectInspectors
-            .get(used++)));
+    synchronized (this) {
+      fields = new ArrayList<MyField>(structFieldObjectInspectors.size());
+      int used = 0;
+      for (int i = 0; i < reflectionFields.length; i++) {
+        if (!shouldIgnoreField(reflectionFields[i].getName())) {
+          reflectionFields[i].setAccessible(true);
+          fields.add(new MyField(i, reflectionFields[i], structFieldObjectInspectors
+              .get(used++)));
+        }
       }
+      assert (fields.size() == structFieldObjectInspectors.size());
+      inited = true;
+      notifyAll();
     }
-    assert (fields.size() == structFieldObjectInspectors.size());
   }
 
   // ThriftStructObjectInspector will override and ignore __isset fields.
@@ -179,4 +247,23 @@ public class ReflectionStructObjectInspector extends
     return struct;
   }
 
+  protected List<? extends ObjectInspector> extractFieldObjectInspectors(Class<?> clazz,
+    ObjectInspectorFactory.ObjectInspectorOptions options) {
+    Field[] fields = ObjectInspectorUtils.getDeclaredNonStaticFields(clazz);
+    ArrayList<ObjectInspector> structFieldObjectInspectors = new ArrayList<ObjectInspector>(
+      fields.length);
+    for (int i = 0; i < fields.length; i++) {
+      if (!shouldIgnoreField(fields[i].getName())) {
+        structFieldObjectInspectors.add(ObjectInspectorFactory.getReflectionObjectInspector(fields[i]
+          .getGenericType(), options, false));
+      }
+    }
+    return structFieldObjectInspectors;
+  }
+
+
+  protected void verifyObjectClassType(Class<?> objectClass) {
+    assert (!List.class.isAssignableFrom(objectClass));
+    assert (!Map.class.isAssignableFrom(objectClass));
+  }
 }

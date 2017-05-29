@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.hive.serde2.objectinspector;
 
+import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
+
+
 /**
  * PrimitiveObjectInspector.
  *
@@ -27,8 +30,11 @@ public interface PrimitiveObjectInspector extends ObjectInspector {
    * The primitive types supported by Hive.
    */
   public static enum PrimitiveCategory {
-    VOID, BOOLEAN, BYTE, SHORT, INT, LONG, FLOAT, DOUBLE, STRING, UNKNOWN
+    VOID, BOOLEAN, BYTE, SHORT, INT, LONG, FLOAT, DOUBLE, STRING,
+    DATE, TIMESTAMP, BINARY, DECIMAL, VARCHAR, CHAR, UNKNOWN
   };
+
+  public PrimitiveTypeInfo getTypeInfo();
 
   /**
    * Get the primitive category of the PrimitiveObjectInspector.
@@ -61,7 +67,7 @@ public interface PrimitiveObjectInspector extends ObjectInspector {
   /**
    * Get a copy of the Object in the same class, so the return value can be
    * stored independently of the parameter.
-   * 
+   *
    * If the Object is a Primitive Java Object, we just return the parameter
    * since Primitive Java Object is immutable.
    */
@@ -73,4 +79,15 @@ public interface PrimitiveObjectInspector extends ObjectInspector {
    * most efficient way to getting data out of the Object.
    */
   boolean preferWritable();
+
+  /**
+   * The precision of the underlying data.
+   */
+  int precision();
+
+  /**
+   * The scale of the underlying data.
+   */
+  int scale();
+
 }

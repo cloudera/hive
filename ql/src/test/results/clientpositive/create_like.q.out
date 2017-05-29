@@ -1,41 +1,81 @@
 PREHOOK: query: CREATE TABLE table1 (a STRING, b STRING) STORED AS TEXTFILE
 PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:default
+PREHOOK: Output: default@table1
 POSTHOOK: query: CREATE TABLE table1 (a STRING, b STRING) STORED AS TEXTFILE
 POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@table1
-PREHOOK: query: DESCRIBE table1
+PREHOOK: query: DESCRIBE FORMATTED table1
 PREHOOK: type: DESCTABLE
-POSTHOOK: query: DESCRIBE table1
+PREHOOK: Input: default@table1
+POSTHOOK: query: DESCRIBE FORMATTED table1
 POSTHOOK: type: DESCTABLE
-a	string	
-b	string	
-PREHOOK: query: DESCRIBE EXTENDED table1
-PREHOOK: type: DESCTABLE
-POSTHOOK: query: DESCRIBE EXTENDED table1
-POSTHOOK: type: DESCTABLE
-a	string	
-b	string	
+POSTHOOK: Input: default@table1
+# col_name            	data_type           	comment             
 	 	 
-Detailed Table Information	Table(tableName:table1, dbName:default, owner:thiruvel, createTime:1286798759, lastAccessTime:0, retention:0, sd:StorageDescriptor(cols:[FieldSchema(name:a, type:string, comment:null), FieldSchema(name:b, type:string, comment:null)], location:pfile:/home/thiruvel/projects/hive/hive.unsecure/build/ql/test/data/warehouse/table1, inputFormat:org.apache.hadoop.mapred.TextInputFormat, outputFormat:org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat, compressed:false, numBuckets:-1, serdeInfo:SerDeInfo(name:null, serializationLib:org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe, parameters:{serialization.format=1}), bucketCols:[], sortCols:[], parameters:{}), partitionKeys:[], parameters:{transient_lastDdlTime=1286798759}, viewOriginalText:null, viewExpandedText:null, tableType:MANAGED_TABLE)	
+a                   	string              	                    
+b                   	string              	                    
+	 	 
+# Detailed Table Information	 	 
+Database:           	default             	 
+#### A masked pattern was here ####
+Protect Mode:       	None                	 
+Retention:          	0                   	 
+#### A masked pattern was here ####
+Table Type:         	MANAGED_TABLE       	 
+Table Parameters:	 	 
+#### A masked pattern was here ####
+	 	 
+# Storage Information	 	 
+SerDe Library:      	org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe	 
+InputFormat:        	org.apache.hadoop.mapred.TextInputFormat	 
+OutputFormat:       	org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat	 
+Compressed:         	No                  	 
+Num Buckets:        	-1                  	 
+Bucket Columns:     	[]                  	 
+Sort Columns:       	[]                  	 
+Storage Desc Params:	 	 
+	serialization.format	1                   
 PREHOOK: query: CREATE TABLE table2 LIKE table1
 PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:default
+PREHOOK: Output: default@table2
 POSTHOOK: query: CREATE TABLE table2 LIKE table1
 POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@table2
-PREHOOK: query: DESCRIBE table2
+PREHOOK: query: DESCRIBE FORMATTED table2
 PREHOOK: type: DESCTABLE
-POSTHOOK: query: DESCRIBE table2
+PREHOOK: Input: default@table2
+POSTHOOK: query: DESCRIBE FORMATTED table2
 POSTHOOK: type: DESCTABLE
-a	string	
-b	string	
-PREHOOK: query: DESCRIBE EXTENDED table2
-PREHOOK: type: DESCTABLE
-POSTHOOK: query: DESCRIBE EXTENDED table2
-POSTHOOK: type: DESCTABLE
-a	string	
-b	string	
+POSTHOOK: Input: default@table2
+# col_name            	data_type           	comment             
 	 	 
-Detailed Table Information	Table(tableName:table2, dbName:default, owner:thiruvel, createTime:1286798760, lastAccessTime:0, retention:0, sd:StorageDescriptor(cols:[FieldSchema(name:a, type:string, comment:null), FieldSchema(name:b, type:string, comment:null)], location:pfile:/home/thiruvel/projects/hive/hive.unsecure/build/ql/test/data/warehouse/table2, inputFormat:org.apache.hadoop.mapred.TextInputFormat, outputFormat:org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat, compressed:false, numBuckets:-1, serdeInfo:SerDeInfo(name:null, serializationLib:org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe, parameters:{serialization.format=1}), bucketCols:[], sortCols:[], parameters:{}), partitionKeys:[], parameters:{EXTERNAL=FALSE, transient_lastDdlTime=1286798760}, viewOriginalText:null, viewExpandedText:null, tableType:MANAGED_TABLE)	
+a                   	string              	                    
+b                   	string              	                    
+	 	 
+# Detailed Table Information	 	 
+Database:           	default             	 
+#### A masked pattern was here ####
+Protect Mode:       	None                	 
+Retention:          	0                   	 
+#### A masked pattern was here ####
+Table Type:         	MANAGED_TABLE       	 
+Table Parameters:	 	 
+#### A masked pattern was here ####
+	 	 
+# Storage Information	 	 
+SerDe Library:      	org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe	 
+InputFormat:        	org.apache.hadoop.mapred.TextInputFormat	 
+OutputFormat:       	org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat	 
+Compressed:         	No                  	 
+Num Buckets:        	-1                  	 
+Bucket Columns:     	[]                  	 
+Sort Columns:       	[]                  	 
+Storage Desc Params:	 	 
+	serialization.format	1                   
 PREHOOK: query: CREATE TABLE IF NOT EXISTS table2 LIKE table1
 PREHOOK: type: CREATETABLE
 POSTHOOK: query: CREATE TABLE IF NOT EXISTS table2 LIKE table1
@@ -46,23 +86,44 @@ POSTHOOK: query: CREATE EXTERNAL TABLE IF NOT EXISTS table2 LIKE table1
 POSTHOOK: type: CREATETABLE
 PREHOOK: query: CREATE EXTERNAL TABLE IF NOT EXISTS table3 LIKE table1
 PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:default
+PREHOOK: Output: default@table3
 POSTHOOK: query: CREATE EXTERNAL TABLE IF NOT EXISTS table3 LIKE table1
 POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@table3
-PREHOOK: query: DESCRIBE table3
+PREHOOK: query: DESCRIBE FORMATTED table3
 PREHOOK: type: DESCTABLE
-POSTHOOK: query: DESCRIBE table3
+PREHOOK: Input: default@table3
+POSTHOOK: query: DESCRIBE FORMATTED table3
 POSTHOOK: type: DESCTABLE
-a	string	
-b	string	
-PREHOOK: query: DESCRIBE EXTENDED table3
-PREHOOK: type: DESCTABLE
-POSTHOOK: query: DESCRIBE EXTENDED table3
-POSTHOOK: type: DESCTABLE
-a	string	
-b	string	
+POSTHOOK: Input: default@table3
+# col_name            	data_type           	comment             
 	 	 
-Detailed Table Information	Table(tableName:table3, dbName:default, owner:thiruvel, createTime:1286798760, lastAccessTime:0, retention:0, sd:StorageDescriptor(cols:[FieldSchema(name:a, type:string, comment:null), FieldSchema(name:b, type:string, comment:null)], location:pfile:/home/thiruvel/projects/hive/hive.unsecure/build/ql/test/data/warehouse/table3, inputFormat:org.apache.hadoop.mapred.TextInputFormat, outputFormat:org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat, compressed:false, numBuckets:-1, serdeInfo:SerDeInfo(name:null, serializationLib:org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe, parameters:{serialization.format=1}), bucketCols:[], sortCols:[], parameters:{}), partitionKeys:[], parameters:{EXTERNAL=TRUE, transient_lastDdlTime=1286798760}, viewOriginalText:null, viewExpandedText:null, tableType:EXTERNAL_TABLE)	
+a                   	string              	                    
+b                   	string              	                    
+	 	 
+# Detailed Table Information	 	 
+Database:           	default             	 
+#### A masked pattern was here ####
+Protect Mode:       	None                	 
+Retention:          	0                   	 
+#### A masked pattern was here ####
+Table Type:         	EXTERNAL_TABLE      	 
+Table Parameters:	 	 
+	EXTERNAL            	TRUE                
+#### A masked pattern was here ####
+	 	 
+# Storage Information	 	 
+SerDe Library:      	org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe	 
+InputFormat:        	org.apache.hadoop.mapred.TextInputFormat	 
+OutputFormat:       	org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat	 
+Compressed:         	No                  	 
+Num Buckets:        	-1                  	 
+Bucket Columns:     	[]                  	 
+Sort Columns:       	[]                  	 
+Storage Desc Params:	 	 
+	serialization.format	1                   
 PREHOOK: query: INSERT OVERWRITE TABLE table1 SELECT key, value FROM src WHERE key = 86
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src
@@ -81,34 +142,449 @@ POSTHOOK: query: INSERT OVERWRITE TABLE table2 SELECT key, value FROM src WHERE 
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@src
 POSTHOOK: Output: default@table2
-POSTHOOK: Lineage: table1.a SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: table1.b SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
 POSTHOOK: Lineage: table2.a SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
 POSTHOOK: Lineage: table2.b SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
 PREHOOK: query: SELECT * FROM table1
 PREHOOK: type: QUERY
 PREHOOK: Input: default@table1
-PREHOOK: Output: file:/tmp/thiruvel/hive_2010-10-11_05-06-07_038_1626206004888639/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: SELECT * FROM table1
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@table1
-POSTHOOK: Output: file:/tmp/thiruvel/hive_2010-10-11_05-06-07_038_1626206004888639/-mr-10000
-POSTHOOK: Lineage: table1.a SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: table1.b SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: table2.a SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: table2.b SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
+#### A masked pattern was here ####
 86	val_86
 PREHOOK: query: SELECT * FROM table2
 PREHOOK: type: QUERY
 PREHOOK: Input: default@table2
-PREHOOK: Output: file:/tmp/thiruvel/hive_2010-10-11_05-06-07_139_9055053700650128611/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: SELECT * FROM table2
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@table2
-POSTHOOK: Output: file:/tmp/thiruvel/hive_2010-10-11_05-06-07_139_9055053700650128611/-mr-10000
-POSTHOOK: Lineage: table1.a SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: table1.b SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: table2.a SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: table2.b SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
+#### A masked pattern was here ####
 100	val_100
 100	val_100
+#### A masked pattern was here ####
+PREHOOK: type: CREATETABLE
+#### A masked pattern was here ####
+PREHOOK: Output: database:default
+PREHOOK: Output: default@table4
+#### A masked pattern was here ####
+POSTHOOK: type: CREATETABLE
+#### A masked pattern was here ####
+POSTHOOK: Output: database:default
+POSTHOOK: Output: default@table4
+#### A masked pattern was here ####
+PREHOOK: type: CREATETABLE
+#### A masked pattern was here ####
+PREHOOK: Output: database:default
+PREHOOK: Output: default@table5
+#### A masked pattern was here ####
+POSTHOOK: type: CREATETABLE
+#### A masked pattern was here ####
+POSTHOOK: Output: database:default
+POSTHOOK: Output: default@table5
+PREHOOK: query: SELECT * FROM table4
+PREHOOK: type: QUERY
+PREHOOK: Input: default@table4
+#### A masked pattern was here ####
+POSTHOOK: query: SELECT * FROM table4
+POSTHOOK: type: QUERY
+POSTHOOK: Input: default@table4
+#### A masked pattern was here ####
+1
+2
+3
+4
+5
+6
+PREHOOK: query: SELECT * FROM table5
+PREHOOK: type: QUERY
+PREHOOK: Input: default@table5
+#### A masked pattern was here ####
+POSTHOOK: query: SELECT * FROM table5
+POSTHOOK: type: QUERY
+POSTHOOK: Input: default@table5
+#### A masked pattern was here ####
+1
+2
+3
+4
+5
+6
+PREHOOK: query: DROP TABLE table5
+PREHOOK: type: DROPTABLE
+PREHOOK: Input: default@table5
+PREHOOK: Output: default@table5
+POSTHOOK: query: DROP TABLE table5
+POSTHOOK: type: DROPTABLE
+POSTHOOK: Input: default@table5
+POSTHOOK: Output: default@table5
+PREHOOK: query: SELECT * FROM table4
+PREHOOK: type: QUERY
+PREHOOK: Input: default@table4
+#### A masked pattern was here ####
+POSTHOOK: query: SELECT * FROM table4
+POSTHOOK: type: QUERY
+POSTHOOK: Input: default@table4
+#### A masked pattern was here ####
+1
+2
+3
+4
+5
+6
+PREHOOK: query: DROP TABLE table4
+PREHOOK: type: DROPTABLE
+PREHOOK: Input: default@table4
+PREHOOK: Output: default@table4
+POSTHOOK: query: DROP TABLE table4
+POSTHOOK: type: DROPTABLE
+POSTHOOK: Input: default@table4
+POSTHOOK: Output: default@table4
+#### A masked pattern was here ####
+PREHOOK: type: CREATETABLE
+#### A masked pattern was here ####
+PREHOOK: Output: database:default
+PREHOOK: Output: default@table4
+#### A masked pattern was here ####
+POSTHOOK: type: CREATETABLE
+#### A masked pattern was here ####
+POSTHOOK: Output: database:default
+POSTHOOK: Output: default@table4
+PREHOOK: query: SELECT * FROM table4
+PREHOOK: type: QUERY
+PREHOOK: Input: default@table4
+#### A masked pattern was here ####
+POSTHOOK: query: SELECT * FROM table4
+POSTHOOK: type: QUERY
+POSTHOOK: Input: default@table4
+#### A masked pattern was here ####
+1
+2
+3
+4
+5
+6
+PREHOOK: query: CREATE TABLE doctors STORED AS AVRO TBLPROPERTIES ('avro.schema.literal'='{
+  "namespace": "testing.hive.avro.serde",
+  "name": "doctors",
+  "type": "record",
+  "fields": [
+    {
+      "name":"number",
+      "type":"int",
+      "doc":"Order of playing the role"
+    },
+    {
+      "name":"first_name",
+      "type":"string",
+      "doc":"first name of actor playing role"
+    },
+    {
+      "name":"last_name",
+      "type":"string",
+      "doc":"last name of actor playing role"
+    }
+  ]
+}')
+PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:default
+PREHOOK: Output: default@doctors
+POSTHOOK: query: CREATE TABLE doctors STORED AS AVRO TBLPROPERTIES ('avro.schema.literal'='{
+  "namespace": "testing.hive.avro.serde",
+  "name": "doctors",
+  "type": "record",
+  "fields": [
+    {
+      "name":"number",
+      "type":"int",
+      "doc":"Order of playing the role"
+    },
+    {
+      "name":"first_name",
+      "type":"string",
+      "doc":"first name of actor playing role"
+    },
+    {
+      "name":"last_name",
+      "type":"string",
+      "doc":"last name of actor playing role"
+    }
+  ]
+}')
+POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:default
+POSTHOOK: Output: default@doctors
+PREHOOK: query: alter table doctors set tblproperties ('k1'='v1', 'k2'='v2')
+PREHOOK: type: ALTERTABLE_PROPERTIES
+PREHOOK: Input: default@doctors
+PREHOOK: Output: default@doctors
+POSTHOOK: query: alter table doctors set tblproperties ('k1'='v1', 'k2'='v2')
+POSTHOOK: type: ALTERTABLE_PROPERTIES
+POSTHOOK: Input: default@doctors
+POSTHOOK: Output: default@doctors
+PREHOOK: query: DESCRIBE FORMATTED doctors
+PREHOOK: type: DESCTABLE
+PREHOOK: Input: default@doctors
+POSTHOOK: query: DESCRIBE FORMATTED doctors
+POSTHOOK: type: DESCTABLE
+POSTHOOK: Input: default@doctors
+# col_name            	data_type           	comment             
+	 	 
+number              	int                 	from deserializer   
+first_name          	string              	from deserializer   
+last_name           	string              	from deserializer   
+	 	 
+# Detailed Table Information	 	 
+Database:           	default             	 
+#### A masked pattern was here ####
+Protect Mode:       	None                	 
+Retention:          	0                   	 
+#### A masked pattern was here ####
+Table Type:         	MANAGED_TABLE       	 
+Table Parameters:	 	 
+	COLUMN_STATS_ACCURATE	false               
+	avro.schema.literal 	{\n  \"namespace\": \"testing.hive.avro.serde\",\n  \"name\": \"doctors\",\n  \"type\": \"record\",\n  \"fields\": [\n    {\n      \"name\":\"number\",\n      \"type\":\"int\",\n      \"doc\":\"Order of playing the role\"\n    },\n    {\n      \"name\":\"first_name\",\n      \"type\":\"string\",\n      \"doc\":\"first name of actor playing role\"\n    },\n    {\n      \"name\":\"last_name\",\n      \"type\":\"string\",\n      \"doc\":\"last name of actor playing role\"\n    }\n  ]\n}
+	k1                  	v1                  
+	k2                  	v2                  
+#### A masked pattern was here ####
+	numFiles            	0                   
+	numRows             	-1                  
+	rawDataSize         	-1                  
+	totalSize           	0                   
+#### A masked pattern was here ####
+	 	 
+# Storage Information	 	 
+SerDe Library:      	org.apache.hadoop.hive.serde2.avro.AvroSerDe	 
+InputFormat:        	org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat	 
+OutputFormat:       	org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat	 
+Compressed:         	No                  	 
+Num Buckets:        	-1                  	 
+Bucket Columns:     	[]                  	 
+Sort Columns:       	[]                  	 
+Storage Desc Params:	 	 
+	serialization.format	1                   
+PREHOOK: query: CREATE TABLE doctors2 like doctors
+PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:default
+PREHOOK: Output: default@doctors2
+POSTHOOK: query: CREATE TABLE doctors2 like doctors
+POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:default
+POSTHOOK: Output: default@doctors2
+PREHOOK: query: DESCRIBE FORMATTED doctors2
+PREHOOK: type: DESCTABLE
+PREHOOK: Input: default@doctors2
+POSTHOOK: query: DESCRIBE FORMATTED doctors2
+POSTHOOK: type: DESCTABLE
+POSTHOOK: Input: default@doctors2
+# col_name            	data_type           	comment             
+	 	 
+number              	int                 	from deserializer   
+first_name          	string              	from deserializer   
+last_name           	string              	from deserializer   
+	 	 
+# Detailed Table Information	 	 
+Database:           	default             	 
+#### A masked pattern was here ####
+Protect Mode:       	None                	 
+Retention:          	0                   	 
+#### A masked pattern was here ####
+Table Type:         	MANAGED_TABLE       	 
+Table Parameters:	 	 
+	avro.schema.literal 	{\n  \"namespace\": \"testing.hive.avro.serde\",\n  \"name\": \"doctors\",\n  \"type\": \"record\",\n  \"fields\": [\n    {\n      \"name\":\"number\",\n      \"type\":\"int\",\n      \"doc\":\"Order of playing the role\"\n    },\n    {\n      \"name\":\"first_name\",\n      \"type\":\"string\",\n      \"doc\":\"first name of actor playing role\"\n    },\n    {\n      \"name\":\"last_name\",\n      \"type\":\"string\",\n      \"doc\":\"last name of actor playing role\"\n    }\n  ]\n}
+#### A masked pattern was here ####
+	 	 
+# Storage Information	 	 
+SerDe Library:      	org.apache.hadoop.hive.serde2.avro.AvroSerDe	 
+InputFormat:        	org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat	 
+OutputFormat:       	org.apache.hadoop.hive.ql.io.avro.AvroContainerOutputFormat	 
+Compressed:         	No                  	 
+Num Buckets:        	-1                  	 
+Bucket Columns:     	[]                  	 
+Sort Columns:       	[]                  	 
+Storage Desc Params:	 	 
+	serialization.format	1                   
+PREHOOK: query: CREATE TABLE PropertiedParquetTable(a INT, b STRING) STORED AS PARQUET TBLPROPERTIES("parquet.compression"="LZO")
+PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:default
+PREHOOK: Output: default@PropertiedParquetTable
+POSTHOOK: query: CREATE TABLE PropertiedParquetTable(a INT, b STRING) STORED AS PARQUET TBLPROPERTIES("parquet.compression"="LZO")
+POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:default
+POSTHOOK: Output: default@PropertiedParquetTable
+PREHOOK: query: CREATE TABLE LikePropertiedParquetTable LIKE PropertiedParquetTable
+PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:default
+PREHOOK: Output: default@LikePropertiedParquetTable
+POSTHOOK: query: CREATE TABLE LikePropertiedParquetTable LIKE PropertiedParquetTable
+POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:default
+POSTHOOK: Output: default@LikePropertiedParquetTable
+PREHOOK: query: DESCRIBE FORMATTED LikePropertiedParquetTable
+PREHOOK: type: DESCTABLE
+PREHOOK: Input: default@likepropertiedparquettable
+POSTHOOK: query: DESCRIBE FORMATTED LikePropertiedParquetTable
+POSTHOOK: type: DESCTABLE
+POSTHOOK: Input: default@likepropertiedparquettable
+# col_name            	data_type           	comment             
+	 	 
+a                   	int                 	                    
+b                   	string              	                    
+	 	 
+# Detailed Table Information	 	 
+Database:           	default             	 
+#### A masked pattern was here ####
+Protect Mode:       	None                	 
+Retention:          	0                   	 
+#### A masked pattern was here ####
+Table Type:         	MANAGED_TABLE       	 
+Table Parameters:	 	 
+	parquet.compression 	LZO                 
+#### A masked pattern was here ####
+	 	 
+# Storage Information	 	 
+SerDe Library:      	org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe	 
+InputFormat:        	org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat	 
+OutputFormat:       	org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat	 
+Compressed:         	No                  	 
+Num Buckets:        	-1                  	 
+Bucket Columns:     	[]                  	 
+Sort Columns:       	[]                  	 
+Storage Desc Params:	 	 
+	serialization.format	1                   
+PREHOOK: query: CREATE TABLE table5(col1 int, col2 string) stored as TEXTFILE
+PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:default
+PREHOOK: Output: default@table5
+POSTHOOK: query: CREATE TABLE table5(col1 int, col2 string) stored as TEXTFILE
+POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:default
+POSTHOOK: Output: default@table5
+PREHOOK: query: DESCRIBE FORMATTED table5
+PREHOOK: type: DESCTABLE
+PREHOOK: Input: default@table5
+POSTHOOK: query: DESCRIBE FORMATTED table5
+POSTHOOK: type: DESCTABLE
+POSTHOOK: Input: default@table5
+# col_name            	data_type           	comment             
+	 	 
+col1                	int                 	                    
+col2                	string              	                    
+	 	 
+# Detailed Table Information	 	 
+Database:           	default             	 
+#### A masked pattern was here ####
+Protect Mode:       	None                	 
+Retention:          	0                   	 
+#### A masked pattern was here ####
+Table Type:         	MANAGED_TABLE       	 
+Table Parameters:	 	 
+#### A masked pattern was here ####
+	 	 
+# Storage Information	 	 
+SerDe Library:      	org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe	 
+InputFormat:        	org.apache.hadoop.mapred.TextInputFormat	 
+OutputFormat:       	org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat	 
+Compressed:         	No                  	 
+Num Buckets:        	-1                  	 
+Bucket Columns:     	[]                  	 
+Sort Columns:       	[]                  	 
+Storage Desc Params:	 	 
+	serialization.format	1                   
+PREHOOK: query: CREATE TABLE table6 like table5 stored as RCFILE
+PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:default
+PREHOOK: Output: default@table6
+POSTHOOK: query: CREATE TABLE table6 like table5 stored as RCFILE
+POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:default
+POSTHOOK: Output: default@table6
+PREHOOK: query: DESCRIBE FORMATTED table6
+PREHOOK: type: DESCTABLE
+PREHOOK: Input: default@table6
+POSTHOOK: query: DESCRIBE FORMATTED table6
+POSTHOOK: type: DESCTABLE
+POSTHOOK: Input: default@table6
+# col_name            	data_type           	comment             
+	 	 
+col1                	int                 	                    
+col2                	string              	                    
+	 	 
+# Detailed Table Information	 	 
+Database:           	default             	 
+#### A masked pattern was here ####
+Protect Mode:       	None                	 
+Retention:          	0                   	 
+#### A masked pattern was here ####
+Table Type:         	MANAGED_TABLE       	 
+Table Parameters:	 	 
+#### A masked pattern was here ####
+	 	 
+# Storage Information	 	 
+SerDe Library:      	org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe	 
+InputFormat:        	org.apache.hadoop.hive.ql.io.RCFileInputFormat	 
+OutputFormat:       	org.apache.hadoop.hive.ql.io.RCFileOutputFormat	 
+Compressed:         	No                  	 
+Num Buckets:        	-1                  	 
+Bucket Columns:     	[]                  	 
+Sort Columns:       	[]                  	 
+Storage Desc Params:	 	 
+	serialization.format	1                   
+PREHOOK: query: drop table table6
+PREHOOK: type: DROPTABLE
+PREHOOK: Input: default@table6
+PREHOOK: Output: default@table6
+POSTHOOK: query: drop table table6
+POSTHOOK: type: DROPTABLE
+POSTHOOK: Input: default@table6
+POSTHOOK: Output: default@table6
+#### A masked pattern was here ####
+PREHOOK: type: CREATETABLE
+#### A masked pattern was here ####
+PREHOOK: Output: database:default
+PREHOOK: Output: default@table6
+#### A masked pattern was here ####
+POSTHOOK: type: CREATETABLE
+#### A masked pattern was here ####
+POSTHOOK: Output: database:default
+POSTHOOK: Output: default@table6
+PREHOOK: query: DESCRIBE FORMATTED table6
+PREHOOK: type: DESCTABLE
+PREHOOK: Input: default@table6
+POSTHOOK: query: DESCRIBE FORMATTED table6
+POSTHOOK: type: DESCTABLE
+POSTHOOK: Input: default@table6
+# col_name            	data_type           	comment             
+	 	 
+col1                	int                 	                    
+col2                	string              	                    
+	 	 
+# Detailed Table Information	 	 
+Database:           	default             	 
+#### A masked pattern was here ####
+Protect Mode:       	None                	 
+Retention:          	0                   	 
+#### A masked pattern was here ####
+Table Type:         	MANAGED_TABLE       	 
+Table Parameters:	 	 
+#### A masked pattern was here ####
+	 	 
+# Storage Information	 	 
+SerDe Library:      	org.apache.hadoop.hive.serde2.columnar.LazyBinaryColumnarSerDe	 
+InputFormat:        	org.apache.hadoop.hive.ql.io.RCFileInputFormat	 
+OutputFormat:       	org.apache.hadoop.hive.ql.io.RCFileOutputFormat	 
+Compressed:         	No                  	 
+Num Buckets:        	-1                  	 
+Bucket Columns:     	[]                  	 
+Sort Columns:       	[]                  	 
+Storage Desc Params:	 	 
+	serialization.format	1                   
+PREHOOK: query: drop table table5
+PREHOOK: type: DROPTABLE
+PREHOOK: Input: default@table5
+PREHOOK: Output: default@table5
+POSTHOOK: query: drop table table5
+POSTHOOK: type: DROPTABLE
+POSTHOOK: Input: default@table5
+POSTHOOK: Output: default@table5

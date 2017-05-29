@@ -19,6 +19,8 @@
 package org.apache.hadoop.hive.ql.udf.generic;
 
 import org.apache.hadoop.hive.ql.exec.Description;
+import org.apache.hadoop.hive.ql.exec.vector.VectorizedExpressions;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.*;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorUtils;
 
@@ -26,6 +28,35 @@ import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorUtils;
  * GenericUDF Class for operation EQUAL.
  */
 @Description(name = "=", value = "a _FUNC_ b - Returns TRUE if a equals b and false otherwise")
+@VectorizedExpressions({LongColEqualLongColumn.class, LongColEqualDoubleColumn.class,
+  DoubleColEqualLongColumn.class, DoubleColEqualDoubleColumn.class,
+  LongColEqualLongScalar.class, LongColEqualDoubleScalar.class,
+  DoubleColEqualLongScalar.class, DoubleColEqualDoubleScalar.class,
+  LongScalarEqualLongColumn.class, LongScalarEqualDoubleColumn.class,
+  DoubleScalarEqualLongColumn.class, DoubleScalarEqualDoubleColumn.class,
+  StringGroupColEqualStringGroupColumn.class, FilterStringGroupColEqualStringGroupColumn.class,
+  StringGroupColEqualStringScalar.class,
+  StringGroupColEqualVarCharScalar.class, StringGroupColEqualCharScalar.class,
+  StringScalarEqualStringGroupColumn.class,
+  VarCharScalarEqualStringGroupColumn.class, CharScalarEqualStringGroupColumn.class,
+  FilterStringGroupColEqualStringScalar.class, FilterStringScalarEqualStringGroupColumn.class,
+  FilterStringGroupColEqualVarCharScalar.class, FilterVarCharScalarEqualStringGroupColumn.class,
+  FilterStringGroupColEqualCharScalar.class, FilterCharScalarEqualStringGroupColumn.class,
+  FilterLongColEqualLongColumn.class, FilterLongColEqualDoubleColumn.class,
+  FilterDoubleColEqualLongColumn.class, FilterDoubleColEqualDoubleColumn.class,
+  FilterLongColEqualLongScalar.class, FilterLongColEqualDoubleScalar.class,
+  FilterDoubleColEqualLongScalar.class, FilterDoubleColEqualDoubleScalar.class,
+  FilterLongScalarEqualLongColumn.class, FilterLongScalarEqualDoubleColumn.class,
+  FilterDoubleScalarEqualLongColumn.class, FilterDoubleScalarEqualDoubleColumn.class,
+  FilterDecimalColEqualDecimalColumn.class, FilterDecimalColEqualDecimalScalar.class,
+  FilterDecimalScalarEqualDecimalColumn.class,
+  TimestampColEqualTimestampScalar.class, TimestampScalarEqualTimestampColumn.class,
+  FilterTimestampColEqualTimestampScalar.class, FilterTimestampScalarEqualTimestampColumn.class,
+  TimestampColEqualLongScalar.class, LongScalarEqualTimestampColumn.class,
+  FilterTimestampColEqualLongScalar.class, FilterLongScalarEqualTimestampColumn.class,
+  TimestampColEqualDoubleScalar.class, DoubleScalarEqualTimestampColumn.class,
+  FilterTimestampColEqualDoubleScalar.class, FilterDoubleScalarEqualTimestampColumn.class
+  })
 public class GenericUDFOPEqual extends GenericUDFBaseCompare {
   public GenericUDFOPEqual(){
     this.opName = "EQUAL";

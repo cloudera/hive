@@ -22,6 +22,9 @@ import java.io.Serializable;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.ql.io.AcidUtils;
+
 /**
  * LoadTableDesc.
  *
@@ -30,9 +33,14 @@ public class LoadTableDesc extends org.apache.hadoop.hive.ql.plan.LoadDesc
     implements Serializable {
   private static final long serialVersionUID = 1L;
   private boolean replace;
-  private String tmpDir;
   private DynamicPartitionCtx dpCtx;
+  private ListBucketingCtx lbCtx;
   private boolean holdDDLTime;
+  private boolean inheritTableSpecs = true; //For partitions, flag controlling whether the current
+                                            //table specs are to be used
+  // Need to remember whether this is an acid compliant operation, and if so whether it is an
+  // insert, update, or delete.
+  private AcidUtils.Operation writeType;
 
   // TODO: the below seems like they should just be combined into partitionDesc
   private org.apache.hadoop.hive.ql.plan.TableDesc table;
@@ -42,39 +50,71 @@ public class LoadTableDesc extends org.apache.hadoop.hive.ql.plan.LoadDesc
     this.holdDDLTime = false;
   }
 
-  public LoadTableDesc(final String sourceDir, final String tmpDir,
+  public LoadTableDesc(final Path sourcePath,
       final org.apache.hadoop.hive.ql.plan.TableDesc table,
-      final Map<String, String> partitionSpec, final boolean replace) {
-    super(sourceDir);
-    init(sourceDir, tmpDir, table, partitionSpec, replace);
+      final Map<String, String> partitionSpec,
+      final boolean replace,
+      final AcidUtils.Operation writeType) {
+    super(sourcePath);
+    init(table, partitionSpec, replace, writeType);
   }
 
-  public LoadTableDesc(final String sourceDir, final String tmpDir,
-      final org.apache.hadoop.hive.ql.plan.TableDesc table,
-      final Map<String, String> partitionSpec) {
-    this(sourceDir, tmpDir, table, partitionSpec, true);
+  /**
+   * For use with non-ACID compliant operations, such as LOAD
+   * @param sourcePath
+   * @param table
+   * @param partitionSpec
+   * @param replace
+   */
+  public LoadTableDesc(final Path sourcePath,
+                       final TableDesc table,
+                       final Map<String, String> partitionSpec,
+                       final boolean replace) {
+    this(sourcePath, table, partitionSpec, replace, AcidUtils.Operation.NOT_ACID);
   }
 
-  public LoadTableDesc(final String sourceDir, final String tmpDir,
+  public LoadTableDesc(final Path sourcePath,
       final org.apache.hadoop.hive.ql.plan.TableDesc table,
-      final DynamicPartitionCtx dpCtx) {
-    super(sourceDir);
+      final Map<String, String> partitionSpec,
+      final AcidUtils.Operation writeType) {
+    this(sourcePath, table, partitionSpec, true, writeType);
+  }
+
+  /**
+   * For DDL operations that are not ACID compliant.
+   * @param sourcePath
+   * @param table
+   * @param partitionSpec
+   */
+  public LoadTableDesc(final Path sourcePath,
+                       final org.apache.hadoop.hive.ql.plan.TableDesc table,
+                       final Map<String, String> partitionSpec) {
+    this(sourcePath, table, partitionSpec, true, AcidUtils.Operation.NOT_ACID);
+  }
+
+  public LoadTableDesc(final Path sourcePath,
+      final org.apache.hadoop.hive.ql.plan.TableDesc table,
+      final DynamicPartitionCtx dpCtx,
+      final AcidUtils.Operation writeType) {
+    super(sourcePath);
     this.dpCtx = dpCtx;
     if (dpCtx != null && dpCtx.getPartSpec() != null && partitionSpec == null) {
-      init(sourceDir, tmpDir, table, dpCtx.getPartSpec(), true);
+      init(table, dpCtx.getPartSpec(), true, writeType);
     } else {
-      init(sourceDir, tmpDir, table, new LinkedHashMap<String, String>(), true);
+      init(table, new LinkedHashMap<String, String>(), true, writeType);
     }
   }
 
-  private void init(final String sourceDir, final String tmpDir,
+  private void init(
       final org.apache.hadoop.hive.ql.plan.TableDesc table,
-      final Map<String, String> partitionSpec, final boolean replace) {
-    this.tmpDir = tmpDir;
+      final Map<String, String> partitionSpec,
+      final boolean replace,
+      AcidUtils.Operation writeType) {
     this.table = table;
     this.partitionSpec = partitionSpec;
     this.replace = replace;
     this.holdDDLTime = false;
+    this.writeType = writeType;
   }
 
   public void setHoldDDLTime(boolean ddlTime) {
@@ -83,15 +123,6 @@ public class LoadTableDesc extends org.apache.hadoop.hive.ql.plan.LoadDesc
 
   public boolean getHoldDDLTime() {
     return holdDDLTime;
-  }
-
-  @Explain(displayName = "tmp directory", normalExplain = false)
-  public String getTmpDir() {
-    return tmpDir;
-  }
-
-  public void setTmpDir(final String tmp) {
-    tmpDir = tmp;
   }
 
   @Explain(displayName = "table")
@@ -127,5 +158,31 @@ public class LoadTableDesc extends org.apache.hadoop.hive.ql.plan.LoadDesc
 
   public void setDPCtx(final DynamicPartitionCtx dpCtx) {
     this.dpCtx = dpCtx;
+  }
+
+  public boolean getInheritTableSpecs() {
+    return inheritTableSpecs;
+  }
+
+  public void setInheritTableSpecs(boolean inheritTableSpecs) {
+    this.inheritTableSpecs = inheritTableSpecs;
+  }
+
+  /**
+   * @return the lbCtx
+   */
+  public ListBucketingCtx getLbCtx() {
+    return lbCtx;
+  }
+
+  /**
+   * @param lbCtx the lbCtx to set
+   */
+  public void setLbCtx(ListBucketingCtx lbCtx) {
+    this.lbCtx = lbCtx;
+  }
+
+  public AcidUtils.Operation getWriteType() {
+    return writeType;
   }
 }

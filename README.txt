@@ -1,34 +1,52 @@
-Apache Hive 0.6.0
-=================
+Apache Hive (TM) @VERSION@
+======================
 
-Hive is a data warehouse system for Hadoop that facilitates
-easy data summarization, ad-hoc querying and analysis of large
-datasets stored in Hadoop compatible file systems. Hive provides a
-mechanism to put structure on this data and query the data using a
-SQL-like language called HiveQL. At the same time this language also
-allows traditional map/reduce programmers to plug in their custom
-mappers and reducers when it is inconvenient or inefficient to express
-this logic in HiveQL.
+The Apache Hive (TM) data warehouse software facilitates querying and
+managing large datasets residing in distributed storage. Built on top
+of Apache Hadoop (TM), it provides:
 
-Please note that Hadoop is a batch processing system and Hadoop jobs
-tend to have high latency and incur substantial overheads in job
-submission and scheduling. Consequently the average latency for Hive
-queries is generally very high (minutes) even when data sets involved
-are very small (say a few hundred megabytes). As a result it cannot be
-compared with systems such as Oracle where analyses are conducted on a
-significantly smaller amount of data but the analyses proceed much
-more iteratively with the response times between iterations being less
-than a few minutes. Hive aims to provide acceptable (but not optimal)
-latency for interactive data browsing, queries over small data sets or
-test queries.
+* Tools to enable easy data extract/transform/load (ETL)
 
-Hive is not designed for online transaction processing and does not
-support real-time queries or row level insert/updates. It is best used
-for batch jobs over large sets of immutable data (like web logs). What
-Hive values most are scalability (scale out with more machines added
-dynamically to the Hadoop cluster), extensibility (with MapReduce
-framework and UDF/UDAF/UDTF), fault-tolerance, and loose-coupling with
-its input formats.
+* A mechanism to impose structure on a variety of data formats
+
+* Access to files stored either directly in Apache HDFS (TM) or in other
+  data storage systems such as Apache HBase (TM)
+
+* Query execution using Apache Hadoop MapReduce or Apache Tez
+  frameworks.
+
+Hive implements a dialect of SQL (Hive QL) that focuses on analytics
+and presents a rich set of SQL semantics including OLAP functions,
+subqueries, common table expressions and more. Hive allows SQL
+developers or users with SQL tools to easily query, analyze and
+process data stored in Hadoop.
+Hive also allows programmers familiar with the MapReduce framework
+to plug in their custom mappers and reducers to perform more
+sophisticated analysis that may not be supported by the built-in
+capabilities of the language. QL can also be extended with custom
+scalar functions (UDF's), aggregations (UDAF's), and table
+functions (UDTF's).
+
+Hive users have a choice of 2 runtimes when executing SQL queries.
+Users can choose to use the Apache Hadoop MapReduce framework,
+which is mature and proven at large scales. MapReduce is a purely
+batch framework, and queries run using the MapReduce framework
+may experience higher latencies (tens of seconds), even
+over small datasets. Alternatively, users can choose to use the
+newer Apache Tez framework to process SQL queries. Tez is
+designed for interactive query and has substantially reduced
+overheads versus MapReduce. Users are free to switch back and
+forth between these frameworks at any time. In either case,
+Hive is best suited for use cases where the amount of data
+processed is large enough to require a distributed system.
+
+Hive is not designed for online transaction processing and does
+not support row level insert/updates. It is best used for batch
+jobs over large sets of immutable data (like web logs). What
+Hive values most are scalability (scale out with more machines
+added dynamically to the Hadoop cluster), extensibility (with
+MapReduce framework and UDF/UDAF/UDTF), fault-tolerance, and
+loose-coupling with its input formats.
 
 
 General Info
@@ -38,56 +56,41 @@ For the latest information about Hive, please visit out website at:
 
   http://hive.apache.org/
 
-and our wiki at:
-
-  http://wiki.apache.org/hadoop/Hive/
-
 
 Getting Started
 ===============
 
 - Installation Instructions and a quick tutorial:
-  http://wiki.apache.org/hadoop/Hive/GettingStarted
+  https://cwiki.apache.org/confluence/display/Hive/GettingStarted
 
 - A longer tutorial that covers more features of HiveQL:
-  http://wiki.apache.org/hadoop/Hive/Tutorial
+  https://cwiki.apache.org/confluence/display/Hive/Tutorial
 
 - The HiveQL Language Manual:
-  http://wiki.apache.org/hadoop/Hive/LanguageManual
+  https://cwiki.apache.org/confluence/display/Hive/LanguageManual
 
 
 Requirements
 ============
 
-- Java 1.6
+- Java 1.6, 1.7
 
-- Hadoop 0.17, 0.18, 0.19, or 0.20.
-
-  *NOTE*: We strongly recommend that you use Hadoop 0.20
-  since the majority of our testing is done against this
-  version and because support for pre-0.20 versions of
-  Hadoop will be dropped in Hive 0.7.
+- Hadoop 1.x, 2.x
 
 
 Upgrading from older versions of Hive
 =====================================
 
-- Hive 0.6.0 includes changes to the MetaStore schema. If
-  you are upgrading from an earlier version of Hive it is
-  imperative that you upgrade the MetaStore schema by
-  running the appropriate schema upgrade script located in
-  the scripts/metastore/upgrade directory.
-
-  We have provided upgrade scripts for Derby, MySQL, and PostgreSQL
-  databases. If you are using a different database for your MetaStore
-  you will need to provide your own upgrade script.
-
-- Hive 0.6.0 includes new configuration properties. If you
-  are upgrading from an earlier version of Hive it is imperative
-  that you replace all of the old copies of the hive-default.xml
-  configuration file with the new version located in the conf/
+- Hive @VERSION@ includes changes to the MetaStore schema. If
+  you are upgrading from an earlier version of Hive it is imperative
+  that you upgrade the MetaStore schema by running the appropriate
+  schema upgrade scripts located in the scripts/metastore/upgrade
   directory.
 
+- We have provided upgrade scripts for MySQL, PostgreSQL, Oracle,
+  Microsoft SQL Server, and Derby databases. If you are using a
+  different database for your MetaStore you will need to provide
+  your own upgrade script.
 
 Useful mailing lists
 ====================
@@ -97,8 +100,8 @@ Useful mailing lists
    to this mailing list.
 
 2. dev@hive.apache.org - For discussions about code, design and features.
-   Send an empty email to dev-subscribe@hive.apache.org in order to subscribe
-   to this mailing list.
+   Send an empty email to dev-subscribe@hive.apache.org in order to
+   subscribe to this mailing list.
 
 3. commits@hive.apache.org - In order to monitor commits to the source
    repository. Send an empty email to commits-subscribe@hive.apache.org

@@ -74,21 +74,26 @@ public class UnionOperator extends Operator<UnionDesc> implements Serializable {
     // Get outputFieldOIs
     columnTypeResolvers = new ReturnObjectInspectorResolver[columns];
     for (int c = 0; c < columns; c++) {
-      columnTypeResolvers[c] = new ReturnObjectInspectorResolver();
+      columnTypeResolvers[c] = new ReturnObjectInspectorResolver(true);
     }
 
     for (int p = 0; p < parents; p++) {
       assert (parentFields[p].size() == columns);
       for (int c = 0; c < columns; c++) {
-        columnTypeResolvers[c].update(parentFields[p].get(c)
-            .getFieldObjectInspector());
+        if (!columnTypeResolvers[c].updateForUnionAll(parentFields[p].get(c)
+            .getFieldObjectInspector())) {
+          // checked in SemanticAnalyzer. Should not happen
+          throw new HiveException("Incompatible types for union operator");
+        }
       }
     }
 
     ArrayList<ObjectInspector> outputFieldOIs = new ArrayList<ObjectInspector>(
         columns);
     for (int c = 0; c < columns; c++) {
-      outputFieldOIs.add(columnTypeResolvers[c].get());
+      // can be null for void type
+      ObjectInspector fieldOI = parentFields[0].get(c).getFieldObjectInspector();
+      outputFieldOIs.add(columnTypeResolvers[c].get(fieldOI));
     }
 
     // create output row ObjectInspector
@@ -137,11 +142,38 @@ public class UnionOperator extends Operator<UnionDesc> implements Serializable {
    */
   @Override
   public String getName() {
-    return new String("UNION");
+    return getOperatorName();
+  }
+
+  static public String getOperatorName() {
+    return "UNION";
   }
 
   @Override
   public OperatorType getType() {
     return OperatorType.UNION;
+  }
+
+  /**
+   * Union operators are not allowed either before or after a explicit mapjoin hint.
+   * Note that, the same query would just work without the mapjoin hint (by setting
+   * hive.auto.convert.join to true).
+   **/
+  @Override
+  public boolean opAllowedBeforeMapJoin() {
+    return false;
+  }
+
+  @Override
+  public boolean opAllowedAfterMapJoin() {
+    return false;
+  }
+
+  @Override
+  public boolean opAllowedBeforeSortMergeJoin() {
+    // If a union occurs before the sort-merge join, it is not useful to convert the the
+    // sort-merge join to a mapjoin. The number of inputs for the union is more than 1 so
+    // it would be difficult to figure out the big table for the mapjoin.
+    return false;
   }
 }

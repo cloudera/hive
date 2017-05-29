@@ -30,18 +30,26 @@ import org.apache.hadoop.hive.ql.exec.Description;
 import org.apache.hadoop.hive.ql.exec.UDAF;
 import org.apache.hadoop.hive.ql.exec.UDAFEvaluator;
 import org.apache.hadoop.hive.serde2.io.DoubleWritable;
+import org.apache.hadoop.hive.shims.ShimLoader;
 import org.apache.hadoop.io.LongWritable;
 
 /**
  * UDAF for calculating the percentile values.
  * There are several definitions of percentile, and we take the method recommended by
  * NIST.
- * @see http://en.wikipedia.org/wiki/Percentile#Alternative_methods
+ * @see <a href="http://en.wikipedia.org/wiki/Percentile#Alternative_methods">
+ *      Percentile references</a>
  */
 @Description(name = "percentile",
     value = "_FUNC_(expr, pc) - Returns the percentile(s) of expr at pc (range: [0,1])."
       + "pc can be a double or double array")
 public class UDAFPercentile extends UDAF {
+
+  private static final Comparator<LongWritable> COMPARATOR;
+
+  static {
+    COMPARATOR = ShimLoader.getHadoopShims().getLongComparator();
+  }
 
   /**
    * A state class to store intermediate aggregation results.
@@ -58,7 +66,7 @@ public class UDAFPercentile extends UDAF {
     @Override
     public int compare(Map.Entry<LongWritable, LongWritable> o1,
         Map.Entry<LongWritable, LongWritable> o2) {
-      return o1.getKey().compareTo(o2.getKey());
+      return COMPARATOR.compare(o1.getKey(), o2.getKey());
     }
   }
 
@@ -148,7 +156,7 @@ public class UDAFPercentile extends UDAF {
       }
       if (state.percentiles == null) {
         if (percentile < 0.0 || percentile > 1.0) {
-          throw new RuntimeException("Percentile value must be wihin the range of 0 to 1.");
+          throw new RuntimeException("Percentile value must be within the range of 0 to 1.");
         }
         state.percentiles = new ArrayList<DoubleWritable>(1);
         state.percentiles.add(new DoubleWritable(percentile.doubleValue()));
@@ -234,12 +242,17 @@ public class UDAFPercentile extends UDAF {
 
     public boolean iterate(LongWritable o, List<DoubleWritable> percentiles) {
       if (state.percentiles == null) {
-        for (int i = 0; i < percentiles.size(); i++) {
-          if (percentiles.get(i).get() < 0.0 || percentiles.get(i).get() > 1.0) {
-            throw new RuntimeException("Percentile value must be wihin the range of 0 to 1.");
+        if(percentiles != null) {
+          for (int i = 0; i < percentiles.size(); i++) {
+            if (percentiles.get(i).get() < 0.0 || percentiles.get(i).get() > 1.0) {
+              throw new RuntimeException("Percentile value must be within the range of 0 to 1.");
+            }
           }
+          state.percentiles = new ArrayList<DoubleWritable>(percentiles);
         }
-        state.percentiles = new ArrayList<DoubleWritable>(percentiles);
+        else {
+          state.percentiles = new ArrayList<DoubleWritable>();
+        }
       }
       if (o != null) {
         increment(state, o, 1);

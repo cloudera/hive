@@ -27,13 +27,13 @@ import java.util.Properties;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hive.serde.Constants;
+import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.objectinspector.MetadataListStructObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Category;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
 import org.apache.hadoop.hive.serde2.objectinspector.StructField;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Category;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
@@ -42,24 +42,15 @@ import org.apache.hadoop.io.Writable;
  * MetadataTypedColumnsetSerDe.
  *
  */
-public class MetadataTypedColumnsetSerDe implements SerDe {
+@SerDeSpec(schemaProps = {
+    serdeConstants.SERIALIZATION_FORMAT,
+    serdeConstants.SERIALIZATION_NULL_FORMAT,
+    serdeConstants.SERIALIZATION_LIB,
+    serdeConstants.SERIALIZATION_LAST_COLUMN_TAKES_REST })
+public class MetadataTypedColumnsetSerDe extends AbstractSerDe {
 
   public static final Log LOG = LogFactory
       .getLog(MetadataTypedColumnsetSerDe.class.getName());
-
-  static {
-    StackTraceElement[] sTrace = new Exception().getStackTrace();
-    String className = sTrace[0].getClassName();
-    try {
-      // For backward compatibility: this class replaces the columnsetSerDe
-      // class.
-      SerDeUtils.registerSerDe(
-          "org.apache.hadoop.hive.serde.thrift.columnsetSerDe", Class
-          .forName(className));
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-  }
 
   public static final String DefaultSeparator = "\001";
   private String separator;
@@ -95,15 +86,16 @@ public class MetadataTypedColumnsetSerDe implements SerDe {
     return defaultVal;
   }
 
+  @Override
   public void initialize(Configuration job, Properties tbl) throws SerDeException {
-    String altSep = tbl.getProperty(Constants.SERIALIZATION_FORMAT);
+    String altSep = tbl.getProperty(serdeConstants.SERIALIZATION_FORMAT);
     separator = getByteValue(altSep, DefaultSeparator);
 
-    String altNull = tbl.getProperty(Constants.SERIALIZATION_NULL_FORMAT);
+    String altNull = tbl.getProperty(serdeConstants.SERIALIZATION_NULL_FORMAT);
     nullString = getByteValue(altNull, defaultNullString);
 
     String columnProperty = tbl.getProperty("columns");
-    String serdeName = tbl.getProperty(Constants.SERIALIZATION_LIB);
+    String serdeName = tbl.getProperty(serdeConstants.SERIALIZATION_LIB);
     // tables that were serialized with columnsetSerDe doesn't have metadata
     // so this hack applies to all such tables
     boolean columnsetSerDe = false;
@@ -125,7 +117,7 @@ public class MetadataTypedColumnsetSerDe implements SerDe {
     }
 
     String lastColumnTakesRestString = tbl
-        .getProperty(Constants.SERIALIZATION_LAST_COLUMN_TAKES_REST);
+        .getProperty(serdeConstants.SERIALIZATION_LAST_COLUMN_TAKES_REST);
     lastColumnTakesRest = (lastColumnTakesRestString != null && lastColumnTakesRestString
         .equalsIgnoreCase("true"));
     splitLimit = (lastColumnTakesRest && columnNames != null) ? columnNames
@@ -139,7 +131,7 @@ public class MetadataTypedColumnsetSerDe implements SerDe {
 
   /**
    * Split the row into columns.
-   * 
+   *
    * @param limit
    *          up to limit columns will be produced (the last column takes all
    *          the rest), -1 for unlimited.
@@ -167,12 +159,13 @@ public class MetadataTypedColumnsetSerDe implements SerDe {
 
   ColumnSet deserializeCache = new ColumnSet();
 
+  @Override
   public Object deserialize(Writable field) throws SerDeException {
     String row = null;
     if (field instanceof BytesWritable) {
       BytesWritable b = (BytesWritable) field;
       try {
-        row = Text.decode(b.get(), 0, b.getSize());
+        row = Text.decode(b.getBytes(), 0, b.getLength());
       } catch (CharacterCodingException e) {
         throw new SerDeException(e);
       }
@@ -193,16 +186,19 @@ public class MetadataTypedColumnsetSerDe implements SerDe {
     }
   }
 
+  @Override
   public ObjectInspector getObjectInspector() throws SerDeException {
     return cachedObjectInspector;
   }
 
+  @Override
   public Class<? extends Writable> getSerializedClass() {
     return Text.class;
   }
 
   Text serializeCache = new Text();
 
+  @Override
   public Writable serialize(Object obj, ObjectInspector objInspector) throws SerDeException {
 
     if (objInspector.getCategory() != Category.STRUCT) {
@@ -230,6 +226,12 @@ public class MetadataTypedColumnsetSerDe implements SerDe {
     }
     serializeCache.set(sb.toString());
     return serializeCache;
+  }
+
+  @Override
+  public SerDeStats getSerDeStats() {
+    // no support for statistics
+    return null;
   }
 
 }

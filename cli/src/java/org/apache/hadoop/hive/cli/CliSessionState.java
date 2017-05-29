@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hive.cli;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -26,10 +27,15 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.session.SessionState;
 
 /**
- * CliSessionState.
- * 
+ * SessionState for hive cli.
+ *
  */
 public class CliSessionState extends SessionState {
+  /**
+   * -database option if any that the session has been invoked with.
+   */
+  public String database;
+
   /**
    * -e option if any that the session has been invoked with.
    */
@@ -50,12 +56,16 @@ public class CliSessionState extends SessionState {
    */
   public List<String> initFiles = new ArrayList<String>();
 
-  public CliSessionState() {
-    super();
-  }
-
   public CliSessionState(HiveConf conf) {
     super(conf);
   }
 
+  @Override
+  public void close() {
+    try {
+      super.close();
+    } catch (IOException ioe) {
+      ioe.printStackTrace();
+    } 
+  }
 }

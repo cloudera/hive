@@ -18,7 +18,6 @@
 
 package org.apache.hadoop.hive.ql.optimizer.lineage;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -28,24 +27,29 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.ql.exec.ColumnInfo;
+import org.apache.hadoop.hive.ql.exec.ExtractOperator;
+import org.apache.hadoop.hive.ql.exec.FileSinkOperator;
+import org.apache.hadoop.hive.ql.exec.FilterOperator;
 import org.apache.hadoop.hive.ql.exec.ForwardOperator;
 import org.apache.hadoop.hive.ql.exec.GroupByOperator;
 import org.apache.hadoop.hive.ql.exec.JoinOperator;
 import org.apache.hadoop.hive.ql.exec.LateralViewJoinOperator;
+import org.apache.hadoop.hive.ql.exec.LimitOperator;
 import org.apache.hadoop.hive.ql.exec.Operator;
 import org.apache.hadoop.hive.ql.exec.ReduceSinkOperator;
 import org.apache.hadoop.hive.ql.exec.RowSchema;
+import org.apache.hadoop.hive.ql.exec.ScriptOperator;
 import org.apache.hadoop.hive.ql.exec.SelectOperator;
 import org.apache.hadoop.hive.ql.exec.TableScanOperator;
+import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.hooks.LineageInfo;
 import org.apache.hadoop.hive.ql.hooks.LineageInfo.BaseColumnInfo;
 import org.apache.hadoop.hive.ql.hooks.LineageInfo.Dependency;
 import org.apache.hadoop.hive.ql.hooks.LineageInfo.DependencyType;
+import org.apache.hadoop.hive.ql.hooks.LineageInfo.Predicate;
 import org.apache.hadoop.hive.ql.hooks.LineageInfo.TableAliasInfo;
 import org.apache.hadoop.hive.ql.lib.Node;
 import org.apache.hadoop.hive.ql.lib.NodeProcessor;
@@ -56,7 +60,10 @@ import org.apache.hadoop.hive.ql.parse.ParseContext;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.apache.hadoop.hive.ql.plan.AggregationDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
+import org.apache.hadoop.hive.ql.plan.FilterDesc;
+import org.apache.hadoop.hive.ql.plan.JoinCondDesc;
 import org.apache.hadoop.hive.ql.plan.JoinDesc;
+import org.apache.hadoop.hive.ql.plan.OperatorDesc;
 import org.apache.hadoop.hive.ql.plan.ReduceSinkDesc;
 
 /**
@@ -71,8 +78,9 @@ public class OpProcFactory {
    *
    * @return Operator The parent operator in the current path.
    */
-  protected static Operator<? extends Serializable> getParent(Stack<Node> stack) {
-    return (Operator<? extends Serializable>)Utils.getNthAncestor(stack, 1);
+  @SuppressWarnings("unchecked")
+  protected static Operator<? extends OperatorDesc> getParent(Stack<Node> stack) {
+    return (Operator<? extends OperatorDesc>)Utils.getNthAncestor(stack, 1);
   }
 
   /**
@@ -88,8 +96,10 @@ public class OpProcFactory {
       LineageCtx lCtx = (LineageCtx) procCtx;
 
       // The operators
-      Operator<? extends Serializable> op = (Operator<? extends Serializable>)nd;
-      Operator<? extends Serializable> inpOp = getParent(stack);
+      @SuppressWarnings("unchecked")
+      Operator<? extends OperatorDesc> op = (Operator<? extends OperatorDesc>)nd;
+      Operator<? extends OperatorDesc> inpOp = getParent(stack);
+      lCtx.getIndex().copyPredicates(inpOp, op);
 
       // Create a single dependency list by concatenating the dependencies of all
       // the cols
@@ -104,16 +114,27 @@ public class OpProcFactory {
         Dependency d = lCtx.getIndex().getDependency(inpOp, ci);
         if (d != null) {
           new_type = LineageCtx.getNewDependencyType(d.getType(), new_type);
-          col_set.addAll(d.getBaseCols());
+          if (!ci.isHiddenVirtualCol()) {
+            col_set.addAll(d.getBaseCols());
+          }
         }
       }
 
       dep.setType(new_type);
-      dep.setBaseCols(new ArrayList<BaseColumnInfo>(col_set));
+      dep.setBaseCols(col_set);
+
+      boolean isScript = op instanceof ScriptOperator;
 
       // This dependency is then set for all the colinfos of the script operator
       for(ColumnInfo ci : op.getSchema().getSignature()) {
-        lCtx.getIndex().putDependency(op, ci, dep);
+        Dependency d = dep;
+        if (!isScript) {
+          Dependency dep_ci = lCtx.getIndex().getDependency(inpOp, ci);
+          if (dep_ci != null) {
+            d = dep_ci;
+          }
+        }
+        lCtx.getIndex().putDependency(op, ci, d);
       }
 
       return null;
@@ -136,7 +157,7 @@ public class OpProcFactory {
 
       // Table scan operator.
       TableScanOperator top = (TableScanOperator)nd;
-      org.apache.hadoop.hive.ql.metadata.Table t = pctx.getTopToTable().get(top);
+      org.apache.hadoop.hive.ql.metadata.Table t = top.getConf().getTableMetadata();
       Table tab = t.getTTable();
 
       // Generate the mappings
@@ -147,7 +168,7 @@ public class OpProcFactory {
         fieldSchemaMap.put(col.getName(), col);
       }
 
-      Iterator<VirtualColumn> vcs = VirtualColumn.registry.values().iterator();
+      Iterator<VirtualColumn> vcs = VirtualColumn.getRegistry(pctx.getConf()).iterator();
       while (vcs.hasNext()) {
         VirtualColumn vc = vcs.next();
         fieldSchemaMap.put(vc.getName(), new FieldSchema(vc.getName(),
@@ -166,9 +187,7 @@ public class OpProcFactory {
 
         // Populate the dependency
         dep.setType(LineageInfo.DependencyType.SIMPLE);
-        // TODO: Find out how to get the expression here.
-        dep.setExpr(null);
-        dep.setBaseCols(new ArrayList<BaseColumnInfo>());
+        dep.setBaseCols(new LinkedHashSet<BaseColumnInfo>());
         dep.getBaseCols().add(bci);
 
         // Put the dependency in the map
@@ -188,7 +207,7 @@ public class OpProcFactory {
     public Object process(Node nd, Stack<Node> stack, NodeProcessorCtx procCtx,
         Object... nodeOutputs) throws SemanticException {
 
-      // Assert that there is atleast one item in the stack. This should never
+      // Assert that there is at least one item in the stack. This should never
       // be called for leafs.
       assert(!stack.isEmpty());
 
@@ -199,6 +218,12 @@ public class OpProcFactory {
 
       // The input operator to the join is always a reduce sink operator
       ReduceSinkOperator inpOp = (ReduceSinkOperator)getParent(stack);
+      lCtx.getIndex().copyPredicates(inpOp, op);
+      Predicate cond = getPredicate(op, lCtx);
+      if (cond != null) {
+        lCtx.getIndex().addPredicate(op, cond);
+      }
+
       ReduceSinkDesc rd = inpOp.getConf();
       int tag = rd.getTag();
 
@@ -213,13 +238,66 @@ public class OpProcFactory {
 
         // Otherwise look up the expression corresponding to this ci
         ExprNodeDesc expr = exprs.get(cnt++);
-        lCtx.getIndex().mergeDependency(op, ci,
-            ExprProcFactory.getExprDependency(lCtx, inpOp, expr));
+        Dependency dependency = ExprProcFactory.getExprDependency(lCtx, inpOp, expr);
+        lCtx.getIndex().mergeDependency(op, ci, dependency);
       }
 
       return null;
     }
 
+    private Predicate getPredicate(JoinOperator jop, LineageCtx lctx) {
+      List<Operator<? extends OperatorDesc>> parentOperators = jop.getParentOperators();
+      JoinDesc jd = jop.getConf();
+      ExprNodeDesc [][] joinKeys = jd.getJoinKeys();
+      if (joinKeys == null || parentOperators == null || parentOperators.size() < 2) {
+        return null;
+      }
+      LineageCtx.Index index = lctx.getIndex();
+      for (Operator<? extends OperatorDesc> op: parentOperators) {
+        if (index.getDependencies(op) == null) {
+          return null;
+        }
+      }
+      Predicate cond = new Predicate();
+      JoinCondDesc[] conds = jd.getConds();
+      int parents = parentOperators.size();
+      StringBuilder sb = new StringBuilder("(");
+      for (int i = 0; i < conds.length; i++) {
+        if (i != 0) {
+          sb.append(" AND ");
+        }
+        int left = conds[i].getLeft();
+        int right = conds[i].getRight();
+        if (joinKeys.length < left
+            || joinKeys[left].length == 0
+            || joinKeys.length < right
+            || joinKeys[right].length == 0
+            || parents < left
+            || parents < right) {
+          return null;
+        }
+        ExprNodeDesc expr = joinKeys[left][0];
+        Operator<? extends OperatorDesc> op = parentOperators.get(left);
+        List<Operator<? extends OperatorDesc>> p = op.getParentOperators();
+        if (p == null || p.isEmpty()) {
+          return null;
+        }
+        sb.append(ExprProcFactory.getExprString(op.getSchema(),
+          expr, lctx, p.get(0), cond));
+        sb.append(" = ");
+        expr = joinKeys[right][0];
+        op = parentOperators.get(right);
+        p = op.getParentOperators();
+        if (p == null || p.isEmpty()) {
+          return null;
+        }
+        sb.append(ExprProcFactory.getExprString(op.getSchema(),
+          expr, lctx, p.get(0), cond));
+      }
+      sb.append(")");
+      cond.setExpr(sb.toString());
+      return cond;
+    }
   }
 
   /**
@@ -230,7 +308,7 @@ public class OpProcFactory {
     public Object process(Node nd, Stack<Node> stack, NodeProcessorCtx procCtx,
         Object... nodeOutputs) throws SemanticException {
 
-      // Assert that there is atleast one item in the stack. This should never
+      // Assert that there is at least one item in the stack. This should never
       // be called for leafs.
       assert(!stack.isEmpty());
 
@@ -238,8 +316,9 @@ public class OpProcFactory {
       LineageCtx lCtx = (LineageCtx) procCtx;
       LateralViewJoinOperator op = (LateralViewJoinOperator)nd;
       boolean isUdtfPath = true;
-      Operator<? extends Serializable> inpOp = getParent(stack);
+      Operator<? extends OperatorDesc> inpOp = getParent(stack);
       ArrayList<ColumnInfo> cols = inpOp.getSchema().getSignature();
+      lCtx.getIndex().copyPredicates(inpOp, op);
 
       if (inpOp instanceof SelectOperator) {
         isUdtfPath = false;
@@ -294,11 +373,31 @@ public class OpProcFactory {
       // Otherwise we treat this as a normal select operator and look at
       // the expressions.
 
-      ArrayList<ColumnInfo> col_infos = sop.getSchema().getSignature();
+      Operator<? extends OperatorDesc> inpOp = getParent(stack);
+      lctx.getIndex().copyPredicates(inpOp, sop);
+
+      RowSchema rs = sop.getSchema();
+      ArrayList<ColumnInfo> col_infos = rs.getSignature();
       int cnt = 0;
       for(ExprNodeDesc expr : sop.getConf().getColList()) {
-        lctx.getIndex().putDependency(sop, col_infos.get(cnt++),
-            ExprProcFactory.getExprDependency(lctx, getParent(stack), expr));
+        Dependency dep = ExprProcFactory.getExprDependency(lctx, inpOp, expr);
+        if (dep != null && dep.getExpr() == null && (dep.getBaseCols().isEmpty()
+            || dep.getType() != LineageInfo.DependencyType.SIMPLE)) {
+          dep.setExpr(ExprProcFactory.getExprString(rs, expr, lctx, inpOp, null));
+        }
+        lctx.getIndex().putDependency(sop, col_infos.get(cnt++), dep);
+      }
+
+      Operator<? extends OperatorDesc> op = null;
+      if (!sop.getChildOperators().isEmpty()) {
+        op = sop.getChildOperators().get(0);
+        if (!op.getChildOperators().isEmpty() && op instanceof LimitOperator) {
+          op = op.getChildOperators().get(0);
+        }
+      }
+      if (op == null || (op.getChildOperators().isEmpty()
+          && op instanceof FileSinkOperator)) {
+        lctx.getIndex().addFinalSelectOp(sop, op);
       }
 
       return null;
@@ -317,7 +416,8 @@ public class OpProcFactory {
       LineageCtx lctx = (LineageCtx)procCtx;
       GroupByOperator gop = (GroupByOperator)nd;
       ArrayList<ColumnInfo> col_infos = gop.getSchema().getSignature();
-      Operator<? extends Serializable> inpOp = getParent(stack);
+      Operator<? extends OperatorDesc> inpOp = getParent(stack);
+      lctx.getIndex().copyPredicates(inpOp, gop);
       int cnt = 0;
 
       for(ExprNodeDesc expr : gop.getConf().getKeys()) {
@@ -325,21 +425,64 @@ public class OpProcFactory {
             ExprProcFactory.getExprDependency(lctx, inpOp, expr));
       }
 
+      // If this is a reduce side GroupBy operator, check if there is
+      // a corresponding map side one. If so, some expression could have
+      // already been resolved in the map side.
+      boolean reduceSideGop = (inpOp instanceof ReduceSinkOperator)
+        && (Utils.getNthAncestor(stack, 2) instanceof GroupByOperator);
+
+      RowSchema rs = gop.getSchema();
       for(AggregationDesc agg : gop.getConf().getAggregators()) {
         // Concatenate the dependencies of all the parameters to
         // create the new dependency
         Dependency dep = new Dependency();
         DependencyType new_type = LineageInfo.DependencyType.EXPRESSION;
-        // TODO: Get the actual string here.
-        dep.setExpr(null);
+        StringBuilder sb = new StringBuilder();
+        boolean first = true;
         LinkedHashSet<BaseColumnInfo> bci_set = new LinkedHashSet<BaseColumnInfo>();
         for(ExprNodeDesc expr : agg.getParameters()) {
+          if (first) {
+            first = false;
+          } else {
+            sb.append(", ");
+          }
           Dependency expr_dep = ExprProcFactory.getExprDependency(lctx, inpOp, expr);
-          if (expr_dep != null) {
+          if (expr_dep != null && !expr_dep.getBaseCols().isEmpty()) {
             new_type = LineageCtx.getNewDependencyType(expr_dep.getType(), new_type);
             bci_set.addAll(expr_dep.getBaseCols());
+            if (expr_dep.getType() == LineageInfo.DependencyType.SIMPLE) {
+              BaseColumnInfo col = expr_dep.getBaseCols().iterator().next();
+              Table t = col.getTabAlias().getTable();
+              if (t != null) {
+                sb.append(t.getDbName()).append(".").append(t.getTableName()).append(".");
+              }
+              sb.append(col.getColumn().getName());
+            }
+          }
+          if (expr_dep == null || expr_dep.getBaseCols().isEmpty()
+              || expr_dep.getType() != LineageInfo.DependencyType.SIMPLE) {
+            sb.append(expr_dep != null && expr_dep.getExpr() != null ? expr_dep.getExpr() :
+              ExprProcFactory.getExprString(rs, expr, lctx, inpOp, null));
           }
         }
+        String expr = sb.toString();
+        String udafName = agg.getGenericUDAFName();
+        if (!(reduceSideGop && expr.startsWith(udafName))) {
+          sb.setLength(0); // reset the buffer
+          sb.append(udafName);
+          sb.append("(");
+          if (agg.getDistinct()) {
+            sb.append("DISTINCT ");
+          }
+          sb.append(expr);
+          if (first) {
+            // No parameter, count(*)
+            sb.append("*");
+          }
+          sb.append(")");
+          expr = sb.toString();
+        }
+        dep.setExpr(expr);
 
         // If the bci_set is empty, this means that the inputs to this
         // aggregate function were all constants (e.g. count(1)). In this case
@@ -350,14 +493,14 @@ public class OpProcFactory {
           if (inpOp.getSchema() != null && inpOp.getSchema().getSignature() != null ) {
             for(ColumnInfo ci : inpOp.getSchema().getSignature()) {
               Dependency inp_dep = lctx.getIndex().getDependency(inpOp, ci);
-            	// The dependency can be null as some of the input cis may not have
-            	// been set in case of joins.
-            	if (inp_dep != null) {
-            	  for(BaseColumnInfo bci : inp_dep.getBaseCols()) {
-            	    new_type = LineageCtx.getNewDependencyType(inp_dep.getType(), new_type);
-            	    tai_set.add(bci.getTabAlias());
-            	  }
-            	}
+              // The dependency can be null as some of the input cis may not have
+              // been set in case of joins.
+              if (inp_dep != null) {
+                for(BaseColumnInfo bci : inp_dep.getBaseCols()) {
+                  new_type = LineageCtx.getNewDependencyType(inp_dep.getType(), new_type);
+                  tai_set.add(bci.getTabAlias());
+                }
+              }
             }
           }
 
@@ -372,7 +515,7 @@ public class OpProcFactory {
           }
         }
 
-        dep.setBaseCols(new ArrayList<BaseColumnInfo>(bci_set));
+        dep.setBaseCols(bci_set);
         dep.setType(new_type);
         lctx.getIndex().putDependency(gop, col_infos.get(cnt++), dep);
       }
@@ -389,23 +532,22 @@ public class OpProcFactory {
    */
   public static class UnionLineage extends DefaultLineage implements NodeProcessor {
 
-    protected static final Log LOG = LogFactory.getLog(OpProcFactory.class.getName());
-
     @SuppressWarnings("unchecked")
     @Override
     public Object process(Node nd, Stack<Node> stack, NodeProcessorCtx procCtx,
         Object... nodeOutputs) throws SemanticException {
-      // Assert that there is atleast one item in the stack. This should never
+      // Assert that there is at least one item in the stack. This should never
       // be called for leafs.
       assert(!stack.isEmpty());
 
       // LineageCtx
       LineageCtx lCtx = (LineageCtx) procCtx;
-      Operator<? extends Serializable> op = (Operator<? extends Serializable>)nd;
+      Operator<? extends OperatorDesc> op = (Operator<? extends OperatorDesc>)nd;
 
       // Get the row schema of the input operator.
       // The row schema of the parent operator
-      Operator<? extends Serializable> inpOp = getParent(stack);
+      Operator<? extends OperatorDesc> inpOp = getParent(stack);
+      lCtx.getIndex().copyPredicates(inpOp, op);
       RowSchema rs = op.getSchema();
       ArrayList<ColumnInfo> inp_cols = inpOp.getSchema().getSignature();
       int cnt = 0;
@@ -424,13 +566,10 @@ public class OpProcFactory {
    */
   public static class ReduceSinkLineage implements NodeProcessor {
 
-    protected static final Log LOG = LogFactory.getLog(OpProcFactory.class.getName());
-
-    @SuppressWarnings("unchecked")
     @Override
     public Object process(Node nd, Stack<Node> stack, NodeProcessorCtx procCtx,
         Object... nodeOutputs) throws SemanticException {
-      // Assert that there is atleast one item in the stack. This should never
+      // Assert that there is at least one item in the stack. This should never
       // be called for leafs.
       assert(!stack.isEmpty());
 
@@ -438,27 +577,99 @@ public class OpProcFactory {
       LineageCtx lCtx = (LineageCtx) procCtx;
       ReduceSinkOperator rop = (ReduceSinkOperator)nd;
 
-      ArrayList<ColumnInfo> col_infos = rop.getSchema().getSignature();
-      Operator<? extends Serializable> inpOp = getParent(stack);
+      Operator<? extends OperatorDesc> inpOp = getParent(stack);
+      lCtx.getIndex().copyPredicates(inpOp, rop);
       int cnt = 0;
 
       // The keys are included only in case the reduce sink feeds into
       // a group by operator through a chain of forward operators
-      Operator<? extends Serializable> op = rop.getChildOperators().get(0);
+      Operator<? extends OperatorDesc> op = rop.getChildOperators().get(0);
       while (op instanceof ForwardOperator) {
         op = op.getChildOperators().get(0);
       }
 
       if (op instanceof GroupByOperator) {
+        ArrayList<ColumnInfo> col_infos = rop.getSchema().getSignature();
         for(ExprNodeDesc expr : rop.getConf().getKeyCols()) {
           lCtx.getIndex().putDependency(rop, col_infos.get(cnt++),
               ExprProcFactory.getExprDependency(lCtx, inpOp, expr));
         }
+        for(ExprNodeDesc expr : rop.getConf().getValueCols()) {
+          lCtx.getIndex().putDependency(rop, col_infos.get(cnt++),
+              ExprProcFactory.getExprDependency(lCtx, inpOp, expr));
+        }
+      } else if (op instanceof ExtractOperator) {
+        ArrayList<ColumnInfo> col_infos = rop.getSchema().getSignature();
+        for(ExprNodeDesc expr : rop.getConf().getValueCols()) {
+          lCtx.getIndex().putDependency(rop, col_infos.get(cnt++),
+              ExprProcFactory.getExprDependency(lCtx, inpOp, expr));
+        }
+      } else {
+        RowSchema schema = rop.getSchema();
+        ReduceSinkDesc desc = rop.getConf();
+        List<ExprNodeDesc> keyCols = desc.getKeyCols();
+        ArrayList<String> keyColNames = desc.getOutputKeyColumnNames();
+        for (int i = 0; i < keyCols.size(); i++) {
+          // order-bys, joins
+          ColumnInfo column = schema.getColumnInfo(Utilities.ReduceField.KEY + "." + keyColNames.get(i));
+          if (column == null) {
+            continue;   // key in values
+          }
+          lCtx.getIndex().putDependency(rop, column,
+              ExprProcFactory.getExprDependency(lCtx, inpOp, keyCols.get(i)));
+        }
+        List<ExprNodeDesc> valCols = desc.getValueCols();
+        ArrayList<String> valColNames = desc.getOutputValueColumnNames();
+        for (int i = 0; i < valCols.size(); i++) {
+          // todo: currently, bucketing,etc. makes RS differently with those for order-bys or joins
+          ColumnInfo column = schema.getColumnInfo(valColNames.get(i));
+          if (column == null) {
+            // order-bys, joins
+            column = schema.getColumnInfo(Utilities.ReduceField.VALUE + "." + valColNames.get(i));
+          }
+          lCtx.getIndex().putDependency(rop, column,
+              ExprProcFactory.getExprDependency(lCtx, inpOp, valCols.get(i)));
+        }
       }
 
-      for(ExprNodeDesc expr : rop.getConf().getValueCols()) {
-        lCtx.getIndex().putDependency(rop, col_infos.get(cnt++),
-            ExprProcFactory.getExprDependency(lCtx, inpOp, expr));
+      return null;
+    }
+  }
+
+  /**
+   * Filter processor.
+   */
+  public static class FilterLineage implements NodeProcessor {
+
+    @Override
+    public Object process(Node nd, Stack<Node> stack, NodeProcessorCtx procCtx,
+        Object... nodeOutputs) throws SemanticException {
+      // Assert that there is at least one item in the stack. This should never
+      // be called for leafs.
+      assert(!stack.isEmpty());
+
+      // LineageCtx
+      LineageCtx lCtx = (LineageCtx) procCtx;
+      FilterOperator fop = (FilterOperator)nd;
+
+      // Get the row schema of the input operator.
+      // The row schema of the parent operator
+      Operator<? extends OperatorDesc> inpOp = getParent(stack);
+      lCtx.getIndex().copyPredicates(inpOp, fop);
+      FilterDesc filterDesc = fop.getConf();
+      RowSchema rs = fop.getSchema();
+      if (!filterDesc.isGenerated()) {
+        Predicate cond = new Predicate();
+        cond.setExpr(ExprProcFactory.getExprString(
+          rs, filterDesc.getPredicate(), lCtx, inpOp, cond));
+        lCtx.getIndex().addPredicate(fop, cond);
+      }
+
+      ArrayList<ColumnInfo> inp_cols = inpOp.getSchema().getSignature();
+      int cnt = 0;
+      for(ColumnInfo ci : rs.getSignature()) {
+        lCtx.getIndex().putDependency(fop, ci,
+            lCtx.getIndex().getDependency(inpOp, inp_cols.get(cnt++)));
       }
 
       return null;
@@ -471,23 +682,22 @@ public class OpProcFactory {
    */
   public static class DefaultLineage implements NodeProcessor {
 
-    protected static final Log LOG = LogFactory.getLog(OpProcFactory.class.getName());
-
     @SuppressWarnings("unchecked")
     @Override
     public Object process(Node nd, Stack<Node> stack, NodeProcessorCtx procCtx,
         Object... nodeOutputs) throws SemanticException {
-      // Assert that there is atleast one item in the stack. This should never
+      // Assert that there is at least one item in the stack. This should never
       // be called for leafs.
       assert(!stack.isEmpty());
 
       // LineageCtx
       LineageCtx lCtx = (LineageCtx) procCtx;
-      Operator<? extends Serializable> op = (Operator<? extends Serializable>)nd;
+      Operator<? extends OperatorDesc> op = (Operator<? extends OperatorDesc>)nd;
 
       // Get the row schema of the input operator.
       // The row schema of the parent operator
-      Operator<? extends Serializable> inpOp = getParent(stack);
+      Operator<? extends OperatorDesc> inpOp = getParent(stack);
+      lCtx.getIndex().copyPredicates(inpOp, op);
       RowSchema rs = op.getSchema();
       ArrayList<ColumnInfo> inp_cols = inpOp.getSchema().getSignature();
       int cnt = 0;
@@ -535,4 +745,7 @@ public class OpProcFactory {
     return new DefaultLineage();
   }
 
+  public static NodeProcessor getFilterProc() {
+    return new FilterLineage();
+  }
 }

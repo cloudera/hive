@@ -1,3 +1,5 @@
+set hive.fetch.task.conversion=more;
+
 EXPLAIN
 SELECT
     'abc',        "abc",
@@ -8,6 +10,7 @@ SELECT
     'abc\\\\\'',  "abc\\\\\"",
     'abc\\\\\\',  "abc\\\\\\",
     'abc""""\\',  "abc''''\\",
+    'mysql_%\\_\%', 'mysql\\\_\\\\\%',
     "awk '{print NR\"\\t\"$0}'",
     'tab\ttab',   "tab\ttab"
 FROM src
@@ -22,6 +25,7 @@ SELECT
     'abc\\\\\'',  "abc\\\\\"",
     'abc\\\\\\',  "abc\\\\\\",
     'abc""""\\',  "abc''''\\",
+    'mysql_%\\_\%', 'mysql\\\_\\\\\%',
     "awk '{print NR\"\\t\"$0}'",
     'tab\ttab',   "tab\ttab"
 FROM src

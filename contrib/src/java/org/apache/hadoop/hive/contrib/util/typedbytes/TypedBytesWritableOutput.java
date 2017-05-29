@@ -32,6 +32,7 @@ import org.apache.hadoop.io.ArrayWritable;
 import org.apache.hadoop.io.BooleanWritable;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.FloatWritable;
+import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.MapWritable;
@@ -43,7 +44,6 @@ import org.apache.hadoop.io.VLongWritable;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.io.WritableUtils;
-import org.apache.hadoop.record.Record;
 
 /**
  * Provides functionality for writing Writable objects as typed bytes.
@@ -138,8 +138,6 @@ public class TypedBytesWritableOutput {
       writeMap((MapWritable) w);
     } else if (w instanceof SortedMapWritable) {
       writeSortedMap((SortedMapWritable) w);
-    } else if (w instanceof Record) {
-      writeRecord((Record) w);
     } else if (w instanceof NullWritable || w == null) {
       writeNull();
     } else {
@@ -148,11 +146,11 @@ public class TypedBytesWritableOutput {
   }
 
   public void writeTypedBytes(TypedBytesWritable tbw) throws IOException {
-    out.writeRaw(tbw.get(), 0, tbw.getSize());
+    out.writeRaw(tbw.getBytes(), 0, tbw.getLength());
   }
 
   public void writeBytes(BytesWritable bw) throws IOException {
-    byte[] bytes = Arrays.copyOfRange(bw.get(), 0, bw.getSize());
+    byte[] bytes = Arrays.copyOfRange(bw.getBytes(), 0, bw.getLength());
     out.writeBytes(bytes);
   }
 
@@ -220,21 +218,23 @@ public class TypedBytesWritableOutput {
     }
   }
 
-  public void writeRecord(Record r) throws IOException {
-    r.serialize(TypedBytesRecordOutput.get(out));
-  }
-
   public void writeNull() throws IOException {
     out.writeNull();
   }
 
   public void writeWritable(Writable w) throws IOException {
-    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-    DataOutputStream dos = new DataOutputStream(baos);
-    WritableUtils.writeString(dos, w.getClass().getName());
-    w.write(dos);
-    dos.close();
-    out.writeBytes(baos.toByteArray(), Type.WRITABLE.code);
+    DataOutputStream dos = null;
+    try {
+      ByteArrayOutputStream baos = new ByteArrayOutputStream();
+      dos = new DataOutputStream(baos);
+      WritableUtils.writeString(dos, w.getClass().getName());
+      w.write(dos);
+      out.writeBytes(baos.toByteArray(), Type.WRITABLE.code);
+      dos.close();
+      dos = null;
+    } finally {
+      IOUtils.closeStream(dos);
+    }
   }
 
   public void writeEndOfRecord() throws IOException {

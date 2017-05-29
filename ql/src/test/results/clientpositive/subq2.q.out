@@ -8,102 +8,69 @@ SELECT a.k, a.c
 FROM (SELECT b.key as k, count(1) as c FROM src b GROUP BY b.key) a
 WHERE a.k >= 90
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_SUBQUERY (TOK_QUERY (TOK_FROM (TOK_TABREF src b)) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (. (TOK_TABLE_OR_COL b) key) k) (TOK_SELEXPR (TOK_FUNCTION count 1) c)) (TOK_GROUPBY (. (TOK_TABLE_OR_COL b) key)))) a)) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (. (TOK_TABLE_OR_COL a) k)) (TOK_SELEXPR (. (TOK_TABLE_OR_COL a) c))) (TOK_WHERE (>= (. (TOK_TABLE_OR_COL a) k) 90))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        a:b 
+      Map Operator Tree:
           TableScan
             alias: b
+            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
-              predicate:
-                  expr: (key >= 90)
-                  type: boolean
+              predicate: (UDFToDouble(key) >= 90.0) (type: boolean)
+              Statistics: Num rows: 166 Data size: 1763 Basic stats: COMPLETE Column stats: NONE
               Select Operator
-                expressions:
-                      expr: key
-                      type: string
-                outputColumnNames: key
+                expressions: key (type: string)
+                outputColumnNames: _col0
+                Statistics: Num rows: 166 Data size: 1763 Basic stats: COMPLETE Column stats: NONE
                 Group By Operator
-                  aggregations:
-                        expr: count(1)
-                  bucketGroup: false
-                  keys:
-                        expr: key
-                        type: string
+                  aggregations: count(1)
+                  keys: _col0 (type: string)
                   mode: hash
                   outputColumnNames: _col0, _col1
+                  Statistics: Num rows: 166 Data size: 1763 Basic stats: COMPLETE Column stats: NONE
                   Reduce Output Operator
-                    key expressions:
-                          expr: _col0
-                          type: string
+                    key expressions: _col0 (type: string)
                     sort order: +
-                    Map-reduce partition columns:
-                          expr: _col0
-                          type: string
-                    tag: -1
-                    value expressions:
-                          expr: _col1
-                          type: bigint
+                    Map-reduce partition columns: _col0 (type: string)
+                    Statistics: Num rows: 166 Data size: 1763 Basic stats: COMPLETE Column stats: NONE
+                    value expressions: _col1 (type: bigint)
       Reduce Operator Tree:
         Group By Operator
-          aggregations:
-                expr: count(VALUE._col0)
-          bucketGroup: false
-          keys:
-                expr: KEY._col0
-                type: string
+          aggregations: count(VALUE._col0)
+          keys: KEY._col0 (type: string)
           mode: mergepartial
           outputColumnNames: _col0, _col1
-          Select Operator
-            expressions:
-                  expr: _col0
-                  type: string
-                  expr: _col1
-                  type: bigint
-            outputColumnNames: _col0, _col1
-            Filter Operator
-              predicate:
-                  expr: (_col0 >= 90)
-                  type: boolean
-              Select Operator
-                expressions:
-                      expr: _col0
-                      type: string
-                      expr: _col1
-                      type: bigint
-                outputColumnNames: _col0, _col1
-                File Output Operator
-                  compressed: false
-                  GlobalTableId: 0
-                  table:
-                      input format: org.apache.hadoop.mapred.TextInputFormat
-                      output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+          Statistics: Num rows: 83 Data size: 881 Basic stats: COMPLETE Column stats: NONE
+          File Output Operator
+            compressed: false
+            Statistics: Num rows: 83 Data size: 881 Basic stats: COMPLETE Column stats: NONE
+            table:
+                input format: org.apache.hadoop.mapred.TextInputFormat
+                output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: SELECT a.k, a.c
 FROM (SELECT b.key as k, count(1) as c FROM src b GROUP BY b.key) a
 WHERE a.k >= 90
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src
-PREHOOK: Output: file:/data/users/heyongqiang/hive-trunk-commit/build/ql/tmp/944603484/10000
+#### A masked pattern was here ####
 POSTHOOK: query: SELECT a.k, a.c
 FROM (SELECT b.key as k, count(1) as c FROM src b GROUP BY b.key) a
 WHERE a.k >= 90
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@src
-POSTHOOK: Output: file:/data/users/heyongqiang/hive-trunk-commit/build/ql/tmp/944603484/10000
+#### A masked pattern was here ####
 100	2
 103	2
 104	2

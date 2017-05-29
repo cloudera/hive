@@ -17,6 +17,9 @@
  */
 package org.apache.hadoop.hive.serde2.lazy;
 
+import java.sql.Date;
+import java.sql.Timestamp;
+
 import junit.framework.TestCase;
 
 import org.apache.hadoop.hive.serde2.ByteStream;
@@ -24,6 +27,7 @@ import org.apache.hadoop.hive.serde2.io.ByteWritable;
 import org.apache.hadoop.hive.serde2.io.DoubleWritable;
 import org.apache.hadoop.hive.serde2.io.ShortWritable;
 import org.apache.hadoop.hive.serde2.lazy.objectinspector.primitive.LazyPrimitiveObjectInspectorFactory;
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
@@ -373,6 +377,57 @@ public class TestLazyPrimitive extends TestCase {
     }
   }
 
+  public void testLazyBinary() {
+    LazyBinary ba = new LazyBinary(LazyPrimitiveObjectInspectorFactory.LAZY_BINARY_OBJECT_INSPECTOR);
+    initLazyObject(ba, new byte[] {}, 0, 0);
+    assertEquals(new BytesWritable(), ba.getWritableObject());
+    initLazyObject(ba, new byte[] {'%'}, 0, 1);
+    assertEquals(new BytesWritable(new byte[] {'%'}), ba.getWritableObject());
+    initLazyObject(ba, new byte[] {'2', '>', '3'}, 1, 1);
+    assertEquals(new BytesWritable(new byte[] {'>'}), ba.getWritableObject());
+    initLazyObject(ba, new byte[] {'2', '?', '3'}, 0, 3);
+    assertEquals(new BytesWritable(new byte[] {'2', '?', '3'}), ba.getWritableObject());
+    initLazyObject(ba, new byte[] {'\n'}, 0, 1);
+    assertEquals(new BytesWritable(new byte[] {'\n'}), ba.getWritableObject());
+  }
+
+  public void testLazyTimestamp() throws Throwable {
+    LazyTimestamp t = new LazyTimestamp(LazyPrimitiveObjectInspectorFactory.LAZY_TIMESTAMP_OBJECT_INSPECTOR);
+    String nullDate = "NULL";
+    byte[] nullBytes = nullDate.getBytes();
+    initLazyObject(t, nullBytes, 0, nullBytes.length);
+    assertEquals(true, t.isNull);
+    String sampleDate = "2013-02-12 21:04:58";
+    byte[] good2013 = sampleDate.getBytes();
+    initLazyObject(t, good2013, 0, good2013.length);
+    assertEquals(false, t.isNull);
+    assertEquals(Timestamp.valueOf(sampleDate),
+        t.getWritableObject().getTimestamp());
+    String badDate = "2013-02-12 21:04:XX";
+    byte[] bad2013 = badDate.getBytes();
+    initLazyObject(t, bad2013, 0, bad2013.length);
+    assertEquals(true, t.isNull);
+  }
+
+  public void testLazyDate() throws Throwable {
+    LazyDate t = new LazyDate(LazyPrimitiveObjectInspectorFactory.LAZY_DATE_OBJECT_INSPECTOR);
+    String nullDate = "NULL";
+    byte[] nullBytes = nullDate.getBytes();
+    initLazyObject(t, nullBytes, 0, nullBytes.length);
+    assertEquals(true, t.isNull);
+    String sampleDate = "2013-02-12";
+    byte[] good2013 = sampleDate.getBytes();
+    initLazyObject(t, good2013, 0, good2013.length);
+    assertEquals(false, t.isNull);
+    assertEquals(Date.valueOf(sampleDate),
+        t.getWritableObject().get());
+    String badDate = "X013-02-12";
+    byte[] bad2013 = badDate.getBytes();
+    initLazyObject(t, bad2013, 0, bad2013.length);
+    assertEquals(true, t.isNull);
+
+  }
+
   public void testLazyIntegerWrite() throws Throwable {
     try {
       ByteStream.Output out = new ByteStream.Output();
@@ -383,7 +438,7 @@ public class TestLazyPrimitive extends TestCase {
         out.reset();
         LazyInteger.writeUTF8(out, v);
         Text t = new Text();
-        t.set(out.getData(), 0, out.getCount());
+        t.set(out.getData(), 0, out.getLength());
         assertEquals(String.valueOf(v), t.toString());
       }
 
@@ -403,7 +458,7 @@ public class TestLazyPrimitive extends TestCase {
         out.reset();
         LazyLong.writeUTF8(out, v);
         Text t = new Text();
-        t.set(out.getData(), 0, out.getCount());
+        t.set(out.getData(), 0, out.getLength());
         assertEquals(String.valueOf(v), t.toString());
       }
 

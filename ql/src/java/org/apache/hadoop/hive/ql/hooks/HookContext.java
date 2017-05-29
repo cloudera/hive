@@ -21,39 +21,58 @@ package org.apache.hadoop.hive.ql.hooks;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
+import org.apache.hadoop.fs.ContentSummary;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.ql.QueryPlan;
 import org.apache.hadoop.hive.ql.exec.TaskRunner;
+import org.apache.hadoop.hive.ql.optimizer.lineage.LineageCtx.Index;
 import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.hive.shims.ShimLoader;
+import org.apache.hadoop.hive.shims.Utils;
 import org.apache.hadoop.security.UserGroupInformation;
 /**
  * Hook Context keeps all the necessary information for all the hooks.
  * New implemented hook can get the query plan, job conf and the list of all completed tasks from this hook context
  */
 public class HookContext {
+
+  static public enum HookType {
+    PRE_EXEC_HOOK, POST_EXEC_HOOK, ON_FAILURE_HOOK
+  }
+
   private QueryPlan queryPlan;
   private HiveConf conf;
   private List<TaskRunner> completeTaskList;
   private Set<ReadEntity> inputs;
   private Set<WriteEntity> outputs;
   private LineageInfo linfo;
+  private Index depMap;
   private UserGroupInformation ugi;
+  private HookType hookType;
+  final private Map<String, ContentSummary> inputPathToContentSummary;
+  private final String ipAddress;
+  private final String userName;
 
-
-  public HookContext(QueryPlan queryPlan, HiveConf conf) throws Exception{
+  public HookContext(QueryPlan queryPlan, HiveConf conf,
+      Map<String, ContentSummary> inputPathToContentSummary, String userName, String ipAddress) throws Exception {
     this.queryPlan = queryPlan;
     this.conf = conf;
+    this.inputPathToContentSummary = inputPathToContentSummary;
     completeTaskList = new ArrayList<TaskRunner>();
     inputs = queryPlan.getInputs();
     outputs = queryPlan.getOutputs();
-    ugi = ShimLoader.getHadoopShims().getUGIForConf(conf);
+    ugi = Utils.getUGI();
     linfo= null;
+    depMap = null;
     if(SessionState.get() != null){
       linfo = SessionState.get().getLineageState().getLineageInfo();
+      depMap = SessionState.get().getLineageState().getIndex();
     }
+    this.ipAddress = ipAddress;
+    this.userName = userName;
   }
 
   public QueryPlan getQueryPlan() {
@@ -108,6 +127,14 @@ public class HookContext {
     this.linfo = linfo;
   }
 
+  public Index getIndex() {
+    return depMap;
+  }
+
+  public void setIndex(Index depMap) {
+    this.depMap = depMap;
+  }
+
   public UserGroupInformation getUgi() {
     return ugi;
   }
@@ -116,5 +143,27 @@ public class HookContext {
     this.ugi = ugi;
   }
 
+  public Map<String, ContentSummary> getInputPathToContentSummary() {
+    return inputPathToContentSummary;
+  }
 
+  public HookType getHookType() {
+    return hookType;
+  }
+
+  public void setHookType(HookType hookType) {
+    this.hookType = hookType;
+  }
+
+  public String getIpAddress() {
+    return this.ipAddress;
+ }
+
+  public String getOperationName() {
+    return queryPlan.getOperationName();
+  }
+
+  public String getUserName() {
+    return this.userName;
+  }
 }

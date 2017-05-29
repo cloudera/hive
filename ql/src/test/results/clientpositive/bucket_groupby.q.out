@@ -1,17 +1,35 @@
 PREHOOK: query: create table clustergroupby(key string, value string) partitioned by(ds string)
 PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:default
+PREHOOK: Output: default@clustergroupby
 POSTHOOK: query: create table clustergroupby(key string, value string) partitioned by(ds string)
 POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@clustergroupby
 PREHOOK: query: describe extended clustergroupby
 PREHOOK: type: DESCTABLE
+PREHOOK: Input: default@clustergroupby
 POSTHOOK: query: describe extended clustergroupby
 POSTHOOK: type: DESCTABLE
-key	string	
-value	string	
-ds	string	
+POSTHOOK: Input: default@clustergroupby
+key                 	string              	                    
+value               	string              	                    
+ds                  	string              	                    
 	 	 
-Detailed Table Information	Table(tableName:clustergroupby, dbName:default, owner:heyongqiang, createTime:1290108934, lastAccessTime:0, retention:0, sd:StorageDescriptor(cols:[FieldSchema(name:key, type:string, comment:null), FieldSchema(name:value, type:string, comment:null), FieldSchema(name:ds, type:string, comment:null)], location:pfile:/Users/heyongqiang/Documents/workspace/Hive-2/build/ql/test/data/warehouse/clustergroupby, inputFormat:org.apache.hadoop.mapred.TextInputFormat, outputFormat:org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat, compressed:false, numBuckets:-1, serdeInfo:SerDeInfo(name:null, serializationLib:org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe, parameters:{serialization.format=1}), bucketCols:[], sortCols:[], parameters:{}), partitionKeys:[FieldSchema(name:ds, type:string, comment:null)], parameters:{transient_lastDdlTime=1290108934}, viewOriginalText:null, viewExpandedText:null, tableType:MANAGED_TABLE)	
+# Partition Information	 	 
+# col_name            	data_type           	comment             
+	 	 
+ds                  	string              	                    
+	 	 
+#### A masked pattern was here ####
+PREHOOK: query: alter table clustergroupby clustered by (key) into 1 buckets
+PREHOOK: type: ALTERTABLE_CLUSTER_SORT
+PREHOOK: Input: default@clustergroupby
+PREHOOK: Output: default@clustergroupby
+POSTHOOK: query: alter table clustergroupby clustered by (key) into 1 buckets
+POSTHOOK: type: ALTERTABLE_CLUSTER_SORT
+POSTHOOK: Input: default@clustergroupby
+POSTHOOK: Output: default@clustergroupby
 PREHOOK: query: insert overwrite table clustergroupby partition (ds='100') select key, value from src sort by key
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src
@@ -28,92 +46,67 @@ PREHOOK: type: QUERY
 POSTHOOK: query: explain
 select key, count(1) from clustergroupby where ds='100' group by key limit 10
 POSTHOOK: type: QUERY
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF clustergroupby)) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_TABLE_OR_COL key)) (TOK_SELEXPR (TOK_FUNCTION count 1))) (TOK_WHERE (= (TOK_TABLE_OR_COL ds) '100')) (TOK_GROUPBY (TOK_TABLE_OR_COL key)) (TOK_LIMIT 10)))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        clustergroupby 
+      Map Operator Tree:
           TableScan
             alias: clustergroupby
-            Filter Operator
-              predicate:
-                  expr: (ds = '100')
-                  type: boolean
-              Select Operator
-                expressions:
-                      expr: key
-                      type: string
-                outputColumnNames: key
-                Group By Operator
-                  aggregations:
-                        expr: count(1)
-                  bucketGroup: false
-                  keys:
-                        expr: key
-                        type: string
-                  mode: hash
-                  outputColumnNames: _col0, _col1
-                  Reduce Output Operator
-                    key expressions:
-                          expr: _col0
-                          type: string
-                    sort order: +
-                    Map-reduce partition columns:
-                          expr: _col0
-                          type: string
-                    tag: -1
-                    value expressions:
-                          expr: _col1
-                          type: bigint
+            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+            Select Operator
+              expressions: key (type: string)
+              outputColumnNames: _col0
+              Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+              Group By Operator
+                aggregations: count(1)
+                keys: _col0 (type: string)
+                mode: hash
+                outputColumnNames: _col0, _col1
+                Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+                Reduce Output Operator
+                  key expressions: _col0 (type: string)
+                  sort order: +
+                  Map-reduce partition columns: _col0 (type: string)
+                  Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+                  value expressions: _col1 (type: bigint)
       Reduce Operator Tree:
         Group By Operator
-          aggregations:
-                expr: count(VALUE._col0)
-          bucketGroup: false
-          keys:
-                expr: KEY._col0
-                type: string
+          aggregations: count(VALUE._col0)
+          keys: KEY._col0 (type: string)
           mode: mergepartial
           outputColumnNames: _col0, _col1
-          Select Operator
-            expressions:
-                  expr: _col0
-                  type: string
-                  expr: _col1
-                  type: bigint
-            outputColumnNames: _col0, _col1
-            Limit
-              File Output Operator
-                compressed: false
-                GlobalTableId: 0
-                table:
-                    input format: org.apache.hadoop.mapred.TextInputFormat
-                    output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+          Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+          Limit
+            Number of rows: 10
+            Statistics: Num rows: 10 Data size: 100 Basic stats: COMPLETE Column stats: NONE
+            File Output Operator
+              compressed: false
+              Statistics: Num rows: 10 Data size: 100 Basic stats: COMPLETE Column stats: NONE
+              table:
+                  input format: org.apache.hadoop.mapred.TextInputFormat
+                  output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                  serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: 10
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select key, count(1) from clustergroupby where ds='100' group by key limit 10
 PREHOOK: type: QUERY
+PREHOOK: Input: default@clustergroupby
 PREHOOK: Input: default@clustergroupby@ds=100
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-35-47_282_4113045751057786056/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select key, count(1) from clustergroupby where ds='100' group by key limit 10
 POSTHOOK: type: QUERY
+POSTHOOK: Input: default@clustergroupby
 POSTHOOK: Input: default@clustergroupby@ds=100
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-35-47_282_4113045751057786056/-mr-10000
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
+#### A masked pattern was here ####
 0	3
 10	1
 100	2
@@ -124,27 +117,22 @@ POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).value SIMPLE [(src)src.Field
 111	1
 113	2
 114	1
-PREHOOK: query: alter table clustergroupby clustered by (key) into 1 buckets
-PREHOOK: type: ALTERTABLE_CLUSTER_SORT
-PREHOOK: Input: default@clustergroupby
-PREHOOK: Output: default@clustergroupby
-POSTHOOK: query: alter table clustergroupby clustered by (key) into 1 buckets
-POSTHOOK: type: ALTERTABLE_CLUSTER_SORT
-POSTHOOK: Input: default@clustergroupby
-POSTHOOK: Output: default@clustergroupby
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
 PREHOOK: query: describe extended clustergroupby
 PREHOOK: type: DESCTABLE
+PREHOOK: Input: default@clustergroupby
 POSTHOOK: query: describe extended clustergroupby
 POSTHOOK: type: DESCTABLE
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-key	string	
-value	string	
-ds	string	
+POSTHOOK: Input: default@clustergroupby
+key                 	string              	                    
+value               	string              	                    
+ds                  	string              	                    
 	 	 
-Detailed Table Information	Table(tableName:clustergroupby, dbName:default, owner:heyongqiang, createTime:1290108934, lastAccessTime:0, retention:0, sd:StorageDescriptor(cols:[FieldSchema(name:key, type:string, comment:null), FieldSchema(name:value, type:string, comment:null), FieldSchema(name:ds, type:string, comment:null)], location:pfile:/Users/heyongqiang/Documents/workspace/Hive-2/build/ql/test/data/warehouse/clustergroupby, inputFormat:org.apache.hadoop.mapred.TextInputFormat, outputFormat:org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat, compressed:false, numBuckets:1, serdeInfo:SerDeInfo(name:null, serializationLib:org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe, parameters:{serialization.format=1}), bucketCols:[key], sortCols:[], parameters:{}), partitionKeys:[FieldSchema(name:ds, type:string, comment:null)], parameters:{numPartitions=1, numFiles=1, last_modified_by=heyongqiang, last_modified_time=1290108955, transient_lastDdlTime=1290108955, numRows=500, totalSize=5812}, viewOriginalText:null, viewExpandedText:null, tableType:MANAGED_TABLE)	
+# Partition Information	 	 
+# col_name            	data_type           	comment             
+	 	 
+ds                  	string              	                    
+	 	 
+#### A masked pattern was here ####
 PREHOOK: query: insert overwrite table clustergroupby partition (ds='101') select key, value from src distribute by key
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src
@@ -153,8 +141,6 @@ POSTHOOK: query: insert overwrite table clustergroupby partition (ds='101') sele
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@src
 POSTHOOK: Output: default@clustergroupby@ds=101
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
 POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
 POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
 PREHOOK: query: --normal--
@@ -165,96 +151,67 @@ POSTHOOK: query: --normal--
 explain
 select key, count(1) from clustergroupby  where ds='101'  group by key limit 10
 POSTHOOK: type: QUERY
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF clustergroupby)) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_TABLE_OR_COL key)) (TOK_SELEXPR (TOK_FUNCTION count 1))) (TOK_WHERE (= (TOK_TABLE_OR_COL ds) '101')) (TOK_GROUPBY (TOK_TABLE_OR_COL key)) (TOK_LIMIT 10)))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        clustergroupby 
+      Map Operator Tree:
           TableScan
             alias: clustergroupby
-            Filter Operator
-              predicate:
-                  expr: (ds = '101')
-                  type: boolean
-              Select Operator
-                expressions:
-                      expr: key
-                      type: string
-                outputColumnNames: key
-                Group By Operator
-                  aggregations:
-                        expr: count(1)
-                  bucketGroup: true
-                  keys:
-                        expr: key
-                        type: string
-                  mode: hash
-                  outputColumnNames: _col0, _col1
-                  Reduce Output Operator
-                    key expressions:
-                          expr: _col0
-                          type: string
-                    sort order: +
-                    Map-reduce partition columns:
-                          expr: _col0
-                          type: string
-                    tag: -1
-                    value expressions:
-                          expr: _col1
-                          type: bigint
+            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+            Select Operator
+              expressions: key (type: string)
+              outputColumnNames: _col0
+              Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+              Group By Operator
+                aggregations: count(1)
+                keys: _col0 (type: string)
+                mode: hash
+                outputColumnNames: _col0, _col1
+                Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+                Reduce Output Operator
+                  key expressions: _col0 (type: string)
+                  sort order: +
+                  Map-reduce partition columns: _col0 (type: string)
+                  Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+                  value expressions: _col1 (type: bigint)
       Reduce Operator Tree:
         Group By Operator
-          aggregations:
-                expr: count(VALUE._col0)
-          bucketGroup: false
-          keys:
-                expr: KEY._col0
-                type: string
+          aggregations: count(VALUE._col0)
+          keys: KEY._col0 (type: string)
           mode: mergepartial
           outputColumnNames: _col0, _col1
-          Select Operator
-            expressions:
-                  expr: _col0
-                  type: string
-                  expr: _col1
-                  type: bigint
-            outputColumnNames: _col0, _col1
-            Limit
-              File Output Operator
-                compressed: false
-                GlobalTableId: 0
-                table:
-                    input format: org.apache.hadoop.mapred.TextInputFormat
-                    output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+          Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+          Limit
+            Number of rows: 10
+            Statistics: Num rows: 10 Data size: 100 Basic stats: COMPLETE Column stats: NONE
+            File Output Operator
+              compressed: false
+              Statistics: Num rows: 10 Data size: 100 Basic stats: COMPLETE Column stats: NONE
+              table:
+                  input format: org.apache.hadoop.mapred.TextInputFormat
+                  output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                  serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: 10
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select key, count(1) from clustergroupby  where ds='101' group by key limit 10
 PREHOOK: type: QUERY
+PREHOOK: Input: default@clustergroupby
 PREHOOK: Input: default@clustergroupby@ds=101
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-36-06_455_5652519335128156482/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select key, count(1) from clustergroupby  where ds='101' group by key limit 10
 POSTHOOK: type: QUERY
+POSTHOOK: Input: default@clustergroupby
 POSTHOOK: Input: default@clustergroupby@ds=101
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-36-06_455_5652519335128156482/-mr-10000
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
+#### A masked pattern was here ####
 0	3
 10	1
 100	2
@@ -273,96 +230,67 @@ POSTHOOK: query: --function--
 explain
 select length(key), count(1) from clustergroupby  where ds='101'  group by length(key) limit 10
 POSTHOOK: type: QUERY
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF clustergroupby)) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_FUNCTION length (TOK_TABLE_OR_COL key))) (TOK_SELEXPR (TOK_FUNCTION count 1))) (TOK_WHERE (= (TOK_TABLE_OR_COL ds) '101')) (TOK_GROUPBY (TOK_FUNCTION length (TOK_TABLE_OR_COL key))) (TOK_LIMIT 10)))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        clustergroupby 
+      Map Operator Tree:
           TableScan
             alias: clustergroupby
-            Filter Operator
-              predicate:
-                  expr: (ds = '101')
-                  type: boolean
-              Select Operator
-                expressions:
-                      expr: key
-                      type: string
-                outputColumnNames: key
-                Group By Operator
-                  aggregations:
-                        expr: count(1)
-                  bucketGroup: true
-                  keys:
-                        expr: length(key)
-                        type: int
-                  mode: hash
-                  outputColumnNames: _col0, _col1
-                  Reduce Output Operator
-                    key expressions:
-                          expr: _col0
-                          type: int
-                    sort order: +
-                    Map-reduce partition columns:
-                          expr: _col0
-                          type: int
-                    tag: -1
-                    value expressions:
-                          expr: _col1
-                          type: bigint
+            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+            Select Operator
+              expressions: length(key) (type: int)
+              outputColumnNames: _col0
+              Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+              Group By Operator
+                aggregations: count(1)
+                keys: _col0 (type: int)
+                mode: hash
+                outputColumnNames: _col0, _col1
+                Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+                Reduce Output Operator
+                  key expressions: _col0 (type: int)
+                  sort order: +
+                  Map-reduce partition columns: _col0 (type: int)
+                  Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+                  value expressions: _col1 (type: bigint)
       Reduce Operator Tree:
         Group By Operator
-          aggregations:
-                expr: count(VALUE._col0)
-          bucketGroup: false
-          keys:
-                expr: KEY._col0
-                type: int
+          aggregations: count(VALUE._col0)
+          keys: KEY._col0 (type: int)
           mode: mergepartial
           outputColumnNames: _col0, _col1
-          Select Operator
-            expressions:
-                  expr: _col0
-                  type: int
-                  expr: _col1
-                  type: bigint
-            outputColumnNames: _col0, _col1
-            Limit
-              File Output Operator
-                compressed: false
-                GlobalTableId: 0
-                table:
-                    input format: org.apache.hadoop.mapred.TextInputFormat
-                    output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+          Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+          Limit
+            Number of rows: 10
+            Statistics: Num rows: 10 Data size: 100 Basic stats: COMPLETE Column stats: NONE
+            File Output Operator
+              compressed: false
+              Statistics: Num rows: 10 Data size: 100 Basic stats: COMPLETE Column stats: NONE
+              table:
+                  input format: org.apache.hadoop.mapred.TextInputFormat
+                  output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                  serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: 10
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select length(key), count(1) from clustergroupby  where ds='101' group by length(key) limit 10
 PREHOOK: type: QUERY
+PREHOOK: Input: default@clustergroupby
 PREHOOK: Input: default@clustergroupby@ds=101
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-36-13_777_4853958758753332533/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select length(key), count(1) from clustergroupby  where ds='101' group by length(key) limit 10
 POSTHOOK: type: QUERY
+POSTHOOK: Input: default@clustergroupby
 POSTHOOK: Input: default@clustergroupby@ds=101
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-36-13_777_4853958758753332533/-mr-10000
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
+#### A masked pattern was here ####
 1	10
 2	74
 3	416
@@ -372,96 +300,67 @@ PREHOOK: type: QUERY
 POSTHOOK: query: explain
 select abs(length(key)), count(1) from clustergroupby  where ds='101'  group by abs(length(key)) limit 10
 POSTHOOK: type: QUERY
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF clustergroupby)) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_FUNCTION abs (TOK_FUNCTION length (TOK_TABLE_OR_COL key)))) (TOK_SELEXPR (TOK_FUNCTION count 1))) (TOK_WHERE (= (TOK_TABLE_OR_COL ds) '101')) (TOK_GROUPBY (TOK_FUNCTION abs (TOK_FUNCTION length (TOK_TABLE_OR_COL key)))) (TOK_LIMIT 10)))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        clustergroupby 
+      Map Operator Tree:
           TableScan
             alias: clustergroupby
-            Filter Operator
-              predicate:
-                  expr: (ds = '101')
-                  type: boolean
-              Select Operator
-                expressions:
-                      expr: key
-                      type: string
-                outputColumnNames: key
-                Group By Operator
-                  aggregations:
-                        expr: count(1)
-                  bucketGroup: true
-                  keys:
-                        expr: abs(length(key))
-                        type: int
-                  mode: hash
-                  outputColumnNames: _col0, _col1
-                  Reduce Output Operator
-                    key expressions:
-                          expr: _col0
-                          type: int
-                    sort order: +
-                    Map-reduce partition columns:
-                          expr: _col0
-                          type: int
-                    tag: -1
-                    value expressions:
-                          expr: _col1
-                          type: bigint
+            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+            Select Operator
+              expressions: abs(length(key)) (type: int)
+              outputColumnNames: _col0
+              Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+              Group By Operator
+                aggregations: count(1)
+                keys: _col0 (type: int)
+                mode: hash
+                outputColumnNames: _col0, _col1
+                Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+                Reduce Output Operator
+                  key expressions: _col0 (type: int)
+                  sort order: +
+                  Map-reduce partition columns: _col0 (type: int)
+                  Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+                  value expressions: _col1 (type: bigint)
       Reduce Operator Tree:
         Group By Operator
-          aggregations:
-                expr: count(VALUE._col0)
-          bucketGroup: false
-          keys:
-                expr: KEY._col0
-                type: int
+          aggregations: count(VALUE._col0)
+          keys: KEY._col0 (type: int)
           mode: mergepartial
           outputColumnNames: _col0, _col1
-          Select Operator
-            expressions:
-                  expr: _col0
-                  type: int
-                  expr: _col1
-                  type: bigint
-            outputColumnNames: _col0, _col1
-            Limit
-              File Output Operator
-                compressed: false
-                GlobalTableId: 0
-                table:
-                    input format: org.apache.hadoop.mapred.TextInputFormat
-                    output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+          Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+          Limit
+            Number of rows: 10
+            Statistics: Num rows: 10 Data size: 100 Basic stats: COMPLETE Column stats: NONE
+            File Output Operator
+              compressed: false
+              Statistics: Num rows: 10 Data size: 100 Basic stats: COMPLETE Column stats: NONE
+              table:
+                  input format: org.apache.hadoop.mapred.TextInputFormat
+                  output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                  serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: 10
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select abs(length(key)), count(1) from clustergroupby  where ds='101' group by abs(length(key)) limit 10
 PREHOOK: type: QUERY
+PREHOOK: Input: default@clustergroupby
 PREHOOK: Input: default@clustergroupby@ds=101
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-36-22_353_1148410217887255773/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select abs(length(key)), count(1) from clustergroupby  where ds='101' group by abs(length(key)) limit 10
 POSTHOOK: type: QUERY
+POSTHOOK: Input: default@clustergroupby
 POSTHOOK: Input: default@clustergroupby@ds=101
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-36-22_353_1148410217887255773/-mr-10000
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
+#### A masked pattern was here ####
 1	10
 2	74
 3	416
@@ -473,104 +372,71 @@ POSTHOOK: query: --constant--
 explain
 select key, count(1) from clustergroupby  where ds='101'  group by key,3 limit 10
 POSTHOOK: type: QUERY
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF clustergroupby)) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_TABLE_OR_COL key)) (TOK_SELEXPR (TOK_FUNCTION count 1))) (TOK_WHERE (= (TOK_TABLE_OR_COL ds) '101')) (TOK_GROUPBY (TOK_TABLE_OR_COL key) 3) (TOK_LIMIT 10)))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        clustergroupby 
+      Map Operator Tree:
           TableScan
             alias: clustergroupby
-            Filter Operator
-              predicate:
-                  expr: (ds = '101')
-                  type: boolean
-              Select Operator
-                expressions:
-                      expr: key
-                      type: string
-                outputColumnNames: key
-                Group By Operator
-                  aggregations:
-                        expr: count(1)
-                  bucketGroup: true
-                  keys:
-                        expr: key
-                        type: string
-                        expr: 3
-                        type: int
-                  mode: hash
-                  outputColumnNames: _col0, _col1, _col2
-                  Reduce Output Operator
-                    key expressions:
-                          expr: _col0
-                          type: string
-                          expr: _col1
-                          type: int
-                    sort order: ++
-                    Map-reduce partition columns:
-                          expr: _col0
-                          type: string
-                          expr: _col1
-                          type: int
-                    tag: -1
-                    value expressions:
-                          expr: _col2
-                          type: bigint
+            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+            Select Operator
+              expressions: key (type: string)
+              outputColumnNames: _col0
+              Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+              Group By Operator
+                aggregations: count(1)
+                keys: _col0 (type: string), 3 (type: int)
+                mode: hash
+                outputColumnNames: _col0, _col1, _col2
+                Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+                Reduce Output Operator
+                  key expressions: _col0 (type: string), _col1 (type: int)
+                  sort order: ++
+                  Map-reduce partition columns: _col0 (type: string), _col1 (type: int)
+                  Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+                  value expressions: _col2 (type: bigint)
       Reduce Operator Tree:
         Group By Operator
-          aggregations:
-                expr: count(VALUE._col0)
-          bucketGroup: false
-          keys:
-                expr: KEY._col0
-                type: string
-                expr: KEY._col1
-                type: int
+          aggregations: count(VALUE._col0)
+          keys: KEY._col0 (type: string), KEY._col1 (type: int)
           mode: mergepartial
           outputColumnNames: _col0, _col1, _col2
+          Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
           Select Operator
-            expressions:
-                  expr: _col0
-                  type: string
-                  expr: _col2
-                  type: bigint
+            expressions: _col0 (type: string), _col2 (type: bigint)
             outputColumnNames: _col0, _col1
+            Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
             Limit
+              Number of rows: 10
+              Statistics: Num rows: 10 Data size: 100 Basic stats: COMPLETE Column stats: NONE
               File Output Operator
                 compressed: false
-                GlobalTableId: 0
+                Statistics: Num rows: 10 Data size: 100 Basic stats: COMPLETE Column stats: NONE
                 table:
                     input format: org.apache.hadoop.mapred.TextInputFormat
                     output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                    serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: 10
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select key, count(1) from clustergroupby  where ds='101' group by key,3 limit 10
 PREHOOK: type: QUERY
+PREHOOK: Input: default@clustergroupby
 PREHOOK: Input: default@clustergroupby@ds=101
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-36-29_836_2726844280049537094/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select key, count(1) from clustergroupby  where ds='101' group by key,3 limit 10
 POSTHOOK: type: QUERY
+POSTHOOK: Input: default@clustergroupby
 POSTHOOK: Input: default@clustergroupby@ds=101
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-36-29_836_2726844280049537094/-mr-10000
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
+#### A masked pattern was here ####
 0	3
 10	1
 100	2
@@ -589,101 +455,67 @@ POSTHOOK: query: --subquery--
 explain
 select key, count(1) from (select value as key, key as value from clustergroupby where ds='101')subq group by key limit 10
 POSTHOOK: type: QUERY
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_SUBQUERY (TOK_QUERY (TOK_FROM (TOK_TABREF clustergroupby)) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_TABLE_OR_COL value) key) (TOK_SELEXPR (TOK_TABLE_OR_COL key) value)) (TOK_WHERE (= (TOK_TABLE_OR_COL ds) '101')))) subq)) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_TABLE_OR_COL key)) (TOK_SELEXPR (TOK_FUNCTION count 1))) (TOK_GROUPBY (TOK_TABLE_OR_COL key)) (TOK_LIMIT 10)))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        subq:clustergroupby 
+      Map Operator Tree:
           TableScan
             alias: clustergroupby
-            Filter Operator
-              predicate:
-                  expr: (ds = '101')
-                  type: boolean
-              Select Operator
-                expressions:
-                      expr: value
-                      type: string
-                outputColumnNames: _col0
-                Select Operator
-                  expressions:
-                        expr: _col0
-                        type: string
-                  outputColumnNames: _col0
-                  Group By Operator
-                    aggregations:
-                          expr: count(1)
-                    bucketGroup: false
-                    keys:
-                          expr: _col0
-                          type: string
-                    mode: hash
-                    outputColumnNames: _col0, _col1
-                    Reduce Output Operator
-                      key expressions:
-                            expr: _col0
-                            type: string
-                      sort order: +
-                      Map-reduce partition columns:
-                            expr: _col0
-                            type: string
-                      tag: -1
-                      value expressions:
-                            expr: _col1
-                            type: bigint
+            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+            Select Operator
+              expressions: value (type: string)
+              outputColumnNames: _col0
+              Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+              Group By Operator
+                aggregations: count(1)
+                keys: _col0 (type: string)
+                mode: hash
+                outputColumnNames: _col0, _col1
+                Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+                Reduce Output Operator
+                  key expressions: _col0 (type: string)
+                  sort order: +
+                  Map-reduce partition columns: _col0 (type: string)
+                  Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+                  value expressions: _col1 (type: bigint)
       Reduce Operator Tree:
         Group By Operator
-          aggregations:
-                expr: count(VALUE._col0)
-          bucketGroup: false
-          keys:
-                expr: KEY._col0
-                type: string
+          aggregations: count(VALUE._col0)
+          keys: KEY._col0 (type: string)
           mode: mergepartial
           outputColumnNames: _col0, _col1
-          Select Operator
-            expressions:
-                  expr: _col0
-                  type: string
-                  expr: _col1
-                  type: bigint
-            outputColumnNames: _col0, _col1
-            Limit
-              File Output Operator
-                compressed: false
-                GlobalTableId: 0
-                table:
-                    input format: org.apache.hadoop.mapred.TextInputFormat
-                    output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+          Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+          Limit
+            Number of rows: 10
+            Statistics: Num rows: 10 Data size: 100 Basic stats: COMPLETE Column stats: NONE
+            File Output Operator
+              compressed: false
+              Statistics: Num rows: 10 Data size: 100 Basic stats: COMPLETE Column stats: NONE
+              table:
+                  input format: org.apache.hadoop.mapred.TextInputFormat
+                  output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                  serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: 10
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select key, count(1) from (select value as key, key as value from clustergroupby where ds='101')subq group by key limit 10
 PREHOOK: type: QUERY
+PREHOOK: Input: default@clustergroupby
 PREHOOK: Input: default@clustergroupby@ds=101
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-36-36_869_6506961229190926826/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select key, count(1) from (select value as key, key as value from clustergroupby where ds='101')subq group by key limit 10
 POSTHOOK: type: QUERY
+POSTHOOK: Input: default@clustergroupby
 POSTHOOK: Input: default@clustergroupby@ds=101
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-36-36_869_6506961229190926826/-mr-10000
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
+#### A masked pattern was here ####
 val_0	3
 val_10	1
 val_100	2
@@ -700,93 +532,66 @@ PREHOOK: type: QUERY
 POSTHOOK: query: explain
 select key, count(1) from clustergroupby  group by key
 POSTHOOK: type: QUERY
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF clustergroupby)) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_TABLE_OR_COL key)) (TOK_SELEXPR (TOK_FUNCTION count 1))) (TOK_GROUPBY (TOK_TABLE_OR_COL key))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        clustergroupby 
+      Map Operator Tree:
           TableScan
             alias: clustergroupby
+            Statistics: Num rows: 1000 Data size: 10624 Basic stats: COMPLETE Column stats: NONE
             Select Operator
-              expressions:
-                    expr: key
-                    type: string
-              outputColumnNames: key
+              expressions: key (type: string)
+              outputColumnNames: _col0
+              Statistics: Num rows: 1000 Data size: 10624 Basic stats: COMPLETE Column stats: NONE
               Group By Operator
-                aggregations:
-                      expr: count(1)
-                bucketGroup: false
-                keys:
-                      expr: key
-                      type: string
+                aggregations: count(1)
+                keys: _col0 (type: string)
                 mode: hash
                 outputColumnNames: _col0, _col1
+                Statistics: Num rows: 1000 Data size: 10624 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
-                  key expressions:
-                        expr: _col0
-                        type: string
+                  key expressions: _col0 (type: string)
                   sort order: +
-                  Map-reduce partition columns:
-                        expr: _col0
-                        type: string
-                  tag: -1
-                  value expressions:
-                        expr: _col1
-                        type: bigint
+                  Map-reduce partition columns: _col0 (type: string)
+                  Statistics: Num rows: 1000 Data size: 10624 Basic stats: COMPLETE Column stats: NONE
+                  value expressions: _col1 (type: bigint)
       Reduce Operator Tree:
         Group By Operator
-          aggregations:
-                expr: count(VALUE._col0)
-          bucketGroup: false
-          keys:
-                expr: KEY._col0
-                type: string
+          aggregations: count(VALUE._col0)
+          keys: KEY._col0 (type: string)
           mode: mergepartial
           outputColumnNames: _col0, _col1
-          Select Operator
-            expressions:
-                  expr: _col0
-                  type: string
-                  expr: _col1
-                  type: bigint
-            outputColumnNames: _col0, _col1
-            File Output Operator
-              compressed: false
-              GlobalTableId: 0
-              table:
-                  input format: org.apache.hadoop.mapred.TextInputFormat
-                  output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+          Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+          File Output Operator
+            compressed: false
+            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+            table:
+                input format: org.apache.hadoop.mapred.TextInputFormat
+                output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select key, count(1) from clustergroupby  group by key
 PREHOOK: type: QUERY
+PREHOOK: Input: default@clustergroupby
 PREHOOK: Input: default@clustergroupby@ds=100
 PREHOOK: Input: default@clustergroupby@ds=101
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-36-45_158_7554312247658259364/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select key, count(1) from clustergroupby  group by key
 POSTHOOK: type: QUERY
+POSTHOOK: Input: default@clustergroupby
 POSTHOOK: Input: default@clustergroupby@ds=100
 POSTHOOK: Input: default@clustergroupby@ds=101
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-36-45_158_7554312247658259364/-mr-10000
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
+#### A masked pattern was here ####
 0	6
 10	2
 100	4
@@ -1102,87 +907,76 @@ PREHOOK: type: QUERY
 POSTHOOK: query: explain
 select key, count(1) from clustergroupby  group by key, 3
 POSTHOOK: type: QUERY
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF clustergroupby)) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_TABLE_OR_COL key)) (TOK_SELEXPR (TOK_FUNCTION count 1))) (TOK_GROUPBY (TOK_TABLE_OR_COL key) 3)))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        clustergroupby 
+      Map Operator Tree:
           TableScan
             alias: clustergroupby
+            Statistics: Num rows: 1000 Data size: 10624 Basic stats: COMPLETE Column stats: NONE
             Select Operator
-              expressions:
-                    expr: key
-                    type: string
-              outputColumnNames: key
+              expressions: key (type: string)
+              outputColumnNames: _col0
+              Statistics: Num rows: 1000 Data size: 10624 Basic stats: COMPLETE Column stats: NONE
               Group By Operator
-                aggregations:
-                      expr: count(1)
-                bucketGroup: false
-                keys:
-                      expr: key
-                      type: string
-                      expr: 3
-                      type: int
+                aggregations: count(1)
+                keys: _col0 (type: string), 3 (type: int)
                 mode: hash
                 outputColumnNames: _col0, _col1, _col2
+                Statistics: Num rows: 1000 Data size: 10624 Basic stats: COMPLETE Column stats: NONE
                 Reduce Output Operator
-                  key expressions:
-                        expr: _col0
-                        type: string
-                        expr: _col1
-                        type: int
+                  key expressions: _col0 (type: string), _col1 (type: int)
                   sort order: ++
-                  Map-reduce partition columns:
-                        expr: _col0
-                        type: string
-                        expr: _col1
-                        type: int
-                  tag: -1
-                  value expressions:
-                        expr: _col2
-                        type: bigint
+                  Map-reduce partition columns: _col0 (type: string), _col1 (type: int)
+                  Statistics: Num rows: 1000 Data size: 10624 Basic stats: COMPLETE Column stats: NONE
+                  value expressions: _col2 (type: bigint)
       Reduce Operator Tree:
         Group By Operator
-          aggregations:
-                expr: count(VALUE._col0)
-          bucketGroup: false
-          keys:
-                expr: KEY._col0
-                type: string
-                expr: KEY._col1
-                type: int
+          aggregations: count(VALUE._col0)
+          keys: KEY._col0 (type: string), KEY._col1 (type: int)
           mode: mergepartial
           outputColumnNames: _col0, _col1, _col2
+          Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
           Select Operator
-            expressions:
-                  expr: _col0
-                  type: string
-                  expr: _col2
-                  type: bigint
+            expressions: _col0 (type: string), _col2 (type: bigint)
             outputColumnNames: _col0, _col1
+            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
             File Output Operator
               compressed: false
-              GlobalTableId: 0
+              Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
               table:
                   input format: org.apache.hadoop.mapred.TextInputFormat
                   output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                  serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
+      Processor Tree:
+        ListSink
 
-
+PREHOOK: query: -- number of buckets cannot be changed, so drop the table
+drop table clustergroupby
+PREHOOK: type: DROPTABLE
+PREHOOK: Input: default@clustergroupby
+PREHOOK: Output: default@clustergroupby
+POSTHOOK: query: -- number of buckets cannot be changed, so drop the table
+drop table clustergroupby
+POSTHOOK: type: DROPTABLE
+POSTHOOK: Input: default@clustergroupby
+POSTHOOK: Output: default@clustergroupby
+PREHOOK: query: create table clustergroupby(key string, value string) partitioned by(ds string)
+PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:default
+PREHOOK: Output: default@clustergroupby
+POSTHOOK: query: create table clustergroupby(key string, value string) partitioned by(ds string)
+POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:default
+POSTHOOK: Output: default@clustergroupby
 PREHOOK: query: --sort columns--
 alter table clustergroupby clustered by (value) sorted by (key, value) into 1 buckets
 PREHOOK: type: ALTERTABLE_CLUSTER_SORT
@@ -1193,23 +987,22 @@ alter table clustergroupby clustered by (value) sorted by (key, value) into 1 bu
 POSTHOOK: type: ALTERTABLE_CLUSTER_SORT
 POSTHOOK: Input: default@clustergroupby
 POSTHOOK: Output: default@clustergroupby
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
 PREHOOK: query: describe extended clustergroupby
 PREHOOK: type: DESCTABLE
+PREHOOK: Input: default@clustergroupby
 POSTHOOK: query: describe extended clustergroupby
 POSTHOOK: type: DESCTABLE
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-key	string	
-value	string	
-ds	string	
+POSTHOOK: Input: default@clustergroupby
+key                 	string              	                    
+value               	string              	                    
+ds                  	string              	                    
 	 	 
-Detailed Table Information	Table(tableName:clustergroupby, dbName:default, owner:heyongqiang, createTime:1290108934, lastAccessTime:0, retention:0, sd:StorageDescriptor(cols:[FieldSchema(name:key, type:string, comment:null), FieldSchema(name:value, type:string, comment:null), FieldSchema(name:ds, type:string, comment:null)], location:pfile:/Users/heyongqiang/Documents/workspace/Hive-2/build/ql/test/data/warehouse/clustergroupby, inputFormat:org.apache.hadoop.mapred.TextInputFormat, outputFormat:org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat, compressed:false, numBuckets:1, serdeInfo:SerDeInfo(name:null, serializationLib:org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe, parameters:{serialization.format=1}), bucketCols:[value], sortCols:[Order(col:key, order:1), Order(col:value, order:1)], parameters:{}), partitionKeys:[FieldSchema(name:ds, type:string, comment:null)], parameters:{numPartitions=2, numFiles=2, last_modified_by=heyongqiang, last_modified_time=1290109014, transient_lastDdlTime=1290109014, numRows=1000, totalSize=11624}, viewOriginalText:null, viewExpandedText:null, tableType:MANAGED_TABLE)	
+# Partition Information	 	 
+# col_name            	data_type           	comment             
+	 	 
+ds                  	string              	                    
+	 	 
+#### A masked pattern was here ####
 PREHOOK: query: insert overwrite table clustergroupby partition (ds='102') select key, value from src distribute by value sort by key, value
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src
@@ -1218,10 +1011,6 @@ POSTHOOK: query: insert overwrite table clustergroupby partition (ds='102') sele
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@src
 POSTHOOK: Output: default@clustergroupby@ds=102
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
 POSTHOOK: Lineage: clustergroupby PARTITION(ds=102).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
 POSTHOOK: Lineage: clustergroupby PARTITION(ds=102).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
 PREHOOK: query: explain
@@ -1230,100 +1019,68 @@ PREHOOK: type: QUERY
 POSTHOOK: query: explain
 select key, count(1) from clustergroupby  where ds='102'  group by key limit 10
 POSTHOOK: type: QUERY
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=102).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=102).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF clustergroupby)) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_TABLE_OR_COL key)) (TOK_SELEXPR (TOK_FUNCTION count 1))) (TOK_WHERE (= (TOK_TABLE_OR_COL ds) '102')) (TOK_GROUPBY (TOK_TABLE_OR_COL key)) (TOK_LIMIT 10)))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        clustergroupby 
+      Map Operator Tree:
           TableScan
             alias: clustergroupby
-            Filter Operator
-              predicate:
-                  expr: (ds = '102')
-                  type: boolean
-              Select Operator
-                expressions:
-                      expr: key
-                      type: string
-                outputColumnNames: key
-                Group By Operator
-                  aggregations:
-                        expr: count(1)
-                  bucketGroup: true
-                  keys:
-                        expr: key
-                        type: string
-                  mode: hash
-                  outputColumnNames: _col0, _col1
-                  Reduce Output Operator
-                    key expressions:
-                          expr: _col0
-                          type: string
-                    sort order: +
-                    Map-reduce partition columns:
-                          expr: _col0
-                          type: string
-                    tag: -1
-                    value expressions:
-                          expr: _col1
-                          type: bigint
+            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+            Select Operator
+              expressions: key (type: string)
+              outputColumnNames: _col0
+              Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+              Group By Operator
+                aggregations: count(1)
+                bucketGroup: true
+                keys: _col0 (type: string)
+                mode: hash
+                outputColumnNames: _col0, _col1
+                Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+                Reduce Output Operator
+                  key expressions: _col0 (type: string)
+                  sort order: +
+                  Map-reduce partition columns: _col0 (type: string)
+                  Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+                  value expressions: _col1 (type: bigint)
       Reduce Operator Tree:
         Group By Operator
-          aggregations:
-                expr: count(VALUE._col0)
-          bucketGroup: false
-          keys:
-                expr: KEY._col0
-                type: string
+          aggregations: count(VALUE._col0)
+          keys: KEY._col0 (type: string)
           mode: mergepartial
           outputColumnNames: _col0, _col1
-          Select Operator
-            expressions:
-                  expr: _col0
-                  type: string
-                  expr: _col1
-                  type: bigint
-            outputColumnNames: _col0, _col1
-            Limit
-              File Output Operator
-                compressed: false
-                GlobalTableId: 0
-                table:
-                    input format: org.apache.hadoop.mapred.TextInputFormat
-                    output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+          Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+          Limit
+            Number of rows: 10
+            Statistics: Num rows: 10 Data size: 100 Basic stats: COMPLETE Column stats: NONE
+            File Output Operator
+              compressed: false
+              Statistics: Num rows: 10 Data size: 100 Basic stats: COMPLETE Column stats: NONE
+              table:
+                  input format: org.apache.hadoop.mapred.TextInputFormat
+                  output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                  serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: 10
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select key, count(1) from clustergroupby  where ds='102' group by key limit 10
 PREHOOK: type: QUERY
+PREHOOK: Input: default@clustergroupby
 PREHOOK: Input: default@clustergroupby@ds=102
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-37-04_173_5662986070533466247/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select key, count(1) from clustergroupby  where ds='102' group by key limit 10
 POSTHOOK: type: QUERY
+POSTHOOK: Input: default@clustergroupby
 POSTHOOK: Input: default@clustergroupby@ds=102
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-37-04_173_5662986070533466247/-mr-10000
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=102).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=102).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
+#### A masked pattern was here ####
 0	3
 10	1
 100	2
@@ -1340,100 +1097,67 @@ PREHOOK: type: QUERY
 POSTHOOK: query: explain
 select value, count(1) from clustergroupby  where ds='102'  group by value limit 10
 POSTHOOK: type: QUERY
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=102).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=102).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF clustergroupby)) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_TABLE_OR_COL value)) (TOK_SELEXPR (TOK_FUNCTION count 1))) (TOK_WHERE (= (TOK_TABLE_OR_COL ds) '102')) (TOK_GROUPBY (TOK_TABLE_OR_COL value)) (TOK_LIMIT 10)))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        clustergroupby 
+      Map Operator Tree:
           TableScan
             alias: clustergroupby
-            Filter Operator
-              predicate:
-                  expr: (ds = '102')
-                  type: boolean
-              Select Operator
-                expressions:
-                      expr: value
-                      type: string
-                outputColumnNames: value
-                Group By Operator
-                  aggregations:
-                        expr: count(1)
-                  bucketGroup: false
-                  keys:
-                        expr: value
-                        type: string
-                  mode: hash
-                  outputColumnNames: _col0, _col1
-                  Reduce Output Operator
-                    key expressions:
-                          expr: _col0
-                          type: string
-                    sort order: +
-                    Map-reduce partition columns:
-                          expr: _col0
-                          type: string
-                    tag: -1
-                    value expressions:
-                          expr: _col1
-                          type: bigint
+            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+            Select Operator
+              expressions: value (type: string)
+              outputColumnNames: _col0
+              Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+              Group By Operator
+                aggregations: count(1)
+                keys: _col0 (type: string)
+                mode: hash
+                outputColumnNames: _col0, _col1
+                Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+                Reduce Output Operator
+                  key expressions: _col0 (type: string)
+                  sort order: +
+                  Map-reduce partition columns: _col0 (type: string)
+                  Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+                  value expressions: _col1 (type: bigint)
       Reduce Operator Tree:
         Group By Operator
-          aggregations:
-                expr: count(VALUE._col0)
-          bucketGroup: false
-          keys:
-                expr: KEY._col0
-                type: string
+          aggregations: count(VALUE._col0)
+          keys: KEY._col0 (type: string)
           mode: mergepartial
           outputColumnNames: _col0, _col1
-          Select Operator
-            expressions:
-                  expr: _col0
-                  type: string
-                  expr: _col1
-                  type: bigint
-            outputColumnNames: _col0, _col1
-            Limit
-              File Output Operator
-                compressed: false
-                GlobalTableId: 0
-                table:
-                    input format: org.apache.hadoop.mapred.TextInputFormat
-                    output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+          Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+          Limit
+            Number of rows: 10
+            Statistics: Num rows: 10 Data size: 100 Basic stats: COMPLETE Column stats: NONE
+            File Output Operator
+              compressed: false
+              Statistics: Num rows: 10 Data size: 100 Basic stats: COMPLETE Column stats: NONE
+              table:
+                  input format: org.apache.hadoop.mapred.TextInputFormat
+                  output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                  serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: 10
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select value, count(1) from clustergroupby  where ds='102'  group by value limit 10
 PREHOOK: type: QUERY
+PREHOOK: Input: default@clustergroupby
 PREHOOK: Input: default@clustergroupby@ds=102
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-37-11_984_9094618456601035974/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select value, count(1) from clustergroupby  where ds='102'  group by value limit 10
 POSTHOOK: type: QUERY
+POSTHOOK: Input: default@clustergroupby
 POSTHOOK: Input: default@clustergroupby@ds=102
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-37-11_984_9094618456601035974/-mr-10000
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=102).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=102).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
+#### A masked pattern was here ####
 val_0	3
 val_10	1
 val_100	2
@@ -1450,110 +1174,72 @@ PREHOOK: type: QUERY
 POSTHOOK: query: explain
 select key, count(1) from clustergroupby  where ds='102'  group by key, value limit 10
 POSTHOOK: type: QUERY
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=102).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=102).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF clustergroupby)) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_TABLE_OR_COL key)) (TOK_SELEXPR (TOK_FUNCTION count 1))) (TOK_WHERE (= (TOK_TABLE_OR_COL ds) '102')) (TOK_GROUPBY (TOK_TABLE_OR_COL key) (TOK_TABLE_OR_COL value)) (TOK_LIMIT 10)))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        clustergroupby 
+      Map Operator Tree:
           TableScan
             alias: clustergroupby
-            Filter Operator
-              predicate:
-                  expr: (ds = '102')
-                  type: boolean
-              Select Operator
-                expressions:
-                      expr: key
-                      type: string
-                      expr: value
-                      type: string
-                outputColumnNames: key, value
-                Group By Operator
-                  aggregations:
-                        expr: count(1)
-                  bucketGroup: true
-                  keys:
-                        expr: key
-                        type: string
-                        expr: value
-                        type: string
-                  mode: hash
-                  outputColumnNames: _col0, _col1, _col2
-                  Reduce Output Operator
-                    key expressions:
-                          expr: _col0
-                          type: string
-                          expr: _col1
-                          type: string
-                    sort order: ++
-                    Map-reduce partition columns:
-                          expr: _col0
-                          type: string
-                          expr: _col1
-                          type: string
-                    tag: -1
-                    value expressions:
-                          expr: _col2
-                          type: bigint
+            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+            Select Operator
+              expressions: key (type: string), value (type: string)
+              outputColumnNames: _col0, _col1
+              Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+              Group By Operator
+                aggregations: count(1)
+                bucketGroup: true
+                keys: _col0 (type: string), _col1 (type: string)
+                mode: hash
+                outputColumnNames: _col0, _col1, _col2
+                Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+                Reduce Output Operator
+                  key expressions: _col0 (type: string), _col1 (type: string)
+                  sort order: ++
+                  Map-reduce partition columns: _col0 (type: string), _col1 (type: string)
+                  Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+                  value expressions: _col2 (type: bigint)
       Reduce Operator Tree:
         Group By Operator
-          aggregations:
-                expr: count(VALUE._col0)
-          bucketGroup: false
-          keys:
-                expr: KEY._col0
-                type: string
-                expr: KEY._col1
-                type: string
+          aggregations: count(VALUE._col0)
+          keys: KEY._col0 (type: string), KEY._col1 (type: string)
           mode: mergepartial
           outputColumnNames: _col0, _col1, _col2
+          Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
           Select Operator
-            expressions:
-                  expr: _col0
-                  type: string
-                  expr: _col2
-                  type: bigint
+            expressions: _col0 (type: string), _col2 (type: bigint)
             outputColumnNames: _col0, _col1
+            Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
             Limit
+              Number of rows: 10
+              Statistics: Num rows: 10 Data size: 100 Basic stats: COMPLETE Column stats: NONE
               File Output Operator
                 compressed: false
-                GlobalTableId: 0
+                Statistics: Num rows: 10 Data size: 100 Basic stats: COMPLETE Column stats: NONE
                 table:
                     input format: org.apache.hadoop.mapred.TextInputFormat
                     output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                    serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: 10
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select key, count(1) from clustergroupby  where ds='102'  group by key, value limit 10
 PREHOOK: type: QUERY
+PREHOOK: Input: default@clustergroupby
 PREHOOK: Input: default@clustergroupby@ds=102
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-37-18_617_5093814006573436611/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select key, count(1) from clustergroupby  where ds='102'  group by key, value limit 10
 POSTHOOK: type: QUERY
+POSTHOOK: Input: default@clustergroupby
 POSTHOOK: Input: default@clustergroupby@ds=102
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-37-18_617_5093814006573436611/-mr-10000
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=102).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=102).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
+#### A masked pattern was here ####
 0	3
 10	1
 100	2
@@ -1564,6 +1250,24 @@ POSTHOOK: Lineage: clustergroupby PARTITION(ds=102).value SIMPLE [(src)src.Field
 111	1
 113	2
 114	1
+PREHOOK: query: -- number of buckets cannot be changed, so drop the table
+drop table clustergroupby
+PREHOOK: type: DROPTABLE
+PREHOOK: Input: default@clustergroupby
+PREHOOK: Output: default@clustergroupby
+POSTHOOK: query: -- number of buckets cannot be changed, so drop the table
+drop table clustergroupby
+POSTHOOK: type: DROPTABLE
+POSTHOOK: Input: default@clustergroupby
+POSTHOOK: Output: default@clustergroupby
+PREHOOK: query: create table clustergroupby(key string, value string) partitioned by(ds string)
+PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:default
+PREHOOK: Output: default@clustergroupby
+POSTHOOK: query: create table clustergroupby(key string, value string) partitioned by(ds string)
+POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:default
+POSTHOOK: Output: default@clustergroupby
 PREHOOK: query: alter table clustergroupby clustered by (value, key) sorted by (key) into 1 buckets
 PREHOOK: type: ALTERTABLE_CLUSTER_SORT
 PREHOOK: Input: default@clustergroupby
@@ -1572,27 +1276,22 @@ POSTHOOK: query: alter table clustergroupby clustered by (value, key) sorted by 
 POSTHOOK: type: ALTERTABLE_CLUSTER_SORT
 POSTHOOK: Input: default@clustergroupby
 POSTHOOK: Output: default@clustergroupby
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=102).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=102).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
 PREHOOK: query: describe extended clustergroupby
 PREHOOK: type: DESCTABLE
+PREHOOK: Input: default@clustergroupby
 POSTHOOK: query: describe extended clustergroupby
 POSTHOOK: type: DESCTABLE
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=102).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=102).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-key	string	
-value	string	
-ds	string	
+POSTHOOK: Input: default@clustergroupby
+key                 	string              	                    
+value               	string              	                    
+ds                  	string              	                    
 	 	 
-Detailed Table Information	Table(tableName:clustergroupby, dbName:default, owner:heyongqiang, createTime:1290108934, lastAccessTime:0, retention:0, sd:StorageDescriptor(cols:[FieldSchema(name:key, type:string, comment:null), FieldSchema(name:value, type:string, comment:null), FieldSchema(name:ds, type:string, comment:null)], location:pfile:/Users/heyongqiang/Documents/workspace/Hive-2/build/ql/test/data/warehouse/clustergroupby, inputFormat:org.apache.hadoop.mapred.TextInputFormat, outputFormat:org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat, compressed:false, numBuckets:1, serdeInfo:SerDeInfo(name:null, serializationLib:org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe, parameters:{serialization.format=1}), bucketCols:[value, key], sortCols:[Order(col:key, order:1)], parameters:{}), partitionKeys:[FieldSchema(name:ds, type:string, comment:null)], parameters:{numPartitions=3, numFiles=3, last_modified_by=heyongqiang, last_modified_time=1290109047, transient_lastDdlTime=1290109047, numRows=1500, totalSize=17436}, viewOriginalText:null, viewExpandedText:null, tableType:MANAGED_TABLE)	
+# Partition Information	 	 
+# col_name            	data_type           	comment             
+	 	 
+ds                  	string              	                    
+	 	 
+#### A masked pattern was here ####
 PREHOOK: query: insert overwrite table clustergroupby partition (ds='103') select key, value from src distribute by value, key sort by key
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src
@@ -1601,12 +1300,6 @@ POSTHOOK: query: insert overwrite table clustergroupby partition (ds='103') sele
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@src
 POSTHOOK: Output: default@clustergroupby@ds=103
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=102).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=102).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
 POSTHOOK: Lineage: clustergroupby PARTITION(ds=103).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
 POSTHOOK: Lineage: clustergroupby PARTITION(ds=103).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
 PREHOOK: query: explain
@@ -1615,104 +1308,68 @@ PREHOOK: type: QUERY
 POSTHOOK: query: explain
 select key, count(1) from clustergroupby  where ds='103'  group by key limit 10
 POSTHOOK: type: QUERY
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=102).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=102).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=103).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=103).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF clustergroupby)) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_TABLE_OR_COL key)) (TOK_SELEXPR (TOK_FUNCTION count 1))) (TOK_WHERE (= (TOK_TABLE_OR_COL ds) '103')) (TOK_GROUPBY (TOK_TABLE_OR_COL key)) (TOK_LIMIT 10)))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        clustergroupby 
+      Map Operator Tree:
           TableScan
             alias: clustergroupby
-            Filter Operator
-              predicate:
-                  expr: (ds = '103')
-                  type: boolean
-              Select Operator
-                expressions:
-                      expr: key
-                      type: string
-                outputColumnNames: key
-                Group By Operator
-                  aggregations:
-                        expr: count(1)
-                  bucketGroup: true
-                  keys:
-                        expr: key
-                        type: string
-                  mode: hash
-                  outputColumnNames: _col0, _col1
-                  Reduce Output Operator
-                    key expressions:
-                          expr: _col0
-                          type: string
-                    sort order: +
-                    Map-reduce partition columns:
-                          expr: _col0
-                          type: string
-                    tag: -1
-                    value expressions:
-                          expr: _col1
-                          type: bigint
+            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+            Select Operator
+              expressions: key (type: string)
+              outputColumnNames: _col0
+              Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+              Group By Operator
+                aggregations: count(1)
+                bucketGroup: true
+                keys: _col0 (type: string)
+                mode: hash
+                outputColumnNames: _col0, _col1
+                Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+                Reduce Output Operator
+                  key expressions: _col0 (type: string)
+                  sort order: +
+                  Map-reduce partition columns: _col0 (type: string)
+                  Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+                  value expressions: _col1 (type: bigint)
       Reduce Operator Tree:
         Group By Operator
-          aggregations:
-                expr: count(VALUE._col0)
-          bucketGroup: false
-          keys:
-                expr: KEY._col0
-                type: string
+          aggregations: count(VALUE._col0)
+          keys: KEY._col0 (type: string)
           mode: mergepartial
           outputColumnNames: _col0, _col1
-          Select Operator
-            expressions:
-                  expr: _col0
-                  type: string
-                  expr: _col1
-                  type: bigint
-            outputColumnNames: _col0, _col1
-            Limit
-              File Output Operator
-                compressed: false
-                GlobalTableId: 0
-                table:
-                    input format: org.apache.hadoop.mapred.TextInputFormat
-                    output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+          Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+          Limit
+            Number of rows: 10
+            Statistics: Num rows: 10 Data size: 100 Basic stats: COMPLETE Column stats: NONE
+            File Output Operator
+              compressed: false
+              Statistics: Num rows: 10 Data size: 100 Basic stats: COMPLETE Column stats: NONE
+              table:
+                  input format: org.apache.hadoop.mapred.TextInputFormat
+                  output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                  serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: 10
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select key, count(1) from clustergroupby  where ds='103' group by key limit 10
 PREHOOK: type: QUERY
+PREHOOK: Input: default@clustergroupby
 PREHOOK: Input: default@clustergroupby@ds=103
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-37-38_066_2359801468488363119/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select key, count(1) from clustergroupby  where ds='103' group by key limit 10
 POSTHOOK: type: QUERY
+POSTHOOK: Input: default@clustergroupby
 POSTHOOK: Input: default@clustergroupby@ds=103
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-37-38_066_2359801468488363119/-mr-10000
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=102).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=102).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=103).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=103).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
+#### A masked pattern was here ####
 0	3
 10	1
 100	2
@@ -1729,114 +1386,71 @@ PREHOOK: type: QUERY
 POSTHOOK: query: explain
 select key, count(1) from clustergroupby  where ds='103'  group by value, key limit 10
 POSTHOOK: type: QUERY
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=102).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=102).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=103).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=103).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF clustergroupby)) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_TABLE_OR_COL key)) (TOK_SELEXPR (TOK_FUNCTION count 1))) (TOK_WHERE (= (TOK_TABLE_OR_COL ds) '103')) (TOK_GROUPBY (TOK_TABLE_OR_COL value) (TOK_TABLE_OR_COL key)) (TOK_LIMIT 10)))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        clustergroupby 
+      Map Operator Tree:
           TableScan
             alias: clustergroupby
-            Filter Operator
-              predicate:
-                  expr: (ds = '103')
-                  type: boolean
-              Select Operator
-                expressions:
-                      expr: value
-                      type: string
-                      expr: key
-                      type: string
-                outputColumnNames: value, key
-                Group By Operator
-                  aggregations:
-                        expr: count(1)
-                  bucketGroup: false
-                  keys:
-                        expr: value
-                        type: string
-                        expr: key
-                        type: string
-                  mode: hash
-                  outputColumnNames: _col0, _col1, _col2
-                  Reduce Output Operator
-                    key expressions:
-                          expr: _col0
-                          type: string
-                          expr: _col1
-                          type: string
-                    sort order: ++
-                    Map-reduce partition columns:
-                          expr: _col0
-                          type: string
-                          expr: _col1
-                          type: string
-                    tag: -1
-                    value expressions:
-                          expr: _col2
-                          type: bigint
+            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+            Select Operator
+              expressions: value (type: string), key (type: string)
+              outputColumnNames: _col0, _col1
+              Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+              Group By Operator
+                aggregations: count(1)
+                keys: _col0 (type: string), _col1 (type: string)
+                mode: hash
+                outputColumnNames: _col0, _col1, _col2
+                Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+                Reduce Output Operator
+                  key expressions: _col0 (type: string), _col1 (type: string)
+                  sort order: ++
+                  Map-reduce partition columns: _col0 (type: string), _col1 (type: string)
+                  Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+                  value expressions: _col2 (type: bigint)
       Reduce Operator Tree:
         Group By Operator
-          aggregations:
-                expr: count(VALUE._col0)
-          bucketGroup: false
-          keys:
-                expr: KEY._col0
-                type: string
-                expr: KEY._col1
-                type: string
+          aggregations: count(VALUE._col0)
+          keys: KEY._col0 (type: string), KEY._col1 (type: string)
           mode: mergepartial
           outputColumnNames: _col0, _col1, _col2
+          Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
           Select Operator
-            expressions:
-                  expr: _col1
-                  type: string
-                  expr: _col2
-                  type: bigint
+            expressions: _col1 (type: string), _col2 (type: bigint)
             outputColumnNames: _col0, _col1
+            Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
             Limit
+              Number of rows: 10
+              Statistics: Num rows: 10 Data size: 100 Basic stats: COMPLETE Column stats: NONE
               File Output Operator
                 compressed: false
-                GlobalTableId: 0
+                Statistics: Num rows: 10 Data size: 100 Basic stats: COMPLETE Column stats: NONE
                 table:
                     input format: org.apache.hadoop.mapred.TextInputFormat
                     output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                    serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: 10
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: select key, count(1) from clustergroupby  where ds='103' group by  value, key limit 10
 PREHOOK: type: QUERY
+PREHOOK: Input: default@clustergroupby
 PREHOOK: Input: default@clustergroupby@ds=103
-PREHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-37-45_975_5803139738369049064/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: select key, count(1) from clustergroupby  where ds='103' group by  value, key limit 10
 POSTHOOK: type: QUERY
+POSTHOOK: Input: default@clustergroupby
 POSTHOOK: Input: default@clustergroupby@ds=103
-POSTHOOK: Output: file:/var/folders/6g/6grtCwPMEf4sqHUPpy6xQG9ByHg/-Tmp-/heyongqiang/hive_2010-11-18_11-37-45_975_5803139738369049064/-mr-10000
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=100).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=101).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=102).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=102).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=103).key SIMPLE [(src)src.FieldSchema(name:key, type:string, comment:default), ]
-POSTHOOK: Lineage: clustergroupby PARTITION(ds=103).value SIMPLE [(src)src.FieldSchema(name:value, type:string, comment:default), ]
+#### A masked pattern was here ####
 0	3
 10	1
 100	2

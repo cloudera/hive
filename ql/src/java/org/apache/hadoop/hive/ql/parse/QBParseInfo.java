@@ -20,12 +20,14 @@ package org.apache.hadoop.hive.ql.parse;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.antlr.runtime.tree.Tree;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.ql.parse.BaseSemanticAnalyzer.tableSpec;
@@ -34,7 +36,6 @@ import org.apache.hadoop.hive.ql.parse.BaseSemanticAnalyzer.tableSpec;
  * Implementation of the parse information related to a query block.
  *
  **/
-
 public class QBParseInfo {
 
   private final boolean isSubQ;
@@ -48,12 +49,25 @@ public class QBParseInfo {
   private final Map<String, ASTNode> destToSelExpr;
   private final HashMap<String, ASTNode> destToWhereExpr;
   private final HashMap<String, ASTNode> destToGroupby;
+  private final Set<String> destRollups;
+  private final Set<String> destCubes;
+  private final Set<String> destGroupingSets;
   private final Map<String, ASTNode> destToHaving;
+  private final HashSet<String> insertIntoTables;
 
   private boolean isAnalyzeCommand; // used for the analyze command (statistics)
   private boolean isInsertToTable;  // used for insert overwrite command (statistics)
+  private boolean isNoScanAnalyzeCommand; // used for the analyze command (statistics) (noscan)
+  private boolean isPartialScanAnalyzeCommand; // used for the analyze command (statistics)
+                                               // (partialscan)
 
   private final HashMap<String, tableSpec> tableSpecs; // used for statistics
+
+  private String tableName;   // used for column statistics
+  private List<String> colName;     // used for column statistics
+  private List<String> colType;    // used for column statistics
+  private boolean isTblLvl; // used for column statistics
+
 
   /**
    * ClusterBy is a short name for both DistributeBy and SortBy.
@@ -76,6 +90,8 @@ public class QBParseInfo {
    */
   private final HashMap<String, ArrayList<ASTNode>> aliasToLateralViews;
 
+  private final HashMap<String, ASTNode> destToLateralView;
+
   /* Order by clause */
   private final HashMap<String, ASTNode> destToOrderby;
   private final HashMap<String, Integer> destToLimit;
@@ -85,6 +101,10 @@ public class QBParseInfo {
   private final LinkedHashMap<String, LinkedHashMap<String, ASTNode>> destToAggregationExprs;
   private final HashMap<String, List<ASTNode>> destToDistinctFuncExprs;
 
+  // used by Windowing
+  private final LinkedHashMap<String, LinkedHashMap<String, ASTNode>> destToWindowingExprs;
+
+
   @SuppressWarnings("unused")
   private static final Log LOG = LogFactory.getLog(QBParseInfo.class.getName());
 
@@ -93,6 +113,7 @@ public class QBParseInfo {
     nameToDest = new HashMap<String, ASTNode>();
     nameToSample = new HashMap<String, TableSample>();
     exprToColumnAlias = new HashMap<ASTNode, String>();
+    destToLateralView = new HashMap<String, ASTNode>();
     destToSelExpr = new LinkedHashMap<String, ASTNode>();
     destToWhereExpr = new HashMap<String, ASTNode>();
     destToGroupby = new HashMap<String, ASTNode>();
@@ -102,8 +123,13 @@ public class QBParseInfo {
     destToSortby = new HashMap<String, ASTNode>();
     destToOrderby = new HashMap<String, ASTNode>();
     destToLimit = new HashMap<String, Integer>();
+    insertIntoTables = new HashSet<String>();
+    destRollups = new HashSet<String>();
+    destCubes = new HashSet<String>();
+    destGroupingSets = new HashSet<String>();
 
     destToAggregationExprs = new LinkedHashMap<String, LinkedHashMap<String, ASTNode>>();
+    destToWindowingExprs = new LinkedHashMap<String, LinkedHashMap<String, ASTNode>>();
     destToDistinctFuncExprs = new HashMap<String, List<ASTNode>>();
 
     this.alias = alias;
@@ -113,6 +139,15 @@ public class QBParseInfo {
     aliasToLateralViews = new HashMap<String, ArrayList<ASTNode>>();
 
     tableSpecs = new HashMap<String, BaseSemanticAnalyzer.tableSpec>();
+
+  }
+
+  /*
+   * If a QB is such that the aggregation expressions need to be handled by
+   * the Windowing PTF; we invoke this function to clear the AggExprs on the dest.
+   */
+  public void clearAggregationExprsForClause(String clause) {
+    destToAggregationExprs.get(clause).clear();
   }
 
   public void setAggregationExprsForClause(String clause,
@@ -129,8 +164,46 @@ public class QBParseInfo {
     }
   }
 
+  public void addInsertIntoTable(String fullName) {
+    insertIntoTables.add(fullName.toLowerCase());
+  }
+
+  public boolean isInsertIntoTable(String dbName, String table) {
+    String fullName = dbName + "." + table;
+    return insertIntoTables.contains(fullName.toLowerCase());
+  }
+
+  /**
+   * Check if a table is in the list to be inserted into
+   * @param fullTableName table name in dbname.tablename format
+   * @return
+   */
+  public boolean isInsertIntoTable(String fullTableName) {
+    return insertIntoTables.contains(fullTableName.toLowerCase());
+  }
+
   public HashMap<String, ASTNode> getAggregationExprsForClause(String clause) {
     return destToAggregationExprs.get(clause);
+  }
+
+  public void addWindowingExprToClause(String clause, ASTNode windowingExprNode) {
+    LinkedHashMap<String, ASTNode> windowingExprs = destToWindowingExprs.get(clause);
+    if ( windowingExprs == null ) {
+      windowingExprs = new LinkedHashMap<String, ASTNode>();
+      destToWindowingExprs.put(clause, windowingExprs);
+    }
+    windowingExprs.put(windowingExprNode.toStringTree(), windowingExprNode);
+  }
+
+  public HashMap<String, ASTNode> getWindowingExprsForClause(String clause) {
+    return destToWindowingExprs.get(clause);
+  }
+
+  public void clearDistinctFuncExprsForClause(String clause) {
+    List<ASTNode> l = destToDistinctFuncExprs.get(clause);
+    if ( l != null ) {
+      l.clear();
+    }
   }
 
   public void setDistinctFuncExprsForClause(String clause, List<ASTNode> ast) {
@@ -227,6 +300,18 @@ public class QBParseInfo {
 
   public ASTNode getGroupByForClause(String clause) {
     return destToGroupby.get(clause);
+  }
+
+  public Set<String> getDestRollups() {
+    return destRollups;
+  }
+
+  public Set<String> getDestCubes() {
+    return destCubes;
+  }
+
+  public Set<String> getDestGroupingSets() {
+    return destGroupingSets;
   }
 
   public HashMap<String, ASTNode> getDestToGroupBy() {
@@ -365,57 +450,53 @@ public class QBParseInfo {
     this.outerQueryLimit = outerQueryLimit;
   }
 
-  public boolean isSelectStarQuery() {
-    if (isSubQ || (joinExpr != null) || (!nameToSample.isEmpty())
-        || (!destToGroupby.isEmpty()) || (!destToClusterby.isEmpty())
-        || (!aliasToLateralViews.isEmpty())) {
+  public boolean isTopLevelSimpleSelectStarQuery() {
+    if (alias != null || destToSelExpr.size() != 1 || !isSimpleSelectQuery()) {
+      return false;
+    }
+    for (ASTNode selExprs : destToSelExpr.values()) {
+      if (selExprs.getChildCount() != 1) {
+        return false;
+      }
+      Tree sel = selExprs.getChild(0).getChild(0);
+      if (sel == null || sel.getType() != HiveParser.TOK_ALLCOLREF) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  // for fast check of possible existence of RS (will be checked again in SimpleFetchOptimizer)
+  public boolean isSimpleSelectQuery() {
+    if (joinExpr != null || !destToOrderby.isEmpty() || !destToSortby.isEmpty()
+        || !destToGroupby.isEmpty() || !destToClusterby.isEmpty() || !destToDistributeby.isEmpty()
+        || !destRollups.isEmpty() || !destCubes.isEmpty() || !destGroupingSets.isEmpty()
+        || !destToHaving.isEmpty()) {
       return false;
     }
 
-    Iterator<Map.Entry<String, LinkedHashMap<String, ASTNode>>> aggrIter = destToAggregationExprs
-        .entrySet().iterator();
-    while (aggrIter.hasNext()) {
-      HashMap<String, ASTNode> h = aggrIter.next().getValue();
-      if ((h != null) && (!h.isEmpty())) {
+    for (Map<String, ASTNode> entry : destToAggregationExprs.values()) {
+      if (entry != null && !entry.isEmpty()) {
         return false;
       }
     }
 
-    if (!destToDistinctFuncExprs.isEmpty()) {
-      Iterator<Map.Entry<String, List<ASTNode>>> distn = destToDistinctFuncExprs
-          .entrySet().iterator();
-      while (distn.hasNext()) {
-        List<ASTNode> ct = distn.next().getValue();
-        if (!ct.isEmpty()) {
-          return false;
-        }
-      }
-    }
-
-    Iterator<Map.Entry<String, ASTNode>> iter = nameToDest.entrySet()
-        .iterator();
-    while (iter.hasNext()) {
-      Map.Entry<String, ASTNode> entry = iter.next();
-      ASTNode v = entry.getValue();
-      if (!(((ASTNode) v.getChild(0)).getToken().getType() == HiveParser.TOK_TMP_FILE)) {
+    for (Map<String, ASTNode> entry : destToWindowingExprs.values()) {
+      if (entry != null && !entry.isEmpty()) {
         return false;
       }
     }
 
-    iter = destToSelExpr.entrySet().iterator();
-    while (iter.hasNext()) {
-      Map.Entry<String, ASTNode> entry = iter.next();
-      ASTNode selExprList = entry.getValue();
-      // Iterate over the selects
-      for (int i = 0; i < selExprList.getChildCount(); ++i) {
+    for (List<ASTNode> ct : destToDistinctFuncExprs.values()) {
+      if (!ct.isEmpty()) {
+        return false;
+      }
+    }
 
-        // list of the columns
-        ASTNode selExpr = (ASTNode) selExprList.getChild(i);
-        ASTNode sel = (ASTNode) selExpr.getChild(0);
-
-        if (sel.getToken().getType() != HiveParser.TOK_ALLCOLREF) {
-          return false;
-        }
+    // exclude insert queries
+    for (ASTNode v : nameToDest.values()) {
+      if (!(v.getChild(0).getType() == HiveParser.TOK_TMP_FILE)) {
+        return false;
       }
     }
 
@@ -472,7 +553,7 @@ public class QBParseInfo {
   }
 
   /**
-   * This method is used only for the anlayze command to get the partition specs
+   * This method is used only for the analyze command to get the partition specs
    */
   public tableSpec getTableSpec() {
 
@@ -480,4 +561,92 @@ public class QBParseInfo {
     return tableSpecs.get(tName.next());
   }
 
+  public HashMap<String, Integer> getDestToLimit() {
+    return destToLimit;
+  }
+
+  public LinkedHashMap<String, LinkedHashMap<String, ASTNode>> getDestToAggregationExprs() {
+    return destToAggregationExprs;
+  }
+
+  public HashMap<String, List<ASTNode>> getDestToDistinctFuncExprs() {
+    return destToDistinctFuncExprs;
+  }
+
+  public HashMap<String, TableSample> getNameToSample() {
+    return nameToSample;
+  }
+
+  public HashMap<String, ASTNode> getDestToLateralView() {
+    return destToLateralView;
+  }
+
+  protected static enum ClauseType {
+    CLUSTER_BY_CLAUSE,
+    DISTRIBUTE_BY_CLAUSE,
+    ORDER_BY_CLAUSE,
+    SORT_BY_CLAUSE
+  }
+
+  public String getTableName() {
+    return tableName;
+  }
+
+  public void setTableName(String tableName) {
+    this.tableName = tableName;
+  }
+
+  public List<String> getColName() {
+    return colName;
+  }
+
+  public void setColName(List<String> colName) {
+    this.colName = colName;
+  }
+
+  public boolean isTblLvl() {
+    return isTblLvl;
+  }
+
+  public void setTblLvl(boolean isTblLvl) {
+    this.isTblLvl = isTblLvl;
+  }
+
+  public List<String> getColType() {
+    return colType;
+  }
+
+  public void setColType(List<String> colType) {
+    this.colType = colType;
+  }
+
+  /**
+   * @return the isNoScanAnalyzeCommand
+   */
+  public boolean isNoScanAnalyzeCommand() {
+    return isNoScanAnalyzeCommand;
+  }
+
+  /**
+   * @param isNoScanAnalyzeCommand the isNoScanAnalyzeCommand to set
+   */
+  public void setNoScanAnalyzeCommand(boolean isNoScanAnalyzeCommand) {
+    this.isNoScanAnalyzeCommand = isNoScanAnalyzeCommand;
+  }
+
+  /**
+   * @return the isPartialScanAnalyzeCommand
+   */
+  public boolean isPartialScanAnalyzeCommand() {
+    return isPartialScanAnalyzeCommand;
+  }
+
+  /**
+   * @param isPartialScanAnalyzeCommand the isPartialScanAnalyzeCommand to set
+   */
+  public void setPartialScanAnalyzeCommand(boolean isPartialScanAnalyzeCommand) {
+    this.isPartialScanAnalyzeCommand = isPartialScanAnalyzeCommand;
+  }
 }
+
+

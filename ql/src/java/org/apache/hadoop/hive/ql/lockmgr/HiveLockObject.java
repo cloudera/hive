@@ -18,38 +18,61 @@
 
 package org.apache.hadoop.hive.ql.lockmgr;
 
-import org.apache.hadoop.hive.ql.metadata.Partition;
+import java.util.Arrays;
+
+import org.apache.commons.lang.builder.HashCodeBuilder;
 import org.apache.hadoop.hive.ql.metadata.DummyPartition;
+import org.apache.hadoop.hive.ql.metadata.Partition;
 import org.apache.hadoop.hive.ql.metadata.Table;
 
 public class HiveLockObject {
-  String [] pathNames = null;
+  String[] pathNames = null;
 
   public static class HiveLockObjectData {
 
-    private String queryId;  // queryId of the command
+    private String queryId; // queryId of the command
     private String lockTime; // time at which lock was acquired
     // mode of the lock: EXPLICIT(lock command)/IMPLICIT(query)
     private String lockMode;
+    private String queryStr;
+    private String clientIp;
 
+    /**
+     * Constructor
+     *
+     * Note: The parameters are used to uniquely identify a HiveLockObject. 
+     * The parameters will be stripped off any ':' characters in order not 
+     * to interfere with the way the data is serialized (':' delimited string).
+     */
     public HiveLockObjectData(String queryId,
-                              String lockTime,
-                              String lockMode) {
-      this.queryId  = queryId;
-      this.lockTime = lockTime;
-      this.lockMode = lockMode;
+        String lockTime,
+        String lockMode,
+        String queryStr) {
+      this.queryId = removeDelimiter(queryId);
+      this.lockTime = removeDelimiter(lockTime);
+      this.lockMode = removeDelimiter(lockMode);
+      this.queryStr = removeDelimiter(queryStr == null ? null : queryStr.trim());
     }
 
-
+    /**
+     * Constructor
+     * 
+     * @param data String of the form "queryId:lockTime:lockMode:queryStr". 
+     * No ':' characters are allowed in any of the components.
+     */
     public HiveLockObjectData(String data) {
       if (data == null) {
         return;
       }
 
       String[] elem = data.split(":");
-      queryId  = elem[0];
+      queryId = elem[0];
       lockTime = elem[1];
       lockMode = elem[2];
+      queryStr = elem[3];
+      if (elem.length >= 5) {
+        clientIp = elem[4];
+      }
     }
 
     public String getQueryId() {
@@ -64,9 +87,82 @@ public class HiveLockObject {
       return lockMode;
     }
 
-    public String toString() {
-      return queryId + ":" + lockTime + ":" + lockMode;
+    public String getQueryStr() {
+      return queryStr;
     }
+
+    @Override
+    public String toString() {
+      return queryId + ":" + lockTime + ":" + lockMode + ":" + queryStr + ":"
+          + clientIp;
+    }
+
+    public String getClientIp() {
+      return this.clientIp;
+    }
+
+    public void setClientIp(String clientIp) {
+      this.clientIp = clientIp;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (!(o instanceof HiveLockObjectData)) {
+        return false;
+      }
+
+      HiveLockObjectData target = (HiveLockObjectData) o;
+      boolean ret = (queryId == null ? target.queryId == null :
+          target.queryId != null && queryId.equals(target.queryId));
+      ret = ret && (lockTime == null ? target.lockTime == null :
+          target.lockTime != null && lockTime.equals(target.lockTime));
+      ret = ret && (lockMode == null ? target.lockMode == null :
+          target.lockMode != null && lockMode.equals(target.lockMode));
+      ret = ret && (queryStr == null ? target.queryStr == null :
+          target.queryStr != null && queryStr.equals(target.queryStr));
+      ret = ret && (clientIp == null ? target.clientIp == null :
+          target.clientIp != null && clientIp.equals(target.clientIp));
+
+      return ret;
+    }
+ 
+    @Override
+    public int hashCode() {
+      HashCodeBuilder builder = new HashCodeBuilder();
+
+      boolean queryId_present = queryId == null;
+      builder.append(queryId_present);
+      if (queryId_present) {
+        builder.append(queryId);
+      }
+
+      boolean lockTime_present = lockTime == null;
+      builder.append(lockTime);
+      if (lockTime_present) {
+        builder.append(lockTime);
+      }
+
+      boolean lockMode_present = lockMode == null;
+      builder.append(lockMode);
+      if (lockMode_present) {
+        builder.append(lockMode);
+      }
+
+      boolean queryStr_present = queryStr == null;
+      builder.append(queryStr);
+      if (queryStr_present) {
+        builder.append(queryStr);
+      }
+
+      boolean clienIp_present = clientIp == null;
+      builder.append(clientIp);
+      if (clienIp_present) {
+        builder.append(clientIp);
+      }
+
+      return builder.toHashCode();
+    }
+
   }
 
   /* user supplied data for that object */
@@ -92,29 +188,30 @@ public class HiveLockObject {
   }
 
   public HiveLockObject(Partition par, HiveLockObjectData lockData) {
-    this(new String[] { par.getTable().getDbName(),
-        par.getTable().getTableName(), par.getName() }, lockData);
+    this(new String[] {par.getTable().getDbName(),
+        par.getTable().getTableName(), par.getName()}, lockData);
   }
 
   public HiveLockObject(DummyPartition par, HiveLockObjectData lockData) {
-    this(new String[] { par.getName() }, lockData);
+    this(new String[] {par.getName()}, lockData);
+  }
+
+  public String[] getPaths() {
+    return pathNames;
   }
 
   public String getName() {
-    if (this.pathNames == null) {
+    if (pathNames == null) {
       return null;
     }
-    String ret = "";
-    boolean first = true;
+    StringBuilder builder = new StringBuilder();
     for (int i = 0; i < pathNames.length; i++) {
-      if (!first) {
-        ret = ret + "/";
-      } else {
-        first = false;
+      if (i > 0) {
+        builder.append('/');
       }
-      ret = ret + pathNames[i];
+      builder.append(pathNames[i]);
     }
-    return ret;
+    return builder.toString();
   }
 
   public String getDisplayName() {
@@ -149,4 +246,34 @@ public class HiveLockObject {
     this.data = data;
   }
 
+  @Override
+  public boolean equals(Object o) {
+    if (!(o instanceof HiveLockObject)) {
+      return false;
+    }
+
+    HiveLockObject tgt = (HiveLockObject) o;
+    return Arrays.equals(pathNames, tgt.pathNames) &&
+        data == null ? tgt.getData() == null :
+        tgt.getData() != null && data.equals(tgt.getData());
+  }
+
+  @Override
+  public int hashCode() {
+    HashCodeBuilder builder = new HashCodeBuilder();
+    builder.append(pathNames);
+    boolean data_present = data == null;
+    builder.append(data_present);
+    if (data_present) {
+      builder.append(data);
+    }
+    return builder.toHashCode();
+  }
+
+  private static String removeDelimiter(String in) {
+    if (in == null) {
+      return null;
+    }
+    return in.replaceAll(":","");
+  }
 }

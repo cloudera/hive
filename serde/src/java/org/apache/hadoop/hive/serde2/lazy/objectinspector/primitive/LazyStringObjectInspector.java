@@ -18,8 +18,8 @@
 package org.apache.hadoop.hive.serde2.lazy.objectinspector.primitive;
 
 import org.apache.hadoop.hive.serde2.lazy.LazyString;
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorUtils;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.StringObjectInspector;
+import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
 import org.apache.hadoop.io.Text;
 
 /**
@@ -28,11 +28,15 @@ import org.apache.hadoop.io.Text;
 public class LazyStringObjectInspector extends
     AbstractPrimitiveLazyObjectInspector<Text> implements StringObjectInspector {
 
-  boolean escaped;
-  byte escapeChar;
+  private boolean escaped;
+  private byte escapeChar;
+
+  protected LazyStringObjectInspector() {
+    super();
+  }
 
   LazyStringObjectInspector(boolean escaped, byte escapeChar) {
-    super(PrimitiveObjectInspectorUtils.stringTypeEntry);
+    super(TypeInfoFactory.stringTypeInfo);
     this.escaped = escaped;
     this.escapeChar = escapeChar;
   }

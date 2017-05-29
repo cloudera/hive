@@ -1,7 +1,9 @@
 PREHOOK: query: CREATE TEMPORARY FUNCTION dboutput AS 'org.apache.hadoop.hive.contrib.genericudf.example.GenericUDFDBOutput'
 PREHOOK: type: CREATEFUNCTION
+PREHOOK: Output: dboutput
 POSTHOOK: query: CREATE TEMPORARY FUNCTION dboutput AS 'org.apache.hadoop.hive.contrib.genericudf.example.GenericUDFDBOutput'
 POSTHOOK: type: CREATEFUNCTION
+POSTHOOK: Output: dboutput
 PREHOOK: query: DESCRIBE FUNCTION dboutput
 PREHOOK: type: DESCFUNCTION
 POSTHOOK: query: DESCRIBE FUNCTION dboutput
@@ -44,41 +46,37 @@ dboutput('jdbc:derby:../build/test_dboutput_db','','',
 
 limit 1
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF src)) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_FUNCTION dboutput 'jdbc:derby:../build/test_dboutput_db;create=true' '' '' 'CREATE TABLE app_info ( kkey VARCHAR(255) NOT NULL, vvalue VARCHAR(255) NOT NULL, UNIQUE(kkey))')) (TOK_SELEXPR (TOK_FUNCTION dboutput 'jdbc:derby:../build/test_dboutput_db' '' '' 'INSERT INTO app_info (kkey,vvalue) VALUES (?,?)' '20' 'a')) (TOK_SELEXPR (TOK_FUNCTION dboutput 'jdbc:derby:../build/test_dboutput_db' '' '' 'INSERT INTO app_info (kkey,vvalue) VALUES (?,?)' '20' 'b'))) (TOK_LIMIT 1)))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        src 
+      Map Operator Tree:
           TableScan
             alias: src
+            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: COMPLETE
             Select Operator
-              expressions:
-                    expr: dboutput('jdbc:derby:../build/test_dboutput_db;create=true','','','CREATE TABLE app_info ( kkey VARCHAR(255) NOT NULL, vvalue VARCHAR(255) NOT NULL, UNIQUE(kkey))')
-                    type: int
-                    expr: dboutput('jdbc:derby:../build/test_dboutput_db','','','INSERT INTO app_info (kkey,vvalue) VALUES (?,?)','20','a')
-                    type: int
-                    expr: dboutput('jdbc:derby:../build/test_dboutput_db','','','INSERT INTO app_info (kkey,vvalue) VALUES (?,?)','20','b')
-                    type: int
+              expressions: dboutput('jdbc:derby:../build/test_dboutput_db;create=true','','','CREATE TABLE app_info ( kkey VARCHAR(255) NOT NULL, vvalue VARCHAR(255) NOT NULL, UNIQUE(kkey))') (type: int), dboutput('jdbc:derby:../build/test_dboutput_db','','','INSERT INTO app_info (kkey,vvalue) VALUES (?,?)','20','a') (type: int), dboutput('jdbc:derby:../build/test_dboutput_db','','','INSERT INTO app_info (kkey,vvalue) VALUES (?,?)','20','b') (type: int)
               outputColumnNames: _col0, _col1, _col2
+              Statistics: Num rows: 500 Data size: 6000 Basic stats: COMPLETE Column stats: COMPLETE
               Limit
+                Number of rows: 1
+                Statistics: Num rows: 1 Data size: 12 Basic stats: COMPLETE Column stats: COMPLETE
                 File Output Operator
                   compressed: false
-                  GlobalTableId: 0
+                  Statistics: Num rows: 1 Data size: 12 Basic stats: COMPLETE Column stats: COMPLETE
                   table:
                       input format: org.apache.hadoop.mapred.TextInputFormat
                       output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                      serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: 1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: FROM src 
 
@@ -94,7 +92,7 @@ dboutput('jdbc:derby:../build/test_dboutput_db','','',
 limit 1
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src
-PREHOOK: Output: file:/data/users/njain/hive5/hive5/build/ql/tmp/109195708/10000
+#### A masked pattern was here ####
 POSTHOOK: query: FROM src 
 
 SELECT dboutput ( 'jdbc:derby:../build/test_dboutput_db;create=true','','',
@@ -109,7 +107,7 @@ dboutput('jdbc:derby:../build/test_dboutput_db','','',
 limit 1
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@src
-POSTHOOK: Output: file:/data/users/njain/hive5/hive5/build/ql/tmp/109195708/10000
+#### A masked pattern was here ####
 0	0	1
 PREHOOK: query: EXPLAIN SELECT
 
@@ -125,44 +123,37 @@ dboutput('jdbc:derby:../build/test_dboutput_db','','',
 
 FROM src WHERE key < 10
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF src)) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (TOK_FUNCTION dboutput 'jdbc:derby:../build/test_dboutput_db' '' '' 'INSERT INTO app_info (kkey,vvalue) VALUES (?,?)' (TOK_TABLE_OR_COL key) (TOK_TABLE_OR_COL value)))) (TOK_WHERE (< (TOK_TABLE_OR_COL key) 10))))
-
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        src 
+      Map Operator Tree:
           TableScan
             alias: src
+            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
             Filter Operator
-              predicate:
-                  expr: (key < 10)
-                  type: boolean
-              Filter Operator
-                predicate:
-                    expr: (key < 10)
-                    type: boolean
-                Select Operator
-                  expressions:
-                        expr: dboutput('jdbc:derby:../build/test_dboutput_db','','','INSERT INTO app_info (kkey,vvalue) VALUES (?,?)',key,value)
-                        type: int
-                  outputColumnNames: _col0
-                  File Output Operator
-                    compressed: false
-                    GlobalTableId: 0
-                    table:
-                        input format: org.apache.hadoop.mapred.TextInputFormat
-                        output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+              predicate: (UDFToDouble(key) < 10.0) (type: boolean)
+              Statistics: Num rows: 166 Data size: 1763 Basic stats: COMPLETE Column stats: NONE
+              Select Operator
+                expressions: dboutput('jdbc:derby:../build/test_dboutput_db','','','INSERT INTO app_info (kkey,vvalue) VALUES (?,?)',key,value) (type: int)
+                outputColumnNames: _col0
+                Statistics: Num rows: 166 Data size: 1763 Basic stats: COMPLETE Column stats: NONE
+                File Output Operator
+                  compressed: false
+                  Statistics: Num rows: 166 Data size: 1763 Basic stats: COMPLETE Column stats: NONE
+                  table:
+                      input format: org.apache.hadoop.mapred.TextInputFormat
+                      output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                      serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: SELECT
 
@@ -172,7 +163,7 @@ dboutput('jdbc:derby:../build/test_dboutput_db','','',
 FROM src WHERE key < 10
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src
-PREHOOK: Output: file:/data/users/njain/hive5/hive5/build/ql/tmp/667407949/10000
+#### A masked pattern was here ####
 POSTHOOK: query: SELECT
 
 dboutput('jdbc:derby:../build/test_dboutput_db','','',
@@ -181,7 +172,7 @@ dboutput('jdbc:derby:../build/test_dboutput_db','','',
 FROM src WHERE key < 10
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@src
-POSTHOOK: Output: file:/data/users/njain/hive5/hive5/build/ql/tmp/667407949/10000
+#### A masked pattern was here ####
 0
 0
 0
@@ -192,9 +183,10 @@ POSTHOOK: Output: file:/data/users/njain/hive5/hive5/build/ql/tmp/667407949/1000
 0
 1
 0
-Deleted file:/data/users/njain/hive5/hive5/build/test_dboutput_db
-Deleted file:/data/users/njain/hive5/hive5/contrib/derby.log
+#### A masked pattern was here ####
 PREHOOK: query: DROP TEMPORARY FUNCTION dboutput
 PREHOOK: type: DROPFUNCTION
+PREHOOK: Output: dboutput
 POSTHOOK: query: DROP TEMPORARY FUNCTION dboutput
 POSTHOOK: type: DROPFUNCTION
+POSTHOOK: Output: dboutput

@@ -21,11 +21,15 @@ package org.apache.hadoop.hive.ql.udf;
 import org.apache.hadoop.hive.ql.exec.UDF;
 import org.apache.hadoop.hive.serde2.ByteStream;
 import org.apache.hadoop.hive.serde2.io.ByteWritable;
+import org.apache.hadoop.hive.serde2.io.DateWritable;
 import org.apache.hadoop.hive.serde2.io.DoubleWritable;
+import org.apache.hadoop.hive.serde2.io.HiveDecimalWritable;
 import org.apache.hadoop.hive.serde2.io.ShortWritable;
+import org.apache.hadoop.hive.serde2.io.TimestampWritable;
 import org.apache.hadoop.hive.serde2.lazy.LazyInteger;
 import org.apache.hadoop.hive.serde2.lazy.LazyLong;
 import org.apache.hadoop.io.BooleanWritable;
+import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.FloatWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
@@ -37,8 +41,8 @@ import org.apache.hadoop.io.Text;
  *
  */
 public class UDFToString extends UDF {
-  private Text t = new Text();
-  private ByteStream.Output out = new ByteStream.Output();
+  private final Text t = new Text();
+  private final ByteStream.Output out = new ByteStream.Output();
 
   public UDFToString() {
   }
@@ -47,8 +51,8 @@ public class UDFToString extends UDF {
     return null;
   }
 
-  private byte[] trueBytes = {'T', 'R', 'U', 'E'};
-  private byte[] falseBytes = {'F', 'A', 'L', 'S', 'E'};
+  private final byte[] trueBytes = {'T', 'R', 'U', 'E'};
+  private final byte[] falseBytes = {'F', 'A', 'L', 'S', 'E'};
 
   public Text evaluate(BooleanWritable i) {
     if (i == null) {
@@ -66,7 +70,7 @@ public class UDFToString extends UDF {
     } else {
       out.reset();
       LazyInteger.writeUTF8NoException(out, i.get());
-      t.set(out.getData(), 0, out.getCount());
+      t.set(out.getData(), 0, out.getLength());
       return t;
     }
   }
@@ -77,7 +81,7 @@ public class UDFToString extends UDF {
     } else {
       out.reset();
       LazyInteger.writeUTF8NoException(out, i.get());
-      t.set(out.getData(), 0, out.getCount());
+      t.set(out.getData(), 0, out.getLength());
       return t;
     }
   }
@@ -88,7 +92,7 @@ public class UDFToString extends UDF {
     } else {
       out.reset();
       LazyInteger.writeUTF8NoException(out, i.get());
-      t.set(out.getData(), 0, out.getCount());
+      t.set(out.getData(), 0, out.getLength());
       return t;
     }
   }
@@ -99,7 +103,7 @@ public class UDFToString extends UDF {
     } else {
       out.reset();
       LazyLong.writeUTF8NoException(out, i.get());
-      t.set(out.getData(), 0, out.getCount());
+      t.set(out.getData(), 0, out.getLength());
       return t;
     }
   }
@@ -122,4 +126,46 @@ public class UDFToString extends UDF {
     }
   }
 
+  public Text evaluate(Text i) {
+      if (i == null) {
+          return null;
+      }
+      i.set(i.toString());
+      return i;
+  }
+
+  public Text evaluate(DateWritable d) {
+    if (d == null) {
+      return null;
+    } else {
+      t.set(d.toString());
+      return t;
+    }
+  }
+
+  public Text evaluate(TimestampWritable i) {
+    if (i == null) {
+      return null;
+    } else {
+      t.set(i.toString());
+      return t;
+    }
+  }
+
+  public Text evaluate(HiveDecimalWritable i) {
+    if (i == null) {
+      return null;
+    } else {
+      t.set(i.toString());
+      return t;
+    }
+  }
+
+  public Text evaluate (BytesWritable bw) {
+    if (null == bw) {
+      return null;
+    }
+    t.set(bw.getBytes(),0,bw.getLength());
+    return t;
+  }
 }

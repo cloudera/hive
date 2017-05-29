@@ -20,8 +20,7 @@ package org.apache.hadoop.hive.ql.exec;
 
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -36,13 +35,12 @@ import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.plan.JoinCondDesc;
 import org.apache.hadoop.hive.ql.plan.JoinDesc;
 import org.apache.hadoop.hive.ql.plan.TableDesc;
+import org.apache.hadoop.hive.serde2.io.ShortWritable;
 import org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
-import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
-import org.apache.hadoop.io.BooleanWritable;
 
 /**
  * Join operator implementation.
@@ -53,83 +51,50 @@ public abstract class CommonJoinOperator<T extends JoinDesc> extends
   protected static final Log LOG = LogFactory.getLog(CommonJoinOperator.class
       .getName());
 
-  /**
-   * IntermediateObject.
-   *
-   */
-  public static class IntermediateObject {
-    ArrayList<Object>[] objs;
-    int curSize;
-
-    public IntermediateObject(ArrayList<Object>[] objs, int curSize) {
-      this.objs = objs;
-      this.curSize = curSize;
-    }
-
-    public ArrayList<Object>[] getObjs() {
-      return objs;
-    }
-
-    public int getCurSize() {
-      return curSize;
-    }
-
-    public void pushObj(ArrayList<Object> newObj) {
-      objs[curSize++] = newObj;
-    }
-
-    public void popObj() {
-      curSize--;
-    }
-
-    public Object topObj() {
-      return objs[curSize - 1];
-    }
-  }
-
   protected transient int numAliases; // number of aliases
   /**
    * The expressions for join inputs.
    */
-  protected transient Map<Byte, List<ExprNodeEvaluator>> joinValues;
+  protected transient List<ExprNodeEvaluator>[] joinValues;
 
   /**
    * The filters for join
    */
-  protected transient Map<Byte, List<ExprNodeEvaluator>> joinFilters;
+  protected transient List<ExprNodeEvaluator>[] joinFilters;
+
+  protected transient int[][] filterMaps;
 
   /**
    * The ObjectInspectors for the join inputs.
    */
-  protected transient Map<Byte, List<ObjectInspector>> joinValuesObjectInspectors;
+  protected transient List<ObjectInspector>[] joinValuesObjectInspectors;
 
   /**
    * The ObjectInspectors for join filters.
    */
-  protected transient
-    Map<Byte, List<ObjectInspector>> joinFilterObjectInspectors;
+  protected transient List<ObjectInspector>[] joinFilterObjectInspectors;
   /**
    * The standard ObjectInspectors for the join inputs.
    */
-  protected transient Map<Byte, List<ObjectInspector>> joinValuesStandardObjectInspectors;
+  protected transient List<ObjectInspector>[] joinValuesStandardObjectInspectors;
   /**
    * The standard ObjectInspectors for the row container.
    */
-  protected transient
-    Map<Byte, List<ObjectInspector>> rowContainerStandardObjectInspectors;
+  protected transient List<ObjectInspector>[] rowContainerStandardObjectInspectors;
 
   protected transient Byte[] order; // order in which the results should
   // be output
   protected transient JoinCondDesc[] condn;
+  protected transient boolean[] nullsafes;
+
   public transient boolean noOuterJoin;
-  protected transient Object[] dummyObj; // for outer joins, contains the
-  // potential nulls for the concerned
-  // aliases
-  protected transient RowContainer<ArrayList<Object>>[] dummyObjVectors; // empty
-  // rows
-  // for
-  // each
-  // table
+
+  // for outer joins, contains the potential nulls for the concerned aliases
+  protected transient ArrayList<Object>[] dummyObj;
+
+  // empty rows for each table
+  protected transient RowContainer<List<Object>>[] dummyObjVectors;
+
   protected transient int totalSz; // total size of the composite object
 
   // keys are the column names. basically this maps the position of the column
@@ -138,19 +103,21 @@ public abstract class CommonJoinOperator<T extends JoinDesc> extends
   private transient Map<Integer, Set<String>> posToAliasMap;
 
   transient LazyBinarySerDe[] spillTableSerDe;
-  protected transient Map<Byte, TableDesc> spillTableDesc; // spill tables are
+  protected transient TableDesc[] spillTableDesc; // spill tables are
   // used if the join
   // input is too large
   // to fit in memory
 
-  HashMap<Byte, AbstractRowContainer<ArrayList<Object>>> storage; // map b/w table alias
+  AbstractRowContainer<List<Object>>[] storage; // map b/w table alias
   // to RowContainer
   int joinEmitInterval = -1;
   int joinCacheSize = 0;
-  int nextSz = 0;
+  long nextSz = 0;
   transient Byte lastAlias = null;
 
   transient boolean handleSkewJoin = false;
+
+  transient boolean hasLeftSemiJoin = false;
 
   protected transient int countAfterReport;
   protected transient int heartbeatInterval;
@@ -165,8 +132,6 @@ public abstract class CommonJoinOperator<T extends JoinDesc> extends
     this.nextSz = clone.nextSz;
     this.childOperators = clone.childOperators;
     this.parentOperators = clone.parentOperators;
-    this.counterNames = clone.counterNames;
-    this.counterNameToEnum = clone.counterNameToEnum;
     this.done = clone.done;
     this.operatorId = clone.operatorId;
     this.storage = clone.storage;
@@ -174,12 +139,9 @@ public abstract class CommonJoinOperator<T extends JoinDesc> extends
     this.conf = clone.getConf();
     this.setSchema(clone.getSchema());
     this.alias = clone.alias;
-    this.beginTime = clone.beginTime;
-    this.inputRows = clone.inputRows;
     this.childOperatorsArray = clone.childOperatorsArray;
     this.childOperatorsTag = clone.childOperatorsTag;
     this.colExprMap = clone.colExprMap;
-    this.counters = clone.counters;
     this.dummyObj = clone.dummyObj;
     this.dummyObjVectors = clone.dummyObjVectors;
     this.forwardCache = clone.forwardCache;
@@ -188,7 +150,6 @@ public abstract class CommonJoinOperator<T extends JoinDesc> extends
     this.hconf = clone.hconf;
     this.id = clone.id;
     this.inputObjInspectors = clone.inputObjInspectors;
-    this.inputRows = clone.inputRows;
     this.noOuterJoin = clone.noOuterJoin;
     this.numAliases = clone.numAliases;
     this.operatorId = clone.operatorId;
@@ -199,14 +160,14 @@ public abstract class CommonJoinOperator<T extends JoinDesc> extends
     this.joinFilterObjectInspectors = clone.joinFilterObjectInspectors;
   }
 
-
-  protected static <T extends JoinDesc> ObjectInspector getJoinOutputObjectInspector(
-      Byte[] order, Map<Byte, List<ObjectInspector>> aliasToObjectInspectors,
-      T conf) {
-    ArrayList<ObjectInspector> structFieldObjectInspectors = new ArrayList<ObjectInspector>();
+  private <T extends JoinDesc> ObjectInspector getJoinOutputObjectInspector(
+      Byte[] order, List<ObjectInspector>[] aliasToObjectInspectors, T conf) {
+    List<ObjectInspector> structFieldObjectInspectors = new ArrayList<ObjectInspector>();
     for (Byte alias : order) {
-      List<ObjectInspector> oiList = aliasToObjectInspectors.get(alias);
-      structFieldObjectInspectors.addAll(oiList);
+      List<ObjectInspector> oiList = getValueObjectInspectors(alias, aliasToObjectInspectors);
+      if (oiList != null && !oiList.isEmpty()) {
+        structFieldObjectInspectors.addAll(oiList);
+      }
     }
 
     StructObjectInspector joinOutputObjectInspector = ObjectInspectorFactory
@@ -215,9 +176,15 @@ public abstract class CommonJoinOperator<T extends JoinDesc> extends
     return joinOutputObjectInspector;
   }
 
-  Configuration hconf;
+  protected List<ObjectInspector> getValueObjectInspectors(
+      byte alias, List<ObjectInspector>[] aliasToObjectInspectors) {
+    return aliasToObjectInspectors[alias];
+  }
+
+  protected Configuration hconf;
 
   @Override
+  @SuppressWarnings("unchecked")
   protected void initializeOp(Configuration hconf) throws HiveException {
     this.handleSkewJoin = conf.getHandleSkewJoin();
     this.hconf = hconf;
@@ -227,55 +194,56 @@ public abstract class CommonJoinOperator<T extends JoinDesc> extends
     countAfterReport = 0;
 
     totalSz = 0;
+
+    int tagLen = conf.getTagLength();
     // Map that contains the rows for each alias
-    storage = new HashMap<Byte, AbstractRowContainer<ArrayList<Object>>>();
+    storage = new AbstractRowContainer[tagLen];
 
     numAliases = conf.getExprs().size();
 
-    joinValues = new HashMap<Byte, List<ExprNodeEvaluator>>();
+    joinValues = new List[tagLen];
 
-    joinFilters = new HashMap<Byte, List<ExprNodeEvaluator>>();
+    joinFilters = new List[tagLen];
 
     order = conf.getTagOrder();
     condn = conf.getConds();
+    nullsafes = conf.getNullSafes();
     noOuterJoin = conf.isNoOuterJoin();
 
     totalSz = JoinUtil.populateJoinKeyValue(joinValues, conf.getExprs(),
         order,NOTSKIPBIGTABLE);
 
     //process join filters
-    joinFilters = new HashMap<Byte, List<ExprNodeEvaluator>>();
+    joinFilters = new List[tagLen];
     JoinUtil.populateJoinKeyValue(joinFilters, conf.getFilters(),order,NOTSKIPBIGTABLE);
 
 
     joinValuesObjectInspectors = JoinUtil.getObjectInspectorsFromEvaluators(joinValues,
-        inputObjInspectors,NOTSKIPBIGTABLE);
+        inputObjInspectors,NOTSKIPBIGTABLE, tagLen);
     joinFilterObjectInspectors = JoinUtil.getObjectInspectorsFromEvaluators(joinFilters,
-        inputObjInspectors,NOTSKIPBIGTABLE);
+        inputObjInspectors,NOTSKIPBIGTABLE, tagLen);
     joinValuesStandardObjectInspectors = JoinUtil.getStandardObjectInspectors(
-        joinValuesObjectInspectors,NOTSKIPBIGTABLE);
+        joinValuesObjectInspectors,NOTSKIPBIGTABLE, tagLen);
+
+    filterMaps = conf.getFilterMap();
 
     if (noOuterJoin) {
       rowContainerStandardObjectInspectors = joinValuesStandardObjectInspectors;
     } else {
-      Map<Byte, List<ObjectInspector>> rowContainerObjectInspectors =
-        new HashMap<Byte, List<ObjectInspector>>();
+      List<ObjectInspector>[] rowContainerObjectInspectors = new List[tagLen];
       for (Byte alias : order) {
         ArrayList<ObjectInspector> rcOIs = new ArrayList<ObjectInspector>();
-        rcOIs.addAll(joinValuesObjectInspectors.get(alias));
-        // for each alias, add object inspector for boolean as the last element
+        rcOIs.addAll(joinValuesObjectInspectors[alias]);
+        // for each alias, add object inspector for short as the last element
         rcOIs.add(
-            PrimitiveObjectInspectorFactory.writableBooleanObjectInspector);
-        rowContainerObjectInspectors.put(alias, rcOIs);
+            PrimitiveObjectInspectorFactory.writableShortObjectInspector);
+        rowContainerObjectInspectors[alias] = rcOIs;
       }
       rowContainerStandardObjectInspectors =
-        JoinUtil.getStandardObjectInspectors(rowContainerObjectInspectors,NOTSKIPBIGTABLE);
+        JoinUtil.getStandardObjectInspectors(rowContainerObjectInspectors,NOTSKIPBIGTABLE, tagLen);
     }
 
-
-
-
-    dummyObj = new Object[numAliases];
+    dummyObj = new ArrayList[numAliases];
     dummyObjVectors = new RowContainer[numAliases];
 
     joinEmitInterval = HiveConf.getIntVar(hconf,
@@ -299,51 +267,70 @@ public abstract class CommonJoinOperator<T extends JoinDesc> extends
         // add whether the row is filtered or not
         // this value does not matter for the dummyObj
         // because the join values are already null
-        nr.add(new BooleanWritable(false));
+        nr.add(new ShortWritable());
       }
       dummyObj[pos] = nr;
       // there should be only 1 dummy object in the RowContainer
-      RowContainer<ArrayList<Object>> values = JoinUtil.getRowContainer(hconf,
-          rowContainerStandardObjectInspectors.get((byte)pos),
-          alias, 1, spillTableDesc, conf, noOuterJoin);
+      RowContainer<List<Object>> values = JoinUtil.getRowContainer(hconf,
+          rowContainerStandardObjectInspectors[pos],
+          alias, 1, spillTableDesc, conf, !hasFilter(pos), reporter);
 
-      values.add((ArrayList<Object>) dummyObj[pos]);
+      values.addRow(dummyObj[pos]);
       dummyObjVectors[pos] = values;
 
       // if serde is null, the input doesn't need to be spilled out
       // e.g., the output columns does not contains the input table
-      RowContainer rc = JoinUtil.getRowContainer(hconf,
-          rowContainerStandardObjectInspectors.get((byte)pos),
-          alias, joinCacheSize,spillTableDesc, conf,noOuterJoin);
-      storage.put(pos, rc);
+      RowContainer<List<Object>> rc = JoinUtil.getRowContainer(hconf,
+          rowContainerStandardObjectInspectors[pos],
+          alias, joinCacheSize, spillTableDesc, conf, !hasFilter(pos), reporter);
+      storage[pos] = rc;
 
       pos++;
     }
 
     forwardCache = new Object[totalSz];
+    aliasFilterTags = new short[numAliases];
+    Arrays.fill(aliasFilterTags, (byte)0xff);
+
+    filterTags = new short[numAliases];
+    skipVectors = new boolean[numAliases][];
+    for(int i = 0; i < skipVectors.length; i++) {
+      skipVectors[i] = new boolean[i + 1];
+    }
+    intermediate = new List[numAliases];
+
+    offsets = new int[numAliases + 1];
+    int sum = 0;
+    for (int i = 0; i < numAliases; i++) {
+      offsets[i] = sum;
+      sum += joinValues[order[i]].size();
+    }
+    offsets[numAliases] = sum;
 
     outputObjInspector = getJoinOutputObjectInspector(order,
         joinValuesStandardObjectInspectors, conf);
-    LOG.info("JOIN "
-        + ((StructObjectInspector) outputObjInspector).getTypeName()
-        + " totalsz = " + totalSz);
 
+    for( int i = 0; i < condn.length; i++ ) {
+      if(condn[i].getType() == JoinDesc.LEFT_SEMI_JOIN) {
+        hasLeftSemiJoin = true;
+      }
+    }
+
+    LOG.info("JOIN " + outputObjInspector.getTypeName() + " totalsz = " + totalSz);
   }
 
+  transient boolean newGroupStarted = false;
 
-
-
-transient boolean newGroupStarted = false;
   @Override
   public void startGroup() throws HiveException {
-    LOG.trace("Join: Starting new group");
     newGroupStarted = true;
-    for (AbstractRowContainer<ArrayList<Object>> alw : storage.values()) {
-      alw.clear();
+    for (AbstractRowContainer<List<Object>> alw : storage) {
+      alw.clearRows();
     }
+    super.startGroup();
   }
 
-  protected int getNextSize(int sz) {
+  protected long getNextSize(long sz) {
     // A very simple counter to keep track of join entries for a key
     if (sz >= 100000) {
       return sz + 100000;
@@ -353,356 +340,288 @@ transient boolean newGroupStarted = false;
   }
 
   protected transient Byte alias;
+  protected transient Object[] forwardCache;
 
-  transient Object[] forwardCache;
+  // pre-calculated offset values for each alias
+  protected transient int[] offsets;
 
-  private void createForwardJoinObject(IntermediateObject intObj,
-      boolean[] nullsArr) throws HiveException {
-    int p = 0;
-    for (int i = 0; i < numAliases; i++) {
-      Byte alias = order[i];
-      int sz = joinValues.get(alias).size();
-      if (nullsArr[i]) {
-        for (int j = 0; j < sz; j++) {
-          forwardCache[p++] = null;
-        }
-      } else {
-        ArrayList<Object> obj = intObj.getObjs()[i];
-        for (int j = 0; j < sz; j++) {
-          forwardCache[p++] = obj.get(j);
-        }
-      }
-    }
+  // a array of bitvectors where each entry denotes whether the element is to
+  // be used or not (whether it is null or not). The size of the bitvector is
+  // same as the number of inputs(aliases) under consideration currently.
+  // When all inputs are accounted for, the output is forwarded appropriately.
+  protected transient boolean[][] skipVectors;
 
-    forward(forwardCache, outputObjInspector);
-    countAfterReport = 0;
-  }
+  // caches objects before constructing forward cache
+  protected transient List[] intermediate;
 
-  private void copyOldArray(boolean[] src, boolean[] dest) {
-    for (int i = 0; i < src.length; i++) {
-      dest[i] = src[i];
-    }
-  }
-
-  private ArrayList<boolean[]> joinObjectsInnerJoin(
-      ArrayList<boolean[]> resNulls, ArrayList<boolean[]> inputNulls,
-      ArrayList<Object> newObj, IntermediateObject intObj, int left,
-      boolean newObjNull) {
-    if (newObjNull) {
-      return resNulls;
-    }
-    Iterator<boolean[]> nullsIter = inputNulls.iterator();
-    while (nullsIter.hasNext()) {
-      boolean[] oldNulls = nullsIter.next();
-      boolean oldObjNull = oldNulls[left];
-      if (!oldObjNull) {
-        boolean[] newNulls = new boolean[intObj.getCurSize()];
-        copyOldArray(oldNulls, newNulls);
-        newNulls[oldNulls.length] = false;
-        resNulls.add(newNulls);
-      }
-    }
-    return resNulls;
-  }
+  // filter tags for objects
+  protected transient short[] filterTags;
 
   /**
-   * Implement semi join operator.
+   * On filterTags
+   *
+   * ANDed value of all filter tags in current join group
+   * if any of values passes on outer join alias (which makes zero for the tag alias),
+   * it means there exists a pair for it and safely regarded as a inner join
+   *
+   * for example, with table a, b something like,
+   *   a = 100, 10 | 100, 20 | 100, 30
+   *   b = 100, 10 | 100, 20 | 100, 30
+   *
+   * the query "a FO b ON a.k=b.k AND a.v>10 AND b.v>30" makes filter map
+   *   0(a) = [1(b),1] : a.v>10
+   *   1(b) = [0(a),1] : b.v>30
+   *
+   * for filtered rows in a (100,10) create a-NULL
+   * for filtered rows in b (100,10) (100,20) (100,30) create NULL-b
+   *
+   * with 0(a) = [1(b),1] : a.v>10
+   *   100, 10 = 00000010 (filtered)
+   *   100, 20 = 00000000 (valid)
+   *   100, 30 = 00000000 (valid)
+   * -------------------------
+   *       sum = 00000000 : for valid rows in b, there is at least one pair in a
+   *
+   * with 1(b) = [0(a),1] : b.v>30
+   *   100, 10 = 00000001 (filtered)
+   *   100, 20 = 00000001 (filtered)
+   *   100, 30 = 00000001 (filtered)
+   * -------------------------
+   *       sum = 00000001 : for valid rows in a (100,20) (100,30), there is no pair in b
+   *
+   * result :
+   *   100, 10 :   N,  N
+   *     N,  N : 100, 10
+   *     N,  N : 100, 20
+   *     N,  N : 100, 30
+   *   100, 20 :   N,  N
+   *   100, 30 :   N,  N
    */
-  private ArrayList<boolean[]> joinObjectsLeftSemiJoin(
-      ArrayList<boolean[]> resNulls, ArrayList<boolean[]> inputNulls,
-      ArrayList<Object> newObj, IntermediateObject intObj, int left,
-      boolean newObjNull) {
-    if (newObjNull) {
-      return resNulls;
+  protected transient short[] aliasFilterTags;
+
+  // all evaluation should be processed here for valid aliasFilterTags
+  //
+  // for MapJoin, filter tag is pre-calculated in MapredLocalTask and stored with value.
+  // when reading the hashtable, MapJoinObjectValue calculates alias filter and provide it to join
+  protected List<Object> getFilteredValue(byte alias, Object row) throws HiveException {
+    boolean hasFilter = hasFilter(alias);
+    List<Object> nr = JoinUtil.computeValues(row, joinValues[alias],
+        joinValuesObjectInspectors[alias], hasFilter);
+    if (hasFilter) {
+      short filterTag = JoinUtil.isFiltered(row, joinFilters[alias],
+          joinFilterObjectInspectors[alias], filterMaps[alias]);
+      nr.add(new ShortWritable(filterTag));
+      aliasFilterTags[alias] &= filterTag;
     }
-    Iterator<boolean[]> nullsIter = inputNulls.iterator();
-    while (nullsIter.hasNext()) {
-      boolean[] oldNulls = nullsIter.next();
-      boolean oldObjNull = oldNulls[left];
-      if (!oldObjNull) {
-        boolean[] newNulls = new boolean[intObj.getCurSize()];
-        copyOldArray(oldNulls, newNulls);
-        newNulls[oldNulls.length] = false;
-        resNulls.add(newNulls);
-      }
-    }
-    return resNulls;
+    return nr;
   }
 
-  private ArrayList<boolean[]> joinObjectsLeftOuterJoin(
-      ArrayList<boolean[]> resNulls, ArrayList<boolean[]> inputNulls,
-      ArrayList<Object> newObj, IntermediateObject intObj, int left,
-      boolean newObjNull) {
-    // newObj is null if is already null or
-    // if the row corresponding to the left alias does not pass through filter
-    int filterIndex = joinValues.get(order[left]).size();
-    if(filterIndex < intObj.getObjs()[left].size()) {
-      newObjNull = newObjNull || ((BooleanWritable) (intObj.getObjs()[left].get(filterIndex))).get();
-    }
+  // fill forwardCache with skipvector
+  private void createForwardJoinObject(boolean[] skip) throws HiveException {
+    Arrays.fill(forwardCache, null);
 
-    Iterator<boolean[]> nullsIter = inputNulls.iterator();
-    while (nullsIter.hasNext()) {
-      boolean[] oldNulls = nullsIter.next();
-      boolean oldObjNull = oldNulls[left];
-      boolean[] newNulls = new boolean[intObj.getCurSize()];
-      copyOldArray(oldNulls, newNulls);
-      if (oldObjNull) {
-        newNulls[oldNulls.length] = true;
-      } else {
-        newNulls[oldNulls.length] = newObjNull;
-      }
-      resNulls.add(newNulls);
-    }
-    return resNulls;
-  }
-
-  private ArrayList<boolean[]> joinObjectsRightOuterJoin(
-      ArrayList<boolean[]> resNulls, ArrayList<boolean[]> inputNulls,
-      ArrayList<Object> newObj, IntermediateObject intObj, int left,
-      boolean newObjNull, boolean firstRow) {
-    if (newObjNull) {
-      return resNulls;
-    }
-
-    if (inputNulls.isEmpty() && firstRow) {
-      boolean[] newNulls = new boolean[intObj.getCurSize()];
-      for (int i = 0; i < intObj.getCurSize() - 1; i++) {
-        newNulls[i] = true;
-      }
-      newNulls[intObj.getCurSize() - 1] = newObjNull;
-      resNulls.add(newNulls);
-      return resNulls;
-    }
-
-    boolean allOldObjsNull = firstRow;
-
-    Iterator<boolean[]> nullsIter = inputNulls.iterator();
-    while (nullsIter.hasNext()) {
-      boolean[] oldNulls = nullsIter.next();
-      if (!oldNulls[left]) {
-        allOldObjsNull = false;
-        break;
-      }
-    }
-
-    // if the row does not pass through filter, all old Objects are null
-    if (((BooleanWritable)newObj.get(newObj.size()-1)).get()) {
-      allOldObjsNull = true;
-    }
-    nullsIter = inputNulls.iterator();
-    while (nullsIter.hasNext()) {
-      boolean[] oldNulls = nullsIter.next();
-      boolean oldObjNull = oldNulls[left] || allOldObjsNull;
-
-      if (!oldObjNull) {
-        boolean[] newNulls = new boolean[intObj.getCurSize()];
-        copyOldArray(oldNulls, newNulls);
-        newNulls[oldNulls.length] = newObjNull;
-        resNulls.add(newNulls);
-      } else if (allOldObjsNull) {
-        boolean[] newNulls = new boolean[intObj.getCurSize()];
-        for (int i = 0; i < intObj.getCurSize() - 1; i++) {
-          newNulls[i] = true;
+    boolean forward = false;
+    for (int i = 0; i < numAliases; i++) {
+      if (!skip[i]) {
+        for (int j = offsets[i]; j < offsets[i + 1]; j++) {
+          forwardCache[j] = intermediate[i].get(j - offsets[i]);
         }
-        newNulls[oldNulls.length] = newObjNull;
-        resNulls.add(newNulls);
-        return resNulls;
+        forward = true;
       }
     }
-    return resNulls;
+    if (forward) {
+      internalForward(forwardCache, outputObjInspector);
+      countAfterReport = 0;
+    }
   }
 
-  private ArrayList<boolean[]> joinObjectsFullOuterJoin(
-      ArrayList<boolean[]> resNulls, ArrayList<boolean[]> inputNulls,
-      ArrayList<Object> newObj, IntermediateObject intObj, int left,
-      boolean newObjNull, boolean firstRow) {
-    if (newObjNull) {
-      Iterator<boolean[]> nullsIter = inputNulls.iterator();
-      while (nullsIter.hasNext()) {
-        boolean[] oldNulls = nullsIter.next();
-        boolean[] newNulls = new boolean[intObj.getCurSize()];
-        copyOldArray(oldNulls, newNulls);
-        newNulls[oldNulls.length] = newObjNull;
-        resNulls.add(newNulls);
+  // entry point (aliasNum = 0)
+  private void genJoinObject() throws HiveException {
+    boolean rightFirst = true;
+    boolean hasFilter = hasFilter(order[0]);
+    AbstractRowContainer.RowIterator<List<Object>> iter = storage[order[0]].rowIter();
+    for (List<Object> rightObj = iter.first(); rightObj != null; rightObj = iter.next()) {
+      boolean rightNull = rightObj == dummyObj[0];
+      if (hasFilter) {
+        filterTags[0] = getFilterTag(rightObj);
       }
-      return resNulls;
+      skipVectors[0][0] = rightNull;
+      intermediate[0] = rightObj;
+
+      genObject(1, rightFirst, rightNull);
+      rightFirst = false;
     }
-
-    if (inputNulls.isEmpty() && firstRow) {
-      boolean[] newNulls = new boolean[intObj.getCurSize()];
-      for (int i = 0; i < intObj.getCurSize() - 1; i++) {
-        newNulls[i] = true;
-      }
-      newNulls[intObj.getCurSize() - 1] = newObjNull;
-      resNulls.add(newNulls);
-      return resNulls;
-    }
-
-    boolean allOldObjsNull = firstRow;
-
-    Iterator<boolean[]> nullsIter = inputNulls.iterator();
-    while (nullsIter.hasNext()) {
-      boolean[] oldNulls = nullsIter.next();
-      if (!oldNulls[left]) {
-        allOldObjsNull = false;
-        break;
-      }
-    }
-
-    // if the row does not pass through filter, all old Objects are null
-    if (((BooleanWritable)newObj.get(newObj.size()-1)).get()) {
-      allOldObjsNull = true;
-    }
-    boolean rhsPreserved = false;
-
-    nullsIter = inputNulls.iterator();
-    while (nullsIter.hasNext()) {
-      boolean[] oldNulls = nullsIter.next();
-      // old obj is null even if the row corresponding to the left alias
-      // does not pass through filter
-      boolean oldObjNull = oldNulls[left] || ((BooleanWritable)
-        (intObj.getObjs()[left].get(joinValues.get(order[left]).size()))).get()
-        || allOldObjsNull;
-      if (!oldObjNull) {
-        boolean[] newNulls = new boolean[intObj.getCurSize()];
-        copyOldArray(oldNulls, newNulls);
-        newNulls[oldNulls.length] = newObjNull;
-        resNulls.add(newNulls);
-      } else if (oldObjNull) {
-        boolean[] newNulls = new boolean[intObj.getCurSize()];
-        copyOldArray(oldNulls, newNulls);
-        newNulls[oldNulls.length] = true;
-        resNulls.add(newNulls);
-
-        if (allOldObjsNull && !rhsPreserved) {
-          newNulls = new boolean[intObj.getCurSize()];
-          for (int i = 0; i < oldNulls.length; i++) {
-            newNulls[i] = true;
-          }
-          newNulls[oldNulls.length] = false;
-          resNulls.add(newNulls);
-          rhsPreserved = true;
-        }
-      }
-    }
-    return resNulls;
   }
 
-  /*
-   * The new input is added to the list of existing inputs. Each entry in the
-   * array of inputNulls denotes the entries in the intermediate object to be
-   * used. The intermediate object is augmented with the new object, and list of
-   * nulls is changed appropriately. The list will contain all non-nulls for a
-   * inner join. The outer joins are processed appropriately.
-   */
-  private ArrayList<boolean[]> joinObjects(ArrayList<boolean[]> inputNulls,
-      ArrayList<Object> newObj, IntermediateObject intObj, int joinPos,
-      boolean firstRow) {
-    ArrayList<boolean[]> resNulls = new ArrayList<boolean[]>();
-    boolean newObjNull = newObj == dummyObj[joinPos] ? true : false;
-    if (joinPos == 0) {
-      if (newObjNull) {
-        return null;
-      }
-      boolean[] nulls = new boolean[1];
-      nulls[0] = newObjNull;
-      resNulls.add(nulls);
-      return resNulls;
-    }
-
-    int left = condn[joinPos - 1].getLeft();
-    int type = condn[joinPos - 1].getType();
-
-    // process all nulls for RIGHT and FULL OUTER JOINS
-    if (((type == JoinDesc.RIGHT_OUTER_JOIN) || (type == JoinDesc.FULL_OUTER_JOIN))
-        && !newObjNull && (inputNulls == null) && firstRow) {
-      boolean[] newNulls = new boolean[intObj.getCurSize()];
-      for (int i = 0; i < newNulls.length - 1; i++) {
-        newNulls[i] = true;
-      }
-      newNulls[newNulls.length - 1] = false;
-      resNulls.add(newNulls);
-      return resNulls;
-    }
-
-    if (inputNulls == null) {
-      return null;
-    }
-
-    if (type == JoinDesc.INNER_JOIN) {
-      return joinObjectsInnerJoin(resNulls, inputNulls, newObj, intObj, left,
-          newObjNull);
-    } else if (type == JoinDesc.LEFT_OUTER_JOIN) {
-      return joinObjectsLeftOuterJoin(resNulls, inputNulls, newObj, intObj,
-          left, newObjNull);
-    } else if (type == JoinDesc.RIGHT_OUTER_JOIN) {
-      return joinObjectsRightOuterJoin(resNulls, inputNulls, newObj, intObj,
-          left, newObjNull, firstRow);
-    } else if (type == JoinDesc.LEFT_SEMI_JOIN) {
-      return joinObjectsLeftSemiJoin(resNulls, inputNulls, newObj, intObj,
-          left, newObjNull);
-    }
-
-    assert (type == JoinDesc.FULL_OUTER_JOIN);
-    return joinObjectsFullOuterJoin(resNulls, inputNulls, newObj, intObj, left,
-        newObjNull, firstRow);
-  }
-
-  /*
-   * genObject is a recursive function. For the inputs, a array of bitvectors is
-   * maintained (inputNulls) where each entry denotes whether the element is to
-   * be used or not (whether it is null or not). The size of the bitvector is
-   * same as the number of inputs under consideration currently. When all inputs
-   * are accounted for, the output is forwarded appropriately.
-   */
-  private void genObject(ArrayList<boolean[]> inputNulls, int aliasNum,
-      IntermediateObject intObj, boolean firstRow) throws HiveException {
-    boolean childFirstRow = firstRow;
-    boolean skipping = false;
-
+  // creates objects in recursive manner
+  private void genObject(int aliasNum, boolean allLeftFirst, boolean allLeftNull)
+      throws HiveException {
     if (aliasNum < numAliases) {
 
+      boolean[] skip = skipVectors[aliasNum];
+      boolean[] prevSkip = skipVectors[aliasNum - 1];
+
+      JoinCondDesc joinCond = condn[aliasNum - 1];
+      int type = joinCond.getType();
+      int left = joinCond.getLeft();
+      int right = joinCond.getRight();
+
       // search for match in the rhs table
-      AbstractRowContainer<ArrayList<Object>> aliasRes = storage.get(order[aliasNum]);
+      AbstractRowContainer<List<Object>> aliasRes = storage[order[aliasNum]];
 
-      for (ArrayList<Object> newObj = aliasRes.first(); newObj != null; newObj = aliasRes
-          .next()) {
+      boolean done = false;
+      boolean loopAgain = false;
+      boolean tryLOForFO = type == JoinDesc.FULL_OUTER_JOIN;
 
-        // check for skipping in case of left semi join
-        if (aliasNum > 0
-            && condn[aliasNum - 1].getType() == JoinDesc.LEFT_SEMI_JOIN
-            && newObj != dummyObj[aliasNum]) { // successful match
-          skipping = true;
+      boolean rightFirst = true;
+      AbstractRowContainer.RowIterator<List<Object>> iter = aliasRes.rowIter();
+      for (List<Object> rightObj = iter.first(); !done && rightObj != null;
+           rightObj = loopAgain ? rightObj : iter.next(), rightFirst = loopAgain = false) {
+        System.arraycopy(prevSkip, 0, skip, 0, prevSkip.length);
+
+        boolean rightNull = rightObj == dummyObj[aliasNum];
+        if (hasFilter(order[aliasNum])) {
+          filterTags[aliasNum] = getFilterTag(rightObj);
         }
+        skip[right] = rightNull;
 
-        intObj.pushObj(newObj);
-
-        // execute the actual join algorithm
-        ArrayList<boolean[]> newNulls = joinObjects(inputNulls, newObj, intObj,
-            aliasNum, childFirstRow);
+        if (type == JoinDesc.INNER_JOIN) {
+          innerJoin(skip, left, right);
+        } else if (type == JoinDesc.LEFT_SEMI_JOIN) {
+          if (innerJoin(skip, left, right)) {
+            // if left-semi-join found a match, skipping the rest of the rows in the
+            // rhs table of the semijoin
+            done = true;
+          }
+        } else if (type == JoinDesc.LEFT_OUTER_JOIN ||
+            (type == JoinDesc.FULL_OUTER_JOIN && rightNull)) {
+          int result = leftOuterJoin(skip, left, right);
+          if (result < 0) {
+            continue;
+          }
+          done = result > 0;
+        } else if (type == JoinDesc.RIGHT_OUTER_JOIN ||
+            (type == JoinDesc.FULL_OUTER_JOIN && allLeftNull)) {
+          if (allLeftFirst && !rightOuterJoin(skip, left, right) ||
+            !allLeftFirst && !innerJoin(skip, left, right)) {
+            continue;
+          }
+        } else if (type == JoinDesc.FULL_OUTER_JOIN) {
+          if (tryLOForFO && leftOuterJoin(skip, left, right) > 0) {
+            loopAgain = allLeftFirst;
+            done = !loopAgain;
+            tryLOForFO = false;
+          } else if (allLeftFirst && !rightOuterJoin(skip, left, right) ||
+            !allLeftFirst && !innerJoin(skip, left, right)) {
+            continue;
+          }
+        }
+        intermediate[aliasNum] = rightObj;
 
         // recursively call the join the other rhs tables
-        genObject(newNulls, aliasNum + 1, intObj, firstRow);
-
-        intObj.popObj();
-        firstRow = false;
-
-        // if left-semi-join found a match, skipping the rest of the rows in the
-        // rhs table of the semijoin
-        if (skipping) {
-          break;
-        }
+        genObject(aliasNum + 1, allLeftFirst && rightFirst, allLeftNull && rightNull);
       }
-    } else {
-      if (inputNulls == null) {
-        return;
-      }
-      Iterator<boolean[]> nullsIter = inputNulls.iterator();
-      while (nullsIter.hasNext()) {
-        boolean[] nullsVec = nullsIter.next();
-        createForwardJoinObject(intObj, nullsVec);
-      }
+    } else if (!allLeftNull) {
+      createForwardJoinObject(skipVectors[numAliases - 1]);
     }
+  }
+
+  // inner join
+  private boolean innerJoin(boolean[] skip, int left, int right) {
+    if (!isInnerJoin(skip, left, right)) {
+      Arrays.fill(skip, true);
+      return false;
+    }
+    return true;
+  }
+
+  // LO
+  //
+  // LEFT\RIGHT   skip  filtered   valid
+  // skip        --(1)     --(1)    --(1)
+  // filtered    +-(1)     +-(1)    +-(1)
+  // valid       +-(1)     +-(4*)   ++(2)
+  //
+  // * If right alias has any pair for left alias, continue (3)
+  // -1 for continue : has pair but not in this turn
+  //  0 for inner join (++) : join and continue LO
+  //  1 for left outer join (+-) : join and skip further LO
+  private int leftOuterJoin(boolean[] skip, int left, int right) {
+    if (skip[left] || skip[right] || !isLeftValid(left, right)) {
+      skip[right] = true;
+      return 1;   // case 1
+    }
+    if (isRightValid(left, right)) {
+      return 0;   // case 2
+    }
+    if (hasRightPairForLeft(left, right)) {
+      return -1;  // case 3
+    }
+    skip[right] = true;
+    return 1;     // case 4
+  }
+
+  // RO
+  //
+  // LEFT\RIGHT   skip  filtered   valid
+  // skip        --(1)     -+(1)   -+(1)
+  // filtered    --(1)     -+(1)   -+(4*)
+  // valid       --(1)     -+(1)   ++(2)
+  //
+  // * If left alias has any pair for right alias, continue (3)
+  // false for continue : has pair but not in this turn
+  private boolean rightOuterJoin(boolean[] skip, int left, int right) {
+    if (skip[left] || skip[right] || !isRightValid(left, right)) {
+      Arrays.fill(skip, 0, right, true);
+      return true;  // case 1
+    }
+    if (isLeftValid(left, right)) {
+      return true;  // case 2
+    }
+    if (hasLeftPairForRight(left, right)) {
+      return false; // case 3
+    }
+    Arrays.fill(skip, 0, right, true);
+    return true;    // case 4
+  }
+
+  // If left and right aliases are all valid, two values will be inner joined,
+  private boolean isInnerJoin(boolean[] skip, int left, int right) {
+    return !skip[left] && !skip[right] &&
+        isLeftValid(left, right) && isRightValid(left, right);
+  }
+
+  // check if left is valid
+  private boolean isLeftValid(int left, int right) {
+    return !hasFilter(left) || !JoinUtil.isFiltered(filterTags[left], right);
+  }
+
+  // check if right is valid
+  private boolean isRightValid(int left, int right) {
+    return !hasFilter(right) || !JoinUtil.isFiltered(filterTags[right], left);
+  }
+
+  // check if any left pair exists for right objects
+  private boolean hasLeftPairForRight(int left, int right) {
+    return !JoinUtil.isFiltered(aliasFilterTags[left], right);
+  }
+
+  // check if any right pair exists for left objects
+  private boolean hasRightPairForLeft(int left, int right) {
+    return !JoinUtil.isFiltered(aliasFilterTags[right], left);
+  }
+
+  private boolean hasAnyFiltered(int alias, List<Object> row) {
+    return row == dummyObj[alias] || hasFilter(alias) && JoinUtil.hasAnyFiltered(getFilterTag(row));
+  }
+
+  protected final boolean hasFilter(int alias) {
+    return filterMaps != null && filterMaps[alias] != null;
+  }
+
+  // get tag value from object (last of list)
+  protected final short getFilterTag(List<Object> row) {
+    return ((ShortWritable) row.get(row.size() - 1)).get();
   }
 
   /**
@@ -712,22 +631,24 @@ transient boolean newGroupStarted = false;
    */
   @Override
   public void endGroup() throws HiveException {
-    LOG.trace("Join Op: endGroup called: numValues=" + numAliases);
-
     checkAndGenObject();
+  }
+
+  protected void internalForward(Object row, ObjectInspector outputOI) throws HiveException {
+    forward(row, outputOI);
   }
 
   private void genUniqueJoinObject(int aliasNum, int forwardCachePos)
       throws HiveException {
-    AbstractRowContainer<ArrayList<Object>> alias = storage.get(order[aliasNum]);
-    for (ArrayList<Object> row = alias.first(); row != null; row = alias.next()) {
-      int sz = joinValues.get(order[aliasNum]).size();
+    AbstractRowContainer.RowIterator<List<Object>> iter = storage[order[aliasNum]].rowIter();
+    for (List<Object> row = iter.first(); row != null; row = iter.next()) {
+      int sz = joinValues[order[aliasNum]].size();
       int p = forwardCachePos;
       for (int j = 0; j < sz; j++) {
         forwardCache[p++] = row.get(j);
       }
       if (aliasNum == numAliases - 1) {
-        forward(forwardCache, outputObjInspector);
+        internalForward(forwardCache, outputObjInspector);
         countAfterReport = 0;
       } else {
         genUniqueJoinObject(aliasNum + 1, p);
@@ -739,20 +660,19 @@ transient boolean newGroupStarted = false;
       throws HiveException {
     int p = 0;
     for (int i = 0; i < numAliases; i++) {
-      int sz = joinValues.get(order[i]).size();
-      ArrayList<Object> obj = storage.get(order[i]).first();
+      int sz = joinValues[order[i]].size();
+      List<Object> obj = storage[order[i]].rowIter().first();
       for (int j = 0; j < sz; j++) {
         forwardCache[p++] = obj.get(j);
       }
     }
 
-    forward(forwardCache, outputObjInspector);
+    internalForward(forwardCache, outputObjInspector);
     countAfterReport = 0;
   }
 
   protected void checkAndGenObject() throws HiveException {
     if (condn[0].getType() == JoinDesc.UNIQUE_JOIN) {
-      new IntermediateObject(new ArrayList[numAliases], 0);
 
       // Check if results need to be emitted.
       // Results only need to be emitted if there is a non-null entry in a table
@@ -763,14 +683,14 @@ transient boolean newGroupStarted = false;
       boolean allOne = true;
       for (int i = 0; i < numAliases; i++) {
         Byte alias = order[i];
-        AbstractRowContainer<ArrayList<Object>> alw = storage.get(alias);
+        AbstractRowContainer<List<Object>> alw = storage[alias];
 
-        if (alw.size() != 1) {
+        if (alw.rowCount() != 1) {
           allOne = false;
         }
 
-        if (alw.size() == 0) {
-          alw.add((ArrayList<Object>) dummyObj[i]);
+        if (alw.rowCount() == 0) {
+          alw.addRow(dummyObj[i]);
           hasNulls = true;
         } else if (condn[i].getPreserved()) {
           preserve = true;
@@ -782,13 +702,9 @@ transient boolean newGroupStarted = false;
       }
 
       if (allOne) {
-        LOG.info("calling genAllOneUniqueJoinObject");
         genAllOneUniqueJoinObject();
-        LOG.info("called genAllOneUniqueJoinObject");
       } else {
-        LOG.trace("calling genUniqueJoinObject");
         genUniqueJoinObject(0, 0);
-        LOG.trace("called genUniqueJoinObject");
       }
     } else {
       // does any result need to be emitted
@@ -796,33 +712,29 @@ transient boolean newGroupStarted = false;
       boolean hasEmpty = false;
       for (int i = 0; i < numAliases; i++) {
         Byte alias = order[i];
-        AbstractRowContainer<ArrayList<Object>> alw = storage.get(alias);
+        AbstractRowContainer<List<Object>> alw = storage[alias];
 
         if (noOuterJoin) {
-          if (alw.size() == 0) {
-            LOG.trace("No data for alias=" + i);
+          if (alw.rowCount() == 0) {
             return;
-          } else if (alw.size() > 1) {
+          } else if (alw.rowCount() > 1) {
             mayHasMoreThanOne = true;
           }
         } else {
-          if (alw.size() == 0) {
+          if (alw.rowCount() == 0) {
             hasEmpty = true;
-            alw.add((ArrayList<Object>) dummyObj[i]);
-          } else if (!hasEmpty && alw.size() == 1) {
-            ArrayList<Object> row = alw.first();
-            int numValues = joinValues.get(alias).size();
-            if (row == dummyObj[alias]
-                || (row.size() > numValues && ((BooleanWritable) (row.get(numValues))).get())) {
+            alw.addRow(dummyObj[i]);
+          } else if (!hasEmpty && alw.rowCount() == 1) {
+            if (hasAnyFiltered(alias, alw.rowIter().first())) {
               hasEmpty = true;
             }
           } else {
             mayHasMoreThanOne = true;
             if (!hasEmpty) {
-              int numValues = joinValues.get(alias).size();
-              for (ArrayList<Object> row = alw.first(); row != null; row = alw.next()) {
-                if (row == dummyObj[alias]
-                    || (row.size() > numValues && ((BooleanWritable) (row.get(numValues))).get())) {
+              AbstractRowContainer.RowIterator<List<Object>> iter = alw.rowIter();
+              for (List<Object> row = iter.first(); row != null; row = iter.next()) {
+                reportProgress();
+                if (hasAnyFiltered(alias, row)) {
                   hasEmpty = true;
                   break;
                 }
@@ -833,20 +745,14 @@ transient boolean newGroupStarted = false;
       }
 
       if (!hasEmpty && !mayHasMoreThanOne) {
-        LOG.trace("calling genAllOneUniqueJoinObject");
         genAllOneUniqueJoinObject();
-        LOG.trace("called genAllOneUniqueJoinObject");
-      } else if (!hasEmpty) {
-        LOG.trace("calling genUniqueJoinObject");
+      } else if (!hasEmpty && !hasLeftSemiJoin) {
         genUniqueJoinObject(0, 0);
-        LOG.trace("called genUniqueJoinObject");
       } else {
-        LOG.trace("calling genObject");
-        genObject(null, 0, new IntermediateObject(new ArrayList[numAliases], 0),
-            true);
-        LOG.trace("called genObject");
+        genJoinObject();
       }
     }
+    Arrays.fill(aliasFilterTags, (byte)0xff);
   }
 
   protected void reportProgress() {
@@ -861,41 +767,25 @@ transient boolean newGroupStarted = false;
   }
 
   /**
-   * Returns true if the row does not pass through filters.
-   */
-  protected static Boolean isFiltered(Object row,
-      List<ExprNodeEvaluator> filters, List<ObjectInspector> ois)
-      throws HiveException {
-    // apply join filters on the row.
-    Boolean ret = false;
-    for (int j = 0; j < filters.size(); j++) {
-      Object condition = filters.get(j).evaluate(row);
-      ret = (Boolean) ((PrimitiveObjectInspector)
-          ois.get(j)).getPrimitiveJavaObject(condition);
-      if (ret == null || !ret) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /**
    * All done.
    *
    */
   @Override
   public void closeOp(boolean abort) throws HiveException {
-    LOG.trace("Join Op close");
-    for (AbstractRowContainer<ArrayList<Object>> alw : storage.values()) {
+    for (AbstractRowContainer<List<Object>> alw : storage) {
       if (alw != null) {
-        alw.clear(); // clean up the temp files
+        alw.clearRows(); // clean up the temp files
       }
     }
-    storage.clear();
+    Arrays.fill(storage, null);
   }
 
   @Override
   public String getName() {
+    return getOperatorName();
+  }
+
+  static public String getOperatorName() {
     return "JOIN";
   }
 
@@ -914,4 +804,13 @@ transient boolean newGroupStarted = false;
     this.posToAliasMap = posToAliasMap;
   }
 
+  @Override
+  public boolean opAllowedBeforeMapJoin() {
+    return false;
+  }
+
+  @Override
+  public boolean opAllowedAfterMapJoin() {
+    return false;
+  }
 }

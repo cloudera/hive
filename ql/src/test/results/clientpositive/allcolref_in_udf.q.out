@@ -1,0 +1,231 @@
+PREHOOK: query: explain
+select concat(*),array(*) from src where key < 100 limit 10
+PREHOOK: type: QUERY
+POSTHOOK: query: explain
+select concat(*),array(*) from src where key < 100 limit 10
+POSTHOOK: type: QUERY
+STAGE DEPENDENCIES:
+  Stage-1 is a root stage
+  Stage-0 depends on stages: Stage-1
+
+STAGE PLANS:
+  Stage: Stage-1
+    Map Reduce
+      Map Operator Tree:
+          TableScan
+            alias: src
+            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+            Filter Operator
+              predicate: (UDFToDouble(key) < 100.0) (type: boolean)
+              Statistics: Num rows: 166 Data size: 1763 Basic stats: COMPLETE Column stats: NONE
+              Select Operator
+                expressions: concat(key, value) (type: string), array(key,value) (type: array<string>)
+                outputColumnNames: _col0, _col1
+                Statistics: Num rows: 166 Data size: 1763 Basic stats: COMPLETE Column stats: NONE
+                Limit
+                  Number of rows: 10
+                  Statistics: Num rows: 10 Data size: 100 Basic stats: COMPLETE Column stats: NONE
+                  File Output Operator
+                    compressed: false
+                    Statistics: Num rows: 10 Data size: 100 Basic stats: COMPLETE Column stats: NONE
+                    table:
+                        input format: org.apache.hadoop.mapred.TextInputFormat
+                        output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                        serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+
+  Stage: Stage-0
+    Fetch Operator
+      limit: 10
+      Processor Tree:
+        ListSink
+
+PREHOOK: query: select concat(*),array(*) from src where key < 100 limit 10
+PREHOOK: type: QUERY
+PREHOOK: Input: default@src
+#### A masked pattern was here ####
+POSTHOOK: query: select concat(*),array(*) from src where key < 100 limit 10
+POSTHOOK: type: QUERY
+POSTHOOK: Input: default@src
+#### A masked pattern was here ####
+86val_86	["86","val_86"]
+27val_27	["27","val_27"]
+98val_98	["98","val_98"]
+66val_66	["66","val_66"]
+37val_37	["37","val_37"]
+15val_15	["15","val_15"]
+82val_82	["82","val_82"]
+17val_17	["17","val_17"]
+0val_0	["0","val_0"]
+57val_57	["57","val_57"]
+PREHOOK: query: -- The order of columns is decided by row schema of prev operator
+-- Like join which has two or more aliases, it's from left most aias to right aliases.
+
+explain
+select stack(2, *) as (e1,e2,e3) from (
+  select concat(*), concat(a.*), concat(b.*), concat(a.*, b.key), concat(a.key, b.*)
+  from src a join src b on a.key+1=b.key where a.key < 100) x limit 10
+PREHOOK: type: QUERY
+POSTHOOK: query: -- The order of columns is decided by row schema of prev operator
+-- Like join which has two or more aliases, it's from left most aias to right aliases.
+
+explain
+select stack(2, *) as (e1,e2,e3) from (
+  select concat(*), concat(a.*), concat(b.*), concat(a.*, b.key), concat(a.key, b.*)
+  from src a join src b on a.key+1=b.key where a.key < 100) x limit 10
+POSTHOOK: type: QUERY
+STAGE DEPENDENCIES:
+  Stage-1 is a root stage
+  Stage-0 depends on stages: Stage-1
+
+STAGE PLANS:
+  Stage: Stage-1
+    Map Reduce
+      Map Operator Tree:
+          TableScan
+            alias: a
+            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+            Filter Operator
+              predicate: ((key + 1) is not null and (key < 100)) (type: boolean)
+              Statistics: Num rows: 83 Data size: 881 Basic stats: COMPLETE Column stats: NONE
+              Reduce Output Operator
+                key expressions: (key + 1) (type: double)
+                sort order: +
+                Map-reduce partition columns: (key + 1) (type: double)
+                Statistics: Num rows: 83 Data size: 881 Basic stats: COMPLETE Column stats: NONE
+                value expressions: key (type: string), value (type: string)
+          TableScan
+            alias: b
+            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+            Filter Operator
+              predicate: UDFToDouble(key) is not null (type: boolean)
+              Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+              Reduce Output Operator
+                key expressions: UDFToDouble(key) (type: double)
+                sort order: +
+                Map-reduce partition columns: UDFToDouble(key) (type: double)
+                Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+                value expressions: key (type: string), value (type: string)
+      Reduce Operator Tree:
+        Join Operator
+          condition map:
+               Inner Join 0 to 1
+          keys:
+            0 (key + 1) (type: double)
+            1 UDFToDouble(key) (type: double)
+          outputColumnNames: _col0, _col1, _col5, _col6
+          Statistics: Num rows: 275 Data size: 2921 Basic stats: COMPLETE Column stats: NONE
+          Select Operator
+            expressions: 2 (type: int), concat(_col0, _col1, _col5, _col6) (type: string), concat(_col0, _col1) (type: string), concat(_col5, _col6) (type: string), concat(_col0, _col1, _col5) (type: string), concat(_col0, _col5, _col6) (type: string)
+            outputColumnNames: _col0, _col1, _col2, _col3, _col4, _col5
+            Statistics: Num rows: 275 Data size: 2921 Basic stats: COMPLETE Column stats: NONE
+            UDTF Operator
+              Statistics: Num rows: 275 Data size: 2921 Basic stats: COMPLETE Column stats: NONE
+              function name: stack
+              Limit
+                Number of rows: 10
+                Statistics: Num rows: 10 Data size: 100 Basic stats: COMPLETE Column stats: NONE
+                File Output Operator
+                  compressed: false
+                  Statistics: Num rows: 10 Data size: 100 Basic stats: COMPLETE Column stats: NONE
+                  table:
+                      input format: org.apache.hadoop.mapred.TextInputFormat
+                      output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                      serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+
+  Stage: Stage-0
+    Fetch Operator
+      limit: 10
+      Processor Tree:
+        ListSink
+
+PREHOOK: query: select stack(2, *) as (e1,e2,e3) from (
+  select concat(*), concat(a.*), concat(b.*), concat(a.*, b.key), concat(a.key, b.*)
+  from src a join src b on a.key+1=b.key where a.key < 100) x limit 10
+PREHOOK: type: QUERY
+PREHOOK: Input: default@src
+#### A masked pattern was here ####
+POSTHOOK: query: select stack(2, *) as (e1,e2,e3) from (
+  select concat(*), concat(a.*), concat(b.*), concat(a.*, b.key), concat(a.key, b.*)
+  from src a join src b on a.key+1=b.key where a.key < 100) x limit 10
+POSTHOOK: type: QUERY
+POSTHOOK: Input: default@src
+#### A masked pattern was here ####
+4val_45val_5	4val_4	5val_5
+4val_45	NULL	5val_5
+4val_45val_5	4val_4	5val_5
+4val_45	NULL	5val_5
+4val_45val_5	4val_4	5val_5
+4val_45	NULL	5val_5
+8val_89val_9	8val_8	9val_9
+8val_89	NULL	9val_9
+9val_910val_10	9val_9	10val_10
+9val_910	NULL	10val_10
+PREHOOK: query: -- HIVE-4181 TOK_FUNCTIONSTAR for UDTF
+create table allcolref as select array(key, value) from src
+PREHOOK: type: CREATETABLE_AS_SELECT
+PREHOOK: Input: default@src
+PREHOOK: Output: database:default
+PREHOOK: Output: default@allcolref
+POSTHOOK: query: -- HIVE-4181 TOK_FUNCTIONSTAR for UDTF
+create table allcolref as select array(key, value) from src
+POSTHOOK: type: CREATETABLE_AS_SELECT
+POSTHOOK: Input: default@src
+POSTHOOK: Output: database:default
+POSTHOOK: Output: default@allcolref
+PREHOOK: query: explain select explode(*) as x from allcolref limit 10
+PREHOOK: type: QUERY
+POSTHOOK: query: explain select explode(*) as x from allcolref limit 10
+POSTHOOK: type: QUERY
+STAGE DEPENDENCIES:
+  Stage-1 is a root stage
+  Stage-0 depends on stages: Stage-1
+
+STAGE PLANS:
+  Stage: Stage-1
+    Map Reduce
+      Map Operator Tree:
+          TableScan
+            alias: allcolref
+            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+            Select Operator
+              expressions: c0 (type: array<string>)
+              outputColumnNames: _col0
+              Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+              UDTF Operator
+                Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+                function name: explode
+                Limit
+                  Number of rows: 10
+                  Statistics: Num rows: 10 Data size: 100 Basic stats: COMPLETE Column stats: NONE
+                  File Output Operator
+                    compressed: false
+                    Statistics: Num rows: 10 Data size: 100 Basic stats: COMPLETE Column stats: NONE
+                    table:
+                        input format: org.apache.hadoop.mapred.TextInputFormat
+                        output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                        serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+
+  Stage: Stage-0
+    Fetch Operator
+      limit: 10
+      Processor Tree:
+        ListSink
+
+PREHOOK: query: select explode(*) as x from allcolref limit 10
+PREHOOK: type: QUERY
+PREHOOK: Input: default@allcolref
+#### A masked pattern was here ####
+POSTHOOK: query: select explode(*) as x from allcolref limit 10
+POSTHOOK: type: QUERY
+POSTHOOK: Input: default@allcolref
+#### A masked pattern was here ####
+238
+val_238
+86
+val_86
+311
+val_311
+27
+val_27
+165
+val_165

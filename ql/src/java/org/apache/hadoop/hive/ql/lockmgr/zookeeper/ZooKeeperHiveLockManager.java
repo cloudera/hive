@@ -18,71 +18,51 @@
 
 package org.apache.hadoop.hive.ql.lockmgr.zookeeper;
 
-import org.apache.zookeeper.ZooKeeper;
-import org.apache.zookeeper.CreateMode;
-import org.apache.zookeeper.Watcher;
-import org.apache.zookeeper.ZooDefs.Ids;
-import java.io.IOException;
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Set;
-import java.util.Queue;
-import java.util.LinkedList;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.Comparator;
-import java.util.Collections;
-import java.util.LinkedHashSet;
-import java.util.regex.Pattern;
-import java.util.regex.Matcher;
-import org.apache.commons.lang.StringEscapeUtils;
-import org.apache.zookeeper.KeeperException;
-
-import org.apache.hadoop.hive.ql.parse.ErrorMsg;
-import org.apache.hadoop.hive.ql.parse.SemanticException;
-import org.apache.hadoop.hive.ql.lockmgr.HiveLockManager;
-import org.apache.hadoop.hive.ql.lockmgr.HiveLockManagerCtx;
-import org.apache.hadoop.hive.ql.lockmgr.HiveLock;
-import org.apache.hadoop.hive.ql.lockmgr.HiveLockObj;
-import org.apache.hadoop.hive.ql.lockmgr.HiveLockObject;
-import org.apache.hadoop.hive.ql.lockmgr.HiveLockObject.HiveLockObjectData;
-import org.apache.hadoop.hive.ql.lockmgr.HiveLockMode;
-import org.apache.hadoop.hive.ql.lockmgr.LockException;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.ql.ErrorMsg;
+import org.apache.hadoop.hive.ql.lockmgr.*;
+import org.apache.hadoop.hive.ql.lockmgr.HiveLockObject.HiveLockObjectData;
+import org.apache.hadoop.hive.ql.metadata.*;
 import org.apache.hadoop.hive.ql.session.SessionState.LogHelper;
-import org.apache.hadoop.hive.ql.metadata.Partition;
-import org.apache.hadoop.hive.ql.metadata.DummyPartition;
-import org.apache.hadoop.hive.ql.metadata.Table;
-import org.apache.hadoop.hive.ql.metadata.Hive;
-import org.apache.hadoop.hive.ql.metadata.HiveException;
+import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.KeeperException;
+import org.apache.curator.framework.CuratorFramework;
+
+import java.net.InetAddress;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class ZooKeeperHiveLockManager implements HiveLockManager {
   HiveLockManagerCtx ctx;
   public static final Log LOG = LogFactory.getLog("ZooKeeperHiveLockManager");
   static final private LogHelper console = new LogHelper(LOG);
 
-  private ZooKeeper zooKeeper;
+  private static CuratorFramework curatorFramework;
 
   // All the locks are created under this parent
   private String    parent;
 
-  private int sessionTimeout;
-  private String quorumServers;
+  private long sleepTime;
+  private int numRetriesForLock;
+  private int numRetriesForUnLock;
 
-  public ZooKeeperHiveLockManager() {
+  private static String clientIp;
+
+  static {
+    clientIp = "UNKNOWN";
+    try {
+      InetAddress clientAddr = InetAddress.getLocalHost();
+      clientIp = clientAddr.getHostAddress();
+    } catch (Exception e1) {
+    }
   }
 
-  /**
-   * @param conf  The hive configuration
-   * Get the quorum server address from the configuration. The format is:
-   * host1:port, host2:port..
-   **/
-  private static String getQuorumServers(HiveConf conf) {
-    String hosts = conf.getVar(HiveConf.ConfVars.HIVE_ZOOKEEPER_QUORUM);
-    String port = conf.getVar(HiveConf.ConfVars.HIVE_ZOOKEEPER_CLIENT_PORT);
-    return hosts + ":" + port;
+  public ZooKeeperHiveLockManager() {
   }
 
   /**
@@ -92,33 +72,36 @@ public class ZooKeeperHiveLockManager implements HiveLockManager {
   public void setContext(HiveLockManagerCtx ctx) throws LockException {
     this.ctx = ctx;
     HiveConf conf = ctx.getConf();
-    sessionTimeout = conf.getIntVar(HiveConf.ConfVars.HIVE_ZOOKEEPER_SESSION_TIMEOUT);
-    quorumServers = ZooKeeperHiveLockManager.getQuorumServers(conf);
+
+    sleepTime = conf.getTimeVar(
+        HiveConf.ConfVars.HIVE_LOCK_SLEEP_BETWEEN_RETRIES, TimeUnit.MILLISECONDS);
+    numRetriesForLock = conf.getIntVar(HiveConf.ConfVars.HIVE_LOCK_NUMRETRIES);
+    numRetriesForUnLock = conf.getIntVar(HiveConf.ConfVars.HIVE_UNLOCK_NUMRETRIES);
 
     try {
-      renewZookeeperInstance(sessionTimeout, quorumServers);
+      curatorFramework = CuratorFrameworkSingleton.getInstance(conf);
       parent = conf.getVar(HiveConf.ConfVars.HIVE_ZOOKEEPER_NAMESPACE);
-
-      try {
-        String par = zooKeeper.create("/" +  parent, new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-      } catch (KeeperException e) {
+      try{
+        curatorFramework.create().withMode(CreateMode.PERSISTENT).forPath("/" +  parent, new byte[0]);
+      } catch (Exception e) {
         // ignore if the parent already exists
+        if (!(e instanceof KeeperException) || ((KeeperException)e).code() != KeeperException.Code.NODEEXISTS) {
+          LOG.warn("Unexpected ZK exception when creating parent node /" + parent, e);
+        }
       }
-
-
     } catch (Exception e) {
-      LOG.error("Failed to create ZooKeeper object: " + e);
+      LOG.error("Failed to create curatorFramework object: ", e);
       throw new LockException(ErrorMsg.ZOOKEEPER_CLIENT_COULD_NOT_BE_INITIALIZED.getMsg());
     }
   }
 
-  private void renewZookeeperInstance(int sessionTimeout, String quorumServers)
-      throws InterruptedException, IOException {
-    if (zooKeeper != null) {
-      zooKeeper.close();
-    }
-
-    zooKeeper = new ZooKeeper(quorumServers, sessionTimeout, new DummyWatcher());
+  @Override
+  public void refresh() {
+    HiveConf conf = ctx.getConf();
+    sleepTime = conf.getTimeVar(
+        HiveConf.ConfVars.HIVE_LOCK_SLEEP_BETWEEN_RETRIES, TimeUnit.MILLISECONDS);
+    numRetriesForLock = conf.getIntVar(HiveConf.ConfVars.HIVE_LOCK_NUMRETRIES);
+    numRetriesForUnLock = conf.getIntVar(HiveConf.ConfVars.HIVE_UNLOCK_NUMRETRIES);
   }
 
   /**
@@ -152,14 +135,12 @@ public class ZooKeeperHiveLockManager implements HiveLockManager {
   /**
    * @param  lockObjects  List of objects and the modes of the locks requested
    * @param  keepAlive    Whether the lock is to be persisted after the statement
-   * @param  numRetries   number of retries when the lock can not be acquired
-   * @param  sleepTime    sleep time between retries
    *
    * Acuire all the locks. Release all the locks and return null if any lock
    * could not be acquired.
    **/
   public List<HiveLock> lock(List<HiveLockObj> lockObjects,
-      boolean keepAlive, int numRetries, int sleepTime) throws LockException
+      boolean keepAlive) throws LockException
   {
     // Sort the objects first. You are guaranteed that if a partition is being locked,
     // the table has already been locked
@@ -198,10 +179,10 @@ public class ZooKeeperHiveLockManager implements HiveLockManager {
 
       HiveLock lock = null;
       try {
-        lock = lock(lockObject.getObj(), lockObject.getMode(), false,
-                    numRetries, sleepTime, true);
+        lock = lock(lockObject.getObj(), lockObject.getMode(), keepAlive, true);
       } catch (LockException e) {
-        console.printError("Error in acquireLocks: "+ e.getLocalizedMessage());
+        console.printError("Error in acquireLocks..." );
+        LOG.error("Error in acquireLocks...", e);
         lock = null;
       }
 
@@ -229,148 +210,197 @@ public class ZooKeeperHiveLockManager implements HiveLockManager {
       for (int pos = len-1; pos >= 0; pos--) {
         HiveLock hiveLock = hiveLocks.get(pos);
         try {
+          LOG.info(" about to release lock for " + hiveLock.getHiveLockObject().getName());
           unlock(hiveLock);
         } catch (LockException e) {
           // The lock may have been released. Ignore and continue
+          LOG.warn("Error when releasing lock", e);
         }
       }
     }
   }
 
   /**
-   * @param  key          The object to be locked
-   * @param  mode         The mode of the lock
-   * @param  keepAlive    Whether the lock is to be persisted after the statement
-   * @param  numRetries   number of retries when the lock can not be acquired
-   * @param  sleepTime    sleep time between retries
-   *
-   * Acuire the lock. Return null if a conflicting lock is present.
+   * @param key
+   *          The object to be locked
+   * @param mode
+   *          The mode of the lock
+   * @param keepAlive
+   *          Whether the lock is to be persisted after the statement Acquire the
+   *          lock. Return null if a conflicting lock is present.
    **/
   public ZooKeeperHiveLock lock(HiveLockObject key, HiveLockMode mode,
-      boolean keepAlive, int numRetries, int sleepTime)
-    throws LockException {
-    return lock(key, mode, keepAlive, numRetries, sleepTime, false);
+      boolean keepAlive) throws LockException {
+    return lock(key, mode, keepAlive, false);
   }
 
   /**
-   * @param  name     The name of the zookeeper child
-   * @param  data     The data for the zookeeper child
-   * @param  mode     The mode in which the child needs to be created
-   * @param  numRetries  number of retries if the child cannot be created
-   * @param  sleepTime   sleep time between retries
+   * @param name
+   *          The name of the zookeeper child
+   * @param data
+   *          The data for the zookeeper child
+   * @param mode
+   *          The mode in which the child needs to be created
+   * @throws KeeperException
+   * @throws InterruptedException
    **/
-  private String createChild(String name, byte[] data, CreateMode mode,
-                             int numRetries, int sleepTime) throws LockException {
-    String res = null;
-    int tryNum = 0;
-    while (true) {
-      String msg = null;
-      try {
-        res = zooKeeper.create(name, data, Ids.OPEN_ACL_UNSAFE, mode);
-      } catch (KeeperException e) {
-        return null;
-        // nothing to do if the node already exists
-      } catch (Exception e) {
-        msg = e.getLocalizedMessage();
-      }
-
-      if (res != null) {
-        return res;
-      }
-
-      try {
-        renewZookeeperInstance(sessionTimeout, quorumServers);
-      } catch (Exception e) {
-        console.printError("Lock for " + name
-                           + " cannot be acquired in " + mode);
-        throw new LockException(ErrorMsg.LOCK_CANNOT_BE_ACQUIRED.getMsg());
-      }
-
-      if (tryNum == numRetries) {
-        console.printError("Lock for " + name
-                           + " cannot be acquired in " + mode);
-        throw new LockException(ErrorMsg.LOCK_CANNOT_BE_ACQUIRED.getMsg());
-      }
-
-      tryNum++;
-
-      console.printInfo("Lock for " + name
-                        + " cannot be acquired in " + mode +
-                        ", will retry again later..., more info: " + msg);
-
-      try {
-        Thread.sleep(sleepTime);
-      } catch (InterruptedException e) {
-      }
-    }
+  private String createChild(String name, byte[] data, CreateMode mode)
+      throws Exception {
+    return curatorFramework.create().withMode(mode).forPath(name, data);
   }
 
   private String getLockName(String parent, HiveLockMode mode) {
     return parent + "/" + "LOCK-" + mode + "-";
   }
 
-  private ZooKeeperHiveLock lock(HiveLockObject key, HiveLockMode mode,
-                                boolean keepAlive, int numRetries, int sleepTime,
-                                boolean parentCreated)
-    throws LockException {
+  private ZooKeeperHiveLock lock (HiveLockObject key, HiveLockMode mode,
+      boolean keepAlive, boolean parentCreated) throws LockException {
+    LOG.info("Acquiring lock for " + key.getName() + " with mode " + key.getData().getLockMode());
+
+    int tryNum = 0;
+    ZooKeeperHiveLock ret = null;
+    Set<String> conflictingLocks = new HashSet<String>();
+
+    do {
+      tryNum++;
+      try {
+        if (tryNum > 1) {
+          Thread.sleep(sleepTime);
+          prepareRetry();
+        }
+        ret = lockPrimitive(key, mode, keepAlive, parentCreated, conflictingLocks);
+        if (ret != null) {
+          break;
+        }
+      } catch (Exception e1) {
+        if (e1 instanceof KeeperException) {
+          KeeperException e = (KeeperException) e1;
+          switch (e.code()) {
+          case CONNECTIONLOSS:
+          case OPERATIONTIMEOUT:
+            LOG.debug("Possibly transient ZooKeeper exception: ", e);
+            continue;
+          default:
+            LOG.error("Serious Zookeeper exception: ", e);
+            break;
+          }
+        }
+        if (tryNum >= numRetriesForLock) {
+          console.printError("Unable to acquire " + key.getData().getLockMode()
+              + ", " + mode + " lock " + key.getDisplayName() + " after "
+              + tryNum + " attempts.");
+          LOG.error("Exceeds maximum retries with errors: ", e1);
+          printConflictingLocks(key,mode,conflictingLocks);
+          conflictingLocks.clear();
+          throw new LockException(e1);
+        }
+      }
+    } while (tryNum < numRetriesForLock);
+
+    if (ret == null) {
+      console.printError("Unable to acquire " + key.getData().getLockMode()
+          + ", " + mode + " lock " + key.getDisplayName() + " after "
+          + tryNum + " attempts.");
+      printConflictingLocks(key,mode,conflictingLocks);
+    }
+    conflictingLocks.clear();
+    return ret;
+  }
+
+  private void printConflictingLocks(HiveLockObject key, HiveLockMode mode,
+      Set<String> conflictingLocks) {
+    if (!conflictingLocks.isEmpty()) {
+      HiveLockObjectData requestedLock = new HiveLockObjectData(key.getData().toString());
+      LOG.debug("Requested lock " + key.getDisplayName()
+          + ":: mode:" + requestedLock.getLockMode() + "," + mode
+          + "; query:" + requestedLock.getQueryStr());
+      for (String conflictingLock : conflictingLocks) {
+        HiveLockObjectData conflictingLockData = new HiveLockObjectData(conflictingLock);
+        LOG.debug("Conflicting lock to " + key.getDisplayName()
+            + ":: mode:" + conflictingLockData.getLockMode()
+            + ";query:" + conflictingLockData.getQueryStr()
+            + ";queryId:" + conflictingLockData.getQueryId()
+            + ";clientIp:" +  conflictingLockData.getClientIp());
+      }
+    }
+  }
+
+  private ZooKeeperHiveLock lockPrimitive(HiveLockObject key,
+      HiveLockMode mode, boolean keepAlive, boolean parentCreated,
+      Set<String> conflictingLocks)
+      throws Exception {
     String res;
 
-    try {
-      // If the parents have already been created, create the last child only
-      List<String> names = new ArrayList<String>();
-      String lastName;
+    // If the parents have already been created, create the last child only
+    List<String> names = new ArrayList<String>();
+    String lastName;
 
-      if (parentCreated) {
-        lastName = getLastObjectName(parent, key);
-        names.add(lastName);
+    HiveLockObjectData lockData = key.getData();
+    lockData.setClientIp(clientIp);
+
+    if (parentCreated) {
+      lastName = getLastObjectName(parent, key);
+      names.add(lastName);
+    } else {
+      names = getObjectNames(key);
+      lastName = names.get(names.size() - 1);
+    }
+
+    // Create the parents first
+    for (String name : names) {
+      try {
+        res = createChild(name, new byte[0], CreateMode.PERSISTENT);
+      } catch (Exception e) {
+        if (!(e instanceof KeeperException) || ((KeeperException)e).code() != KeeperException.Code.NODEEXISTS) {
+          //if the exception is not 'NODEEXISTS', re-throw it
+          throw e;
+        }
       }
-      else {
-        names = getObjectNames(key);
-        lastName = names.get(names.size()-1);
+    }
+
+    res = createChild(getLockName(lastName, mode), key.getData().toString()
+        .getBytes(), keepAlive ? CreateMode.PERSISTENT_SEQUENTIAL
+        : CreateMode.EPHEMERAL_SEQUENTIAL);
+
+    int seqNo = getSequenceNumber(res, getLockName(lastName, mode));
+    if (seqNo == -1) {
+      curatorFramework.delete().forPath(res);
+      return null;
+    }
+
+    List<String> children = curatorFramework.getChildren().forPath(lastName);
+
+    String exLock = getLockName(lastName, HiveLockMode.EXCLUSIVE);
+    String shLock = getLockName(lastName, HiveLockMode.SHARED);
+
+    for (String child : children) {
+      child = lastName + "/" + child;
+
+      // Is there a conflicting lock on the same object with a lower sequence
+      // number
+      int childSeq = seqNo;
+      if (child.startsWith(exLock)) {
+        childSeq = getSequenceNumber(child, exLock);
+      }
+      if ((mode == HiveLockMode.EXCLUSIVE) && child.startsWith(shLock)) {
+        childSeq = getSequenceNumber(child, shLock);
       }
 
-      // Create the parents first
-      for (String name : names) {
-        res = createChild(name, new byte[0], CreateMode.PERSISTENT, numRetries, sleepTime);
-      }
-
-      res = createChild(getLockName(lastName, mode), key.getData().toString().getBytes(),
-                        keepAlive ? CreateMode.PERSISTENT_SEQUENTIAL : CreateMode.EPHEMERAL_SEQUENTIAL,
-                        numRetries, sleepTime);
-
-      int seqNo = getSequenceNumber(res, getLockName(lastName, mode));
-      if (seqNo == -1) {
-        zooKeeper.delete(res, -1);
+      if ((childSeq >= 0) && (childSeq < seqNo)) {
+        try {
+          curatorFramework.delete().forPath(res);
+        } finally {
+          if (LOG.isDebugEnabled()) {
+            try {
+              String data = new String(curatorFramework.getData().forPath(child));
+              conflictingLocks.add(data);
+            } catch (Exception e) {
+              //ignored
+            }
+          }
+        }
         return null;
       }
-
-      List<String> children = zooKeeper.getChildren(lastName, false);
-
-      String exLock = getLockName(lastName, HiveLockMode.EXCLUSIVE);
-      String shLock = getLockName(lastName, HiveLockMode.SHARED);
-
-      for (String child : children) {
-        child = lastName + "/" + child;
-
-        // Is there a conflicting lock on the same object with a lower sequence number
-        int childSeq = seqNo;
-        if (child.startsWith(exLock)) {
-          childSeq = getSequenceNumber(child, exLock);
-        }
-        if ((mode == HiveLockMode.EXCLUSIVE) && child.startsWith(shLock)) {
-          childSeq = getSequenceNumber(child, shLock);
-        }
-
-        if ((childSeq >= 0) && (childSeq < seqNo)) {
-          zooKeeper.delete(res, -1);
-          console.printError("conflicting lock present for " + key.getDisplayName() +
-                             " mode " + mode);
-          return null;
-        }
-      }
-    } catch (Exception e) {
-      LOG.error("Failed to get ZooKeeper lock: " + e);
-      throw new LockException(e);
     }
 
     return new ZooKeeperHiveLock(res, key, mode);
@@ -378,27 +408,59 @@ public class ZooKeeperHiveLockManager implements HiveLockManager {
 
   /* Remove the lock specified */
   public void unlock(HiveLock hiveLock) throws LockException {
-    unlock(ctx.getConf(), zooKeeper, hiveLock, parent);
+    unlockWithRetry(hiveLock, parent);
+  }
+
+  private void unlockWithRetry(HiveLock hiveLock, String parent) throws LockException {
+
+    int tryNum = 0;
+    do {
+      try {
+        tryNum++;
+        if (tryNum > 1) {
+          Thread.sleep(sleepTime);
+        }
+        unlockPrimitive(hiveLock, parent, curatorFramework);
+        break;
+      } catch (Exception e) {
+        if (tryNum >= numRetriesForUnLock) {
+          String name = ((ZooKeeperHiveLock)hiveLock).getPath();
+          LOG.error("Node " + name + " can not be deleted after " + numRetriesForUnLock + " attempts.");
+          throw new LockException(e);
+        }
+      }
+    } while (tryNum < numRetriesForUnLock);
+
+    return;
   }
 
   /* Remove the lock specified */
-  private static void unlock(HiveConf conf, ZooKeeper zkpClient,
-                             HiveLock hiveLock, String parent) throws LockException {
+  @VisibleForTesting
+  static void unlockPrimitive(HiveLock hiveLock, String parent, CuratorFramework curatorFramework) throws LockException {
     ZooKeeperHiveLock zLock = (ZooKeeperHiveLock)hiveLock;
+    HiveLockObject obj = zLock.getHiveLockObject();
+    String name  = getLastObjectName(parent, obj);
     try {
-      zkpClient.delete(zLock.getPath(), -1);
+      curatorFramework.delete().forPath(zLock.getPath());
 
       // Delete the parent node if all the children have been deleted
-      HiveLockObject obj = zLock.getHiveLockObject();
-      String name  = getLastObjectName(parent, obj);
-
-      List<String> children = zkpClient.getChildren(name, false);
-      if ((children == null) || (children.isEmpty()))
-      {
-        zkpClient.delete(name, -1);
+      List<String> children = curatorFramework.getChildren().forPath(name);
+      if (children == null || children.isEmpty()) {
+        curatorFramework.delete().forPath(name);
       }
+    } catch (KeeperException.NoNodeException nne) {
+      //can happen in retrying deleting the zLock after exceptions like InterruptedException
+      //or in a race condition where parent has already been deleted by other process when it
+      //is to be deleted. Both cases should not raise error
+      LOG.debug("Node " + zLock.getPath() + " or its parent has already been deleted.");
+    } catch (KeeperException.NotEmptyException nee) {
+      //can happen in a race condition where another process adds a zLock under this parent
+      //just before it is about to be deleted. It should not be a problem since this parent
+      //can eventually be deleted by the process which hold its last child zLock
+      LOG.debug("Node " + name + " to be deleted is not empty.");
     } catch (Exception e) {
-      LOG.error("Failed to release ZooKeeper lock: " + e);
+      //exceptions including InterruptException and other KeeperException
+      LOG.error("Failed to release ZooKeeper lock: ", e);
       throw new LockException(e);
     }
   }
@@ -406,22 +468,25 @@ public class ZooKeeperHiveLockManager implements HiveLockManager {
   /* Release all locks - including PERSISTENT locks */
   public static void releaseAllLocks(HiveConf conf) throws Exception {
     try {
-      int sessionTimeout = conf.getIntVar(HiveConf.ConfVars.HIVE_ZOOKEEPER_SESSION_TIMEOUT);
-      String quorumServers = getQuorumServers(conf);
-      ZooKeeper zkpClient = new ZooKeeper(quorumServers, sessionTimeout, new DummyWatcher());
       String parent = conf.getVar(HiveConf.ConfVars.HIVE_ZOOKEEPER_NAMESPACE);
-      List<HiveLock> locks = getLocks(conf, zkpClient, null, parent, false, false);
-
+      List<HiveLock> locks = getLocks(conf, null, parent, false, false);
+      Exception lastExceptionGot = null;
       if (locks != null) {
         for (HiveLock lock : locks) {
-          unlock(conf, zkpClient, lock, parent);
+          try {
+            unlockPrimitive(lock, parent, curatorFramework);
+          } catch (Exception e) {
+            lastExceptionGot = e;
+          }
         }
       }
 
-      zkpClient.close();
-      zkpClient = null;
+      // if we got exception during doing the unlock, rethrow it here
+      if(lastExceptionGot != null) {
+        throw lastExceptionGot;
+      }
     } catch (Exception e) {
-      LOG.error("Failed to release all locks: " + e.getMessage());
+      LOG.error("Failed to release all locks: ", e);
       throw new Exception(ErrorMsg.ZOOKEEPER_CLIENT_COULD_NOT_BE_INITIALIZED.getMsg());
     }
   }
@@ -429,13 +494,13 @@ public class ZooKeeperHiveLockManager implements HiveLockManager {
   /* Get all locks */
   public List<HiveLock> getLocks(boolean verifyTablePartition, boolean fetchData)
     throws LockException {
-    return getLocks(ctx.getConf(), zooKeeper, null, parent, verifyTablePartition, fetchData);
+    return getLocks(ctx.getConf(), null, parent, verifyTablePartition, fetchData);
   }
 
   /* Get all locks for a particular object */
   public List<HiveLock> getLocks(HiveLockObject key, boolean verifyTablePartitions,
                                  boolean fetchData) throws LockException {
-    return getLocks(ctx.getConf(), zooKeeper, key, parent, verifyTablePartitions, fetchData);
+    return getLocks(ctx.getConf(), key, parent, verifyTablePartitions, fetchData);
   }
 
   /**
@@ -443,7 +508,7 @@ public class ZooKeeperHiveLockManager implements HiveLockManager {
    * @param zkpClient   The ZooKeeper client
    * @param key         The object to be compared against - if key is null, then get all locks
    **/
-  private static List<HiveLock> getLocks(HiveConf conf, ZooKeeper zkpClient,
+  private static List<HiveLock> getLocks(HiveConf conf,
       HiveLockObject key, String parent, boolean verifyTablePartition, boolean fetchData)
       throws LockException {
     List<HiveLock> locks = new ArrayList<HiveLock>();
@@ -454,12 +519,12 @@ public class ZooKeeperHiveLockManager implements HiveLockManager {
     try {
       if (key != null) {
         commonParent = "/" + parent + "/" + key.getName();
-        children = zkpClient.getChildren(commonParent, false);
+        children = curatorFramework.getChildren().forPath(commonParent);
         recurse = false;
       }
       else {
         commonParent = "/" + parent;
-        children = zkpClient.getChildren(commonParent, false);
+        children = curatorFramework.getChildren().forPath(commonParent);
       }
     } catch (Exception e) {
       // no locks present
@@ -481,7 +546,7 @@ public class ZooKeeperHiveLockManager implements HiveLockManager {
 
       if (recurse) {
         try {
-          children = zkpClient.getChildren(curChild, false);
+          children = curatorFramework.getChildren().forPath(curChild);
           for (String child : children) {
             childn.add(curChild + "/" + child);
           }
@@ -490,7 +555,7 @@ public class ZooKeeperHiveLockManager implements HiveLockManager {
         }
       }
 
-      HiveLockMode mode = getLockMode(conf, curChild);
+      HiveLockMode mode = getLockMode(curChild);
       if (mode == null) {
         continue;
       }
@@ -507,9 +572,10 @@ public class ZooKeeperHiveLockManager implements HiveLockManager {
 
         if (fetchData) {
           try {
-            data = new HiveLockObjectData(new String(zkpClient.getData(curChild, new DummyWatcher(), null)));
+            data = new HiveLockObjectData(new String(curatorFramework.getData().watched().forPath(curChild)));
+            data.setClientIp(clientIp);
           } catch (Exception e) {
-            LOG.error("Error in getting data for " + curChild + " " + e);
+            LOG.error("Error in getting data for " + curChild, e);
             // ignore error
           }
         }
@@ -523,45 +589,42 @@ public class ZooKeeperHiveLockManager implements HiveLockManager {
   /** Remove all redundant nodes **/
   private void removeAllRedundantNodes() {
     try {
-      renewZookeeperInstance(sessionTimeout, quorumServers);
       checkRedundantNode("/" + parent);
     } catch (Exception e) {
-      // ignore all errors
+      LOG.warn("Exception while removing all redundant nodes", e);
     }
   }
 
   private void checkRedundantNode(String node) {
     try {
       // Nothing to do if it is a lock mode
-      if (getLockMode(ctx.getConf(), node) != null)
+      if (getLockMode(node) != null) {
         return;
+      }
 
-      List<String> children = zooKeeper.getChildren(node, false);
+      List<String> children = curatorFramework.getChildren().forPath(node);
       for (String child : children) {
         checkRedundantNode(node + "/" + child);
       }
 
-      children = zooKeeper.getChildren(node, false);
+      children = curatorFramework.getChildren().forPath(node);
       if ((children == null) || (children.isEmpty()))
       {
-        zooKeeper.delete(node, -1);
+        curatorFramework.delete().forPath(node);
       }
     } catch (Exception e) {
-      // ignore all errors
+      LOG.warn("Error in checkRedundantNode for node " + node, e);
     }
   }
 
   /* Release all transient locks, by simply closing the client */
   public void close() throws LockException {
-    try {
-      if (zooKeeper != null) {
-        zooKeeper.close();
-        zooKeeper = null;
-      }
+  try {
 
       if (HiveConf.getBoolVar(ctx.getConf(), HiveConf.ConfVars.HIVE_ZOOKEEPER_CLEAN_EXTRA_NODES)) {
         removeAllRedundantNodes();
       }
+
     } catch (Exception e) {
       LOG.error("Failed to close zooKeeper client: " + e);
       throw new LockException(e);
@@ -629,7 +692,7 @@ public class ZooKeeperHiveLockManager implements HiveLockManager {
       }
 
       if (partn == null) {
-        return new HiveLockObject(new DummyPartition(tab, path), data);
+        return new HiveLockObject(new DummyPartition(tab, path, partSpec), data);
       }
 
       return new HiveLockObject(partn, data);
@@ -643,13 +706,14 @@ public class ZooKeeperHiveLockManager implements HiveLockManager {
   private static Pattern exMode = Pattern.compile("^.*-(EXCLUSIVE)-([0-9]+)$");
 
   /* Get the mode of the lock encoded in the path */
-  private static HiveLockMode getLockMode(HiveConf conf, String path) {
+  private static HiveLockMode getLockMode(String path) {
 
     Matcher shMatcher = shMode.matcher(path);
     Matcher exMatcher = exMode.matcher(path);
 
-    if (shMatcher.matches())
+    if (shMatcher.matches()) {
       return HiveLockMode.SHARED;
+    }
 
     if (exMatcher.matches()) {
       return HiveLockMode.EXCLUSIVE;
@@ -658,8 +722,8 @@ public class ZooKeeperHiveLockManager implements HiveLockManager {
     return null;
   }
 
-  public static class DummyWatcher implements Watcher {
-    public void process(org.apache.zookeeper.WatchedEvent event)  {
-    }
+  @Override
+  public void prepareRetry() throws LockException {
   }
+
 }

@@ -31,19 +31,21 @@ import org.apache.hadoop.hive.contrib.util.typedbytes.TypedBytesWritableInput;
 import org.apache.hadoop.hive.contrib.util.typedbytes.TypedBytesWritableOutput;
 import org.apache.hadoop.hive.ql.io.NonSyncDataInputBuffer;
 import org.apache.hadoop.hive.ql.io.NonSyncDataOutputBuffer;
-import org.apache.hadoop.hive.serde.Constants;
-import org.apache.hadoop.hive.serde2.SerDe;
+import org.apache.hadoop.hive.serde.serdeConstants;
+import org.apache.hadoop.hive.serde2.AbstractSerDe;
 import org.apache.hadoop.hive.serde2.SerDeException;
+import org.apache.hadoop.hive.serde2.SerDeSpec;
+import org.apache.hadoop.hive.serde2.SerDeStats;
 import org.apache.hadoop.hive.serde2.SerDeUtils;
 import org.apache.hadoop.hive.serde2.io.ByteWritable;
 import org.apache.hadoop.hive.serde2.io.DoubleWritable;
 import org.apache.hadoop.hive.serde2.io.ShortWritable;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Category;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StructField;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Category;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.BooleanObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.ByteObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.DoubleObjectInspector;
@@ -72,7 +74,8 @@ import org.apache.hadoop.io.Writable;
  * this, which is apparently 25% faster than the python version is available at
  * http://github.com/klbostee/ctypedbytes/tree/master
  */
-public class TypedBytesSerDe implements SerDe {
+@SerDeSpec(schemaProps = {serdeConstants.LIST_COLUMNS, serdeConstants.LIST_COLUMN_TYPES})
+public class TypedBytesSerDe extends AbstractSerDe {
 
   public static final Log LOG = LogFactory.getLog(TypedBytesSerDe.class
       .getName());
@@ -104,8 +107,8 @@ public class TypedBytesSerDe implements SerDe {
     tbIn = new TypedBytesWritableInput(inBarrStr);
 
     // Read the configuration parameters
-    String columnNameProperty = tbl.getProperty(Constants.LIST_COLUMNS);
-    String columnTypeProperty = tbl.getProperty(Constants.LIST_COLUMN_TYPES);
+    String columnNameProperty = tbl.getProperty(serdeConstants.LIST_COLUMNS);
+    String columnTypeProperty = tbl.getProperty(serdeConstants.LIST_COLUMN_TYPES);
 
     columnNames = Arrays.asList(columnNameProperty.split(","));
     columnTypes = null;
@@ -164,7 +167,7 @@ public class TypedBytesSerDe implements SerDe {
   public Object deserialize(Writable blob) throws SerDeException {
 
     BytesWritable data = (BytesWritable) blob;
-    inBarrStr.reset(data.get(), 0, data.getSize());
+    inBarrStr.reset(data.getBytes(), 0, data.getLength());
 
     try {
 
@@ -379,5 +382,10 @@ public class TypedBytesSerDe implements SerDe {
       throw new RuntimeException("Unrecognized type: " + oi.getCategory());
     }
     }
+  }
+
+  public SerDeStats getSerDeStats() {
+    // no support for statistics
+    return null;
   }
 }

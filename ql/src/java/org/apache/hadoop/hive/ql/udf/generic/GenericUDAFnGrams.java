@@ -26,22 +26,15 @@ import org.apache.hadoop.hive.ql.exec.Description;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentTypeException;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
-import org.apache.hadoop.hive.serde2.io.DoubleWritable;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.StandardMapObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StandardListObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.StructField;
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.DoubleObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.WritableDoubleObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorUtils;
-import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.ListTypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
-import org.apache.hadoop.util.StringUtils;
 import org.apache.hadoop.io.Text;
 
 /**
@@ -69,7 +62,7 @@ public class GenericUDAFnGrams implements GenericUDAFResolver {
       throw new UDFArgumentTypeException(parameters.length-1,
           "Please specify either three or four arguments.");
     }
-    
+
     // Validate the first parameter, which is the expression to compute over. This should be an
     // array of strings type, or an array of arrays of strings.
     PrimitiveTypeInfo pti;
@@ -99,7 +92,7 @@ public class GenericUDAFnGrams implements GenericUDAFResolver {
     }
     if(pti.getPrimitiveCategory() != PrimitiveObjectInspector.PrimitiveCategory.STRING) {
       throw new UDFArgumentTypeException(0,
-          "Only array<string> or array<array<string>> is allowed, but " 
+          "Only array<string> or array<array<string>> is allowed, but "
           + parameters[0].getTypeName() + " was passed as parameter 1.");
     }
 
@@ -107,12 +100,13 @@ public class GenericUDAFnGrams implements GenericUDAFResolver {
     if(parameters[1].getCategory() != ObjectInspector.Category.PRIMITIVE) {
       throw new UDFArgumentTypeException(1, "Only integers are accepted but "
           + parameters[1].getTypeName() + " was passed as parameter 2.");
-    } 
+    }
     switch(((PrimitiveTypeInfo) parameters[1]).getPrimitiveCategory()) {
     case BYTE:
     case SHORT:
     case INT:
     case LONG:
+    case TIMESTAMP:
       break;
 
     default:
@@ -124,12 +118,13 @@ public class GenericUDAFnGrams implements GenericUDAFResolver {
     if(parameters[2].getCategory() != ObjectInspector.Category.PRIMITIVE) {
       throw new UDFArgumentTypeException(2, "Only integers are accepted but "
             + parameters[2].getTypeName() + " was passed as parameter 3.");
-    } 
+    }
     switch(((PrimitiveTypeInfo) parameters[2]).getPrimitiveCategory()) {
     case BYTE:
     case SHORT:
     case INT:
     case LONG:
+    case TIMESTAMP:
       break;
 
     default:
@@ -142,12 +137,13 @@ public class GenericUDAFnGrams implements GenericUDAFResolver {
       if(parameters[3].getCategory() != ObjectInspector.Category.PRIMITIVE) {
         throw new UDFArgumentTypeException(3, "Only integers are accepted but "
             + parameters[3].getTypeName() + " was passed as parameter 4.");
-      } 
+      }
       switch(((PrimitiveTypeInfo) parameters[3]).getPrimitiveCategory()) {
       case BYTE:
       case SHORT:
       case INT:
       case LONG:
+      case TIMESTAMP:
         break;
 
       default:
@@ -164,15 +160,15 @@ public class GenericUDAFnGrams implements GenericUDAFResolver {
    */
   public static class GenericUDAFnGramEvaluator extends GenericUDAFEvaluator {
     // For PARTIAL1 and COMPLETE: ObjectInspectors for original data
-    private StandardListObjectInspector outerInputOI;
-    private StandardListObjectInspector innerInputOI;
-    private PrimitiveObjectInspector inputOI;
-    private PrimitiveObjectInspector nOI;
-    private PrimitiveObjectInspector kOI;
-    private PrimitiveObjectInspector pOI;
+    private transient StandardListObjectInspector outerInputOI;
+    private transient StandardListObjectInspector innerInputOI;
+    private transient PrimitiveObjectInspector inputOI;
+    private transient PrimitiveObjectInspector nOI;
+    private transient PrimitiveObjectInspector kOI;
+    private transient PrimitiveObjectInspector pOI;
 
-    // For PARTIAL2 and FINAL: ObjectInspectors for partial aggregations 
-    private StandardListObjectInspector loi;
+    // For PARTIAL2 and FINAL: ObjectInspectors for partial aggregations
+    private transient StandardListObjectInspector loi;
 
     @Override
     public ObjectInspector init(Mode m, ObjectInspector[] parameters) throws HiveException {
@@ -206,8 +202,8 @@ public class GenericUDAFnGrams implements GenericUDAFResolver {
       // Init output object inspectors.
       //
       // The return type for a partial aggregation is still a list of strings.
-      // 
-      // The return type for FINAL and COMPLETE is a full aggregation result, which is 
+      //
+      // The return type for FINAL and COMPLETE is a full aggregation result, which is
       // an array of structures containing the n-gram and its estimated frequency.
       if (m == Mode.PARTIAL1 || m == Mode.PARTIAL2) {
         return ObjectInspectorFactory.getStandardListObjectInspector(
@@ -221,7 +217,7 @@ public class GenericUDAFnGrams implements GenericUDAFResolver {
         foi.add(PrimitiveObjectInspectorFactory.writableDoubleObjectInspector);
         ArrayList<String> fname = new ArrayList<String>();
         fname.add("ngram");
-        fname.add("estfrequency");               
+        fname.add("estfrequency");
         return ObjectInspectorFactory.getStandardListObjectInspector(
                  ObjectInspectorFactory.getStandardStructObjectInspector(fname, foi) );
       }
@@ -229,14 +225,21 @@ public class GenericUDAFnGrams implements GenericUDAFResolver {
 
     @Override
     public void merge(AggregationBuffer agg, Object partial) throws HiveException {
-      if(partial == null) { 
+      if(partial == null) {
         return;
       }
       NGramAggBuf myagg = (NGramAggBuf) agg;
       List<Text> partialNGrams = (List<Text>) loi.getList(partial);
       int n = Integer.parseInt(partialNGrams.get(partialNGrams.size()-1).toString());
+
+      // A value of 0 for n indicates that the mapper processed data that does not meet
+      // filter criteria, so merge() should be NO-OP.
+      if (n == 0) {
+        return;
+      }
+
       if(myagg.n > 0 && myagg.n != n) {
-        throw new HiveException(getClass().getSimpleName() + ": mismatch in value for 'n'" 
+        throw new HiveException(getClass().getSimpleName() + ": mismatch in value for 'n'"
             + ", which usually is caused by a non-constant expression. Found '"+n+"' and '"
             + myagg.n + "'.");
       }
@@ -270,7 +273,7 @@ public class GenericUDAFnGrams implements GenericUDAFResolver {
         return;
       }
       NGramAggBuf myagg = (NGramAggBuf) agg;
-    
+
       // Parse out 'n' and 'k' if we haven't already done so, and while we're at it,
       // also parse out the precision factor 'pf' if the user has supplied one.
       if(!myagg.nge.isInitialized()) {
@@ -314,7 +317,7 @@ public class GenericUDAFnGrams implements GenericUDAFResolver {
 
           // parse out n-grams, update frequency counts
           processNgrams(myagg, words);
-        } 
+        }
       } else {
         // we're dealing with an array of strings
         ArrayList<String> words = new ArrayList<String>();
@@ -334,8 +337,8 @@ public class GenericUDAFnGrams implements GenericUDAFResolver {
       return myagg.nge.getNGrams();
     }
 
-    // Aggregation buffer methods. 
-    static class NGramAggBuf implements AggregationBuffer {
+    // Aggregation buffer methods.
+    static class NGramAggBuf extends AbstractAggregationBuffer {
       NGramEstimator nge;
       int n;
     };

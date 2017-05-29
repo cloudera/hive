@@ -25,6 +25,7 @@ import org.apache.hadoop.hive.ql.exec.Description;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentTypeException;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
+import org.apache.hadoop.hive.ql.util.JavaDataModel;
 import org.apache.hadoop.hive.serde2.io.DoubleWritable;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
@@ -38,7 +39,6 @@ import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectIn
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.io.LongWritable;
-import org.apache.hadoop.util.StringUtils;
 
 /**
  * Compute the covariance covar_pop(x, y), using the following one-pass method
@@ -92,6 +92,8 @@ public class GenericUDAFCovariance extends AbstractGenericUDAFResolver {
     case LONG:
     case FLOAT:
     case DOUBLE:
+    case TIMESTAMP:
+    case DECIMAL:
       switch (((PrimitiveTypeInfo) parameters[1]).getPrimitiveCategory()) {
       case BYTE:
       case SHORT:
@@ -99,9 +101,12 @@ public class GenericUDAFCovariance extends AbstractGenericUDAFResolver {
       case LONG:
       case FLOAT:
       case DOUBLE:
+      case TIMESTAMP:
+      case DECIMAL:
         return new GenericUDAFCovarianceEvaluator();
       case STRING:
       case BOOLEAN:
+      case DATE:
       default:
         throw new UDFArgumentTypeException(1,
             "Only numeric or string type arguments are accepted but "
@@ -109,6 +114,7 @@ public class GenericUDAFCovariance extends AbstractGenericUDAFResolver {
       }
     case STRING:
     case BOOLEAN:
+    case DATE:
     default:
       throw new UDFArgumentTypeException(0,
           "Only numeric or string type arguments are accepted but "
@@ -144,11 +150,11 @@ public class GenericUDAFCovariance extends AbstractGenericUDAFResolver {
     private PrimitiveObjectInspector yInputOI;
 
     // For PARTIAL2 and FINAL
-    private StructObjectInspector soi;
-    private StructField countField;
-    private StructField xavgField;
-    private StructField yavgField;
-    private StructField covarField;
+    private transient StructObjectInspector soi;
+    private transient StructField countField;
+    private transient StructField xavgField;
+    private transient StructField yavgField;
+    private transient StructField covarField;
     private LongObjectInspector countFieldOI;
     private DoubleObjectInspector xavgFieldOI;
     private DoubleObjectInspector yavgFieldOI;
@@ -220,11 +226,14 @@ public class GenericUDAFCovariance extends AbstractGenericUDAFResolver {
       }
     }
 
-    static class StdAgg implements AggregationBuffer {
+    @AggregationType(estimable = true)
+    static class StdAgg extends AbstractAggregationBuffer {
       long count; // number n of elements
       double xavg; // average of x elements
       double yavg; // average of y elements
       double covar; // n times the covariance
+      @Override
+      public int estimate() { return JavaDataModel.PRIMITIVES2 * 4; }
     };
 
     @Override
@@ -243,7 +252,7 @@ public class GenericUDAFCovariance extends AbstractGenericUDAFResolver {
       myagg.covar = 0;
     }
 
-    private boolean warned = false;
+    private final boolean warned = false;
 
     @Override
     public void iterate(AggregationBuffer agg, Object[] parameters) throws HiveException {

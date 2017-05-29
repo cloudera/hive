@@ -1,1 +1,1 @@
-FAILED: Error in semantic analysis: Map Join cannot be performed with Outer join
+FAILED: SemanticException [Error 10057]: MAPJOIN cannot be performed with OUTER JOIN

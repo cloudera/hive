@@ -18,38 +18,40 @@
 
 package org.apache.hadoop.hive.ql.security.authorization;
 
+import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.List;
 
 /**
  * Privilege defines a privilege in Hive. Each privilege has a name and scope associated with it.
  * This class contains all of the predefined privileges in Hive.
  */
 public class Privilege {
-  
-  private String priv;
-  
+
+  private PrivilegeType priv;
+
   private EnumSet<PrivilegeScope> supportedScopeSet;
-  
-  private Privilege(String priv, EnumSet<PrivilegeScope> scopeSet) {
+
+  private Privilege(PrivilegeType priv, EnumSet<PrivilegeScope> scopeSet) {
     super();
     this.priv = priv;
     this.supportedScopeSet = scopeSet;
   }
 
-  public Privilege(String priv) {
+  public Privilege(PrivilegeType priv) {
     super();
     this.priv = priv;
-    
+
   }
 
-  public String getPriv() {
+  public PrivilegeType getPriv() {
     return priv;
   }
 
-  public void setPriv(String priv) {
+  public void setPriv(PrivilegeType priv) {
     this.priv = priv;
   }
-  
+
   public boolean supportColumnLevel() {
     return supportedScopeSet != null
         && supportedScopeSet.contains(PrivilegeScope.COLUMN_LEVEL_SCOPE);
@@ -64,39 +66,57 @@ public class Privilege {
     return supportedScopeSet != null
         && supportedScopeSet.contains(PrivilegeScope.TABLE_LEVEL_SCOPE);
   }
-  
+
+  public List<String> getScopeList() {
+    if (supportedScopeSet == null) {
+      return null;
+    }
+    List<String> scopes = new ArrayList<String>();
+    for (PrivilegeScope scope : supportedScopeSet) {
+      scopes.add(scope.name());
+    }
+    return scopes;
+  }
+
+  @Override
   public String toString() {
-    return this.priv;
+    return this.getPriv().toString();
   }
 
   public Privilege() {
   }
 
-  public static Privilege ALL = new Privilege("All",
+  public static Privilege ALL = new Privilege(PrivilegeType.ALL,
       PrivilegeScope.ALLSCOPE_EXCEPT_COLUMN);
 
-  public static Privilege ALTER_METADATA = new Privilege("Alter",
+  public static Privilege ALTER_METADATA = new Privilege(PrivilegeType.ALTER_METADATA,
       PrivilegeScope.ALLSCOPE_EXCEPT_COLUMN);
 
-  public static Privilege ALTER_DATA = new Privilege("Update",
+  public static Privilege ALTER_DATA = new Privilege(PrivilegeType.ALTER_DATA,
       PrivilegeScope.ALLSCOPE_EXCEPT_COLUMN);
 
-  public static Privilege CREATE = new Privilege("Create",
+  public static Privilege CREATE = new Privilege(PrivilegeType.CREATE,
       PrivilegeScope.ALLSCOPE_EXCEPT_COLUMN);
 
-  public static Privilege DROP = new Privilege("Drop",
+  public static Privilege DROP = new Privilege(PrivilegeType.DROP,
       PrivilegeScope.ALLSCOPE_EXCEPT_COLUMN);
 
-  public static Privilege INDEX = new Privilege("Index",
+  public static Privilege INDEX = new Privilege(PrivilegeType.INDEX,
       PrivilegeScope.ALLSCOPE);
 
-  public static Privilege LOCK = new Privilege("Lock",
+  public static Privilege LOCK = new Privilege(PrivilegeType.LOCK,
       PrivilegeScope.ALLSCOPE_EXCEPT_COLUMN);
 
-  public static Privilege SELECT = new Privilege("Select",
+  public static Privilege SELECT = new Privilege(PrivilegeType.SELECT,
       PrivilegeScope.ALLSCOPE);
 
-  public static Privilege SHOW_DATABASE = new Privilege("Show_Database",
+  public static Privilege INSERT = new Privilege(PrivilegeType.INSERT,
+      PrivilegeScope.ALLSCOPE_EXCEPT_COLUMN);
+
+  public static Privilege DELETE = new Privilege(PrivilegeType.DELETE,
+      PrivilegeScope.ALLSCOPE_EXCEPT_COLUMN);
+
+  public static Privilege SHOW_DATABASE = new Privilege(PrivilegeType.SHOW_DATABASE,
       EnumSet.of(PrivilegeScope.USER_LEVEL_SCOPE));
 
 }

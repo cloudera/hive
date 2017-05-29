@@ -28,7 +28,7 @@ import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 /**
  * Compute the sample standard deviation by extending GenericUDAFVariance and
  * overriding the terminate() method of the evaluator.
- * 
+ *
  */
 @Description(name = "stddev_samp",
     value = "_FUNC_(x) - Returns the sample standard deviation of a set of numbers")
@@ -54,8 +54,11 @@ public class GenericUDAFStdSample extends GenericUDAFVariance {
     case FLOAT:
     case DOUBLE:
     case STRING:
+    case TIMESTAMP:
+    case DECIMAL:
       return new GenericUDAFStdSampleEvaluator();
     case BOOLEAN:
+    case DATE:
     default:
       throw new UDFArgumentTypeException(0,
           "Only numeric or string type arguments are accepted but "

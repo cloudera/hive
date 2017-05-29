@@ -1,4 +1,5 @@
-set hive.exec.post.hooks = org.apache.hadoop.hive.ql.hooks.MapJoinCounterHook ;
+set hive.exec.post.hooks = org.apache.hadoop.hive.ql.hooks.MapJoinCounterHook,org.apache.hadoop.hive.ql.hooks.PrintCompletedTasksHook;
+
 drop table dest1;
 CREATE TABLE dest1(key INT, value STRING) STORED AS TEXTFILE;
 
@@ -15,6 +16,7 @@ INSERT OVERWRITE TABLE dest1 SELECT src1.key, src3.value;
 
 set hive.mapjoin.localtask.max.memory.usage = 0.0001;
 set hive.mapjoin.check.memory.rows = 2;
+set hive.auto.convert.join.noconditionaltask = false;
 
 
 FROM srcpart src1 JOIN src src2 ON (src1.key = src2.key)

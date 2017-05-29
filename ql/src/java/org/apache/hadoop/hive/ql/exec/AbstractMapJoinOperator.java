@@ -20,22 +20,14 @@ package org.apache.hadoop.hive.ql.exec;
 
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.ql.exec.persistence.AbstractMapJoinKey;
 import org.apache.hadoop.hive.ql.exec.persistence.RowContainer;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.plan.MapJoinDesc;
 import org.apache.hadoop.hive.ql.plan.api.OperatorType;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory;
-import org.apache.hadoop.hive.serde2.objectinspector.StructField;
-import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
-
 
 public abstract class AbstractMapJoinOperator <T extends MapJoinDesc> extends CommonJoinOperator<T> implements
     Serializable {
@@ -44,28 +36,17 @@ public abstract class AbstractMapJoinOperator <T extends MapJoinDesc> extends Co
   /**
    * The expressions for join inputs's join keys.
    */
-  protected transient Map<Byte, List<ExprNodeEvaluator>> joinKeys;
+  protected transient List<ExprNodeEvaluator>[] joinKeys;
   /**
    * The ObjectInspectors for the join inputs's join keys.
    */
-  protected transient Map<Byte, List<ObjectInspector>> joinKeysObjectInspectors;
-  /**
-   * The standard ObjectInspectors for the join inputs's join keys.
-   */
-  protected transient Map<Byte, List<ObjectInspector>> joinKeysStandardObjectInspectors;
+  protected transient List<ObjectInspector>[] joinKeysObjectInspectors;
 
-  protected transient int posBigTable = -1; // one of the tables that is not in memory
-  transient int mapJoinRowsKey; // rows for a given key
+  protected transient byte posBigTable = -1; // pos of driver alias
 
-  protected transient RowContainer<ArrayList<Object>> emptyList = null;
+  protected transient RowContainer<List<Object>> emptyList = null;
 
   transient int numMapRowsRead;
-
-  private static final transient String[] FATAL_ERR_MSG = {
-      null, // counter value 0 means no error
-      "Mapside join size exceeds hive.mapjoin.maxsize. "
-          + "Please increase that or remove the mapjoin hint."
-      };
 
   transient boolean firstRow;
 
@@ -78,57 +59,48 @@ public abstract class AbstractMapJoinOperator <T extends MapJoinDesc> extends Co
   }
 
   @Override
+  @SuppressWarnings("unchecked")
   protected void initializeOp(Configuration hconf) throws HiveException {
+    if (conf.getGenJoinKeys()) {
+      int tagLen = conf.getTagLength();
+      joinKeys = new List[tagLen];
+      JoinUtil.populateJoinKeyValue(joinKeys, conf.getKeys(), NOTSKIPBIGTABLE);
+      joinKeysObjectInspectors = JoinUtil.getObjectInspectorsFromEvaluators(joinKeys,
+          inputObjInspectors,NOTSKIPBIGTABLE, tagLen);
+    }
+
     super.initializeOp(hconf);
 
     numMapRowsRead = 0;
     firstRow = true;
 
-    joinKeys = new HashMap<Byte, List<ExprNodeEvaluator>>();
-
-    JoinUtil.populateJoinKeyValue(joinKeys, conf.getKeys(),order,NOTSKIPBIGTABLE);
-    joinKeysObjectInspectors = JoinUtil.getObjectInspectorsFromEvaluators(joinKeys,
-        inputObjInspectors,NOTSKIPBIGTABLE);
-    joinKeysStandardObjectInspectors = JoinUtil.getStandardObjectInspectors(
-        joinKeysObjectInspectors,NOTSKIPBIGTABLE);
-
     // all other tables are small, and are cached in the hash table
-    posBigTable = conf.getPosBigTable();
+    posBigTable = (byte) conf.getPosBigTable();
 
-    emptyList = new RowContainer<ArrayList<Object>>(1, hconf);
-    RowContainer bigPosRC = JoinUtil.getRowContainer(hconf,
-        rowContainerStandardObjectInspectors.get((byte) posBigTable),
-        order[posBigTable], joinCacheSize,spillTableDesc, conf,noOuterJoin);
-    storage.put((byte) posBigTable, bigPosRC);
+    emptyList = new RowContainer<List<Object>>(1, hconf, reporter);
 
-    mapJoinRowsKey = HiveConf.getIntVar(hconf,
-        HiveConf.ConfVars.HIVEMAPJOINROWSIZE);
+    RowContainer<List<Object>> bigPosRC = JoinUtil.getRowContainer(hconf,
+        rowContainerStandardObjectInspectors[posBigTable],
+        posBigTable, joinCacheSize,spillTableDesc, conf,
+        !hasFilter(posBigTable), reporter);
+    storage[posBigTable] = bigPosRC;
 
-    List<? extends StructField> structFields = ((StructObjectInspector) outputObjInspector)
-        .getAllStructFieldRefs();
-    if (conf.getOutputColumnNames().size() < structFields.size()) {
-      List<ObjectInspector> structFieldObjectInspectors = new ArrayList<ObjectInspector>();
-      for (Byte alias : order) {
-        int sz = conf.getExprs().get(alias).size();
-        List<Integer> retained = conf.getRetainList().get(alias);
-        for (int i = 0; i < sz; i++) {
-          int pos = retained.get(i);
-          structFieldObjectInspectors.add(structFields.get(pos)
-              .getFieldObjectInspector());
-        }
-      }
-      outputObjInspector = ObjectInspectorFactory
-          .getStandardStructObjectInspector(conf.getOutputColumnNames(),
-          structFieldObjectInspectors);
-    }
     initializeChildren(hconf);
   }
 
-
   @Override
-  protected void fatalErrorMessage(StringBuilder errMsg, long counterCode) {
-    errMsg.append("Operator " + getOperatorId() + " (id=" + id + "): "
-        + FATAL_ERR_MSG[(int) counterCode]);
+  protected List<ObjectInspector> getValueObjectInspectors(
+      byte alias, List<ObjectInspector>[] aliasToObjectInspectors) {
+    List<ObjectInspector> inspectors = aliasToObjectInspectors[alias];
+    List<Integer> retained = conf.getRetainList().get(alias);
+    if (inspectors.size() == retained.size()) {
+      return inspectors;
+    }
+    List<ObjectInspector> retainedOIs = new ArrayList<ObjectInspector>();
+    for (int index : retained) {
+      retainedOIs.add(inspectors.get(index));
+    }
+    return retainedOIs;
   }
 
   @Override
@@ -136,33 +108,10 @@ public abstract class AbstractMapJoinOperator <T extends MapJoinDesc> extends Co
     return OperatorType.MAPJOIN;
   }
 
-  // returns true if there are elements in key list and any of them is null
-  protected boolean hasAnyNulls(ArrayList<Object> key) {
-    if (key != null && key.size() > 0) {
-      for (Object k : key) {
-        if (k == null) {
-          return true;
-        }
-      }
-    }
-    return false;
+  @Override
+  public void closeOp(boolean abort) throws HiveException {
+    super.closeOp(abort);
+    emptyList = null;
+    joinKeys = null;
   }
-
-  // returns true if there are elements in key list and any of them is null
-  protected boolean hasAnyNulls(Object[] key) {
-    if (key != null && key.length> 0) {
-      for (Object k : key) {
-        if (k == null) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
-  // returns true if there are elements in key list and any of them is null
-  protected boolean hasAnyNulls(AbstractMapJoinKey key) {
-    return key.hasAnyNulls();
-  }
-
 }

@@ -1,22 +1,38 @@
-PREHOOK: query: CREATE TABLE dest1(key INT, val1 INT, val2 INT)
+PREHOOK: query: -- SORT_QUERY_RESULTS
+
+CREATE TABLE dest1(key INT, val1 INT, val2 INT)
 PREHOOK: type: CREATETABLE
-POSTHOOK: query: CREATE TABLE dest1(key INT, val1 INT, val2 INT)
+PREHOOK: Output: database:default
+PREHOOK: Output: default@dest1
+POSTHOOK: query: -- SORT_QUERY_RESULTS
+
+CREATE TABLE dest1(key INT, val1 INT, val2 INT)
 POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@dest1
 PREHOOK: query: CREATE TABLE dest2(key INT, val1 INT, val2 INT)
 PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:default
+PREHOOK: Output: default@dest2
 POSTHOOK: query: CREATE TABLE dest2(key INT, val1 INT, val2 INT)
 POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@dest2
 PREHOOK: query: CREATE TABLE INPUT(key INT, value STRING) STORED AS TEXTFILE
 PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:default
+PREHOOK: Output: default@INPUT
 POSTHOOK: query: CREATE TABLE INPUT(key INT, value STRING) STORED AS TEXTFILE
 POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@INPUT
-PREHOOK: query: LOAD DATA LOCAL INPATH '../data/files/kv5.txt' INTO TABLE INPUT
+PREHOOK: query: LOAD DATA LOCAL INPATH '../../data/files/kv5.txt' INTO TABLE INPUT
 PREHOOK: type: LOAD
-POSTHOOK: query: LOAD DATA LOCAL INPATH '../data/files/kv5.txt' INTO TABLE INPUT
+#### A masked pattern was here ####
+PREHOOK: Output: default@input
+POSTHOOK: query: LOAD DATA LOCAL INPATH '../../data/files/kv5.txt' INTO TABLE INPUT
 POSTHOOK: type: LOAD
+#### A masked pattern was here ####
 POSTHOOK: Output: default@input
 PREHOOK: query: EXPLAIN
 FROM INPUT 
@@ -28,9 +44,6 @@ FROM INPUT
 INSERT OVERWRITE TABLE dest1 SELECT INPUT.key, count(substr(INPUT.value,5)), count(distinct substr(INPUT.value,5)) GROUP BY INPUT.key
 INSERT OVERWRITE TABLE dest2 SELECT INPUT.key, sum(substr(INPUT.value,5)), sum(distinct substr(INPUT.value,5))   GROUP BY INPUT.key
 POSTHOOK: type: QUERY
-ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_TABREF INPUT)) (TOK_INSERT (TOK_DESTINATION (TOK_TAB dest1)) (TOK_SELECT (TOK_SELEXPR (. (TOK_TABLE_OR_COL INPUT) key)) (TOK_SELEXPR (TOK_FUNCTION count (TOK_FUNCTION substr (. (TOK_TABLE_OR_COL INPUT) value) 5))) (TOK_SELEXPR (TOK_FUNCTIONDI count (TOK_FUNCTION substr (. (TOK_TABLE_OR_COL INPUT) value) 5)))) (TOK_GROUPBY (. (TOK_TABLE_OR_COL INPUT) key))) (TOK_INSERT (TOK_DESTINATION (TOK_TAB dest2)) (TOK_SELECT (TOK_SELEXPR (. (TOK_TABLE_OR_COL INPUT) key)) (TOK_SELEXPR (TOK_FUNCTION sum (TOK_FUNCTION substr (. (TOK_TABLE_OR_COL INPUT) value) 5))) (TOK_SELEXPR (TOK_FUNCTIONDI sum (TOK_FUNCTION substr (. (TOK_TABLE_OR_COL INPUT) value) 5)))) (TOK_GROUPBY (. (TOK_TABLE_OR_COL INPUT) key))))
-
 STAGE DEPENDENCIES:
   Stage-2 is a root stage
   Stage-3 depends on stages: Stage-2
@@ -43,112 +56,73 @@ STAGE DEPENDENCIES:
 STAGE PLANS:
   Stage: Stage-2
     Map Reduce
-      Alias -> Map Operator Tree:
-        input 
+      Map Operator Tree:
           TableScan
             alias: input
+            Statistics: Num rows: 2 Data size: 280 Basic stats: COMPLETE Column stats: NONE
             Reduce Output Operator
-              key expressions:
-                    expr: substr(value, 5)
-                    type: string
+              key expressions: substr(value, 5) (type: string)
               sort order: +
-              Map-reduce partition columns:
-                    expr: substr(value, 5)
-                    type: string
-              tag: -1
-              value expressions:
-                    expr: key
-                    type: int
+              Map-reduce partition columns: substr(value, 5) (type: string)
+              Statistics: Num rows: 2 Data size: 280 Basic stats: COMPLETE Column stats: NONE
+              value expressions: key (type: int)
       Reduce Operator Tree:
         Forward
+          Statistics: Num rows: 2 Data size: 280 Basic stats: COMPLETE Column stats: NONE
           Group By Operator
-            aggregations:
-                  expr: count(KEY._col0)
-                  expr: count(DISTINCT KEY._col0)
-            bucketGroup: false
-            keys:
-                  expr: VALUE._col0
-                  type: int
+            aggregations: count(KEY._col0), count(DISTINCT KEY._col0)
+            keys: VALUE._col0 (type: int)
             mode: hash
             outputColumnNames: _col0, _col1, _col2
+            Statistics: Num rows: 2 Data size: 280 Basic stats: COMPLETE Column stats: NONE
             File Output Operator
               compressed: false
-              GlobalTableId: 0
               table:
                   input format: org.apache.hadoop.mapred.SequenceFileInputFormat
                   output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                  serde: org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe
           Group By Operator
-            aggregations:
-                  expr: sum(KEY._col0)
-                  expr: sum(DISTINCT KEY._col0)
-            bucketGroup: false
-            keys:
-                  expr: VALUE._col0
-                  type: int
+            aggregations: sum(KEY._col0), sum(DISTINCT KEY._col0)
+            keys: VALUE._col0 (type: int)
             mode: hash
             outputColumnNames: _col0, _col1, _col2
+            Statistics: Num rows: 2 Data size: 280 Basic stats: COMPLETE Column stats: NONE
             File Output Operator
               compressed: false
-              GlobalTableId: 0
               table:
                   input format: org.apache.hadoop.mapred.SequenceFileInputFormat
                   output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                  serde: org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe
 
   Stage: Stage-3
     Map Reduce
-      Alias -> Map Operator Tree:
-        file:/tmp/nzhang/hive_2010-09-14_16-12-47_850_4438080186685603592/-mr-10004 
+      Map Operator Tree:
+          TableScan
             Reduce Output Operator
-              key expressions:
-                    expr: _col0
-                    type: int
+              key expressions: _col0 (type: int)
               sort order: +
-              Map-reduce partition columns:
-                    expr: _col0
-                    type: int
-              tag: -1
-              value expressions:
-                    expr: _col1
-                    type: bigint
-                    expr: _col2
-                    type: bigint
+              Map-reduce partition columns: _col0 (type: int)
+              Statistics: Num rows: 2 Data size: 280 Basic stats: COMPLETE Column stats: NONE
+              value expressions: _col1 (type: bigint), _col2 (type: bigint)
       Reduce Operator Tree:
         Group By Operator
-          aggregations:
-                expr: count(VALUE._col0)
-                expr: count(VALUE._col1)
-          bucketGroup: false
-          keys:
-                expr: KEY._col0
-                type: int
+          aggregations: count(VALUE._col0), count(VALUE._col1)
+          keys: KEY._col0 (type: int)
           mode: final
           outputColumnNames: _col0, _col1, _col2
+          Statistics: Num rows: 1 Data size: 140 Basic stats: COMPLETE Column stats: NONE
           Select Operator
-            expressions:
-                  expr: _col0
-                  type: int
-                  expr: _col1
-                  type: bigint
-                  expr: _col2
-                  type: bigint
+            expressions: _col0 (type: int), UDFToInteger(_col1) (type: int), UDFToInteger(_col2) (type: int)
             outputColumnNames: _col0, _col1, _col2
-            Select Operator
-              expressions:
-                    expr: _col0
-                    type: int
-                    expr: UDFToInteger(_col1)
-                    type: int
-                    expr: UDFToInteger(_col2)
-                    type: int
-              outputColumnNames: _col0, _col1, _col2
-              File Output Operator
-                compressed: false
-                GlobalTableId: 1
-                table:
-                    input format: org.apache.hadoop.mapred.TextInputFormat
-                    output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-                    serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                    name: dest1
+            Statistics: Num rows: 1 Data size: 140 Basic stats: COMPLETE Column stats: NONE
+            File Output Operator
+              compressed: false
+              Statistics: Num rows: 1 Data size: 140 Basic stats: COMPLETE Column stats: NONE
+              table:
+                  input format: org.apache.hadoop.mapred.TextInputFormat
+                  output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                  serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                  name: default.dest1
 
   Stage: Stage-0
     Move Operator
@@ -158,66 +132,40 @@ STAGE PLANS:
               input format: org.apache.hadoop.mapred.TextInputFormat
               output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              name: dest1
+              name: default.dest1
 
   Stage: Stage-4
     Stats-Aggr Operator
 
   Stage: Stage-5
     Map Reduce
-      Alias -> Map Operator Tree:
-        file:/tmp/nzhang/hive_2010-09-14_16-12-47_850_4438080186685603592/-mr-10005 
+      Map Operator Tree:
+          TableScan
             Reduce Output Operator
-              key expressions:
-                    expr: _col0
-                    type: int
+              key expressions: _col0 (type: int)
               sort order: +
-              Map-reduce partition columns:
-                    expr: _col0
-                    type: int
-              tag: -1
-              value expressions:
-                    expr: _col1
-                    type: double
-                    expr: _col2
-                    type: double
+              Map-reduce partition columns: _col0 (type: int)
+              Statistics: Num rows: 2 Data size: 280 Basic stats: COMPLETE Column stats: NONE
+              value expressions: _col1 (type: double), _col2 (type: double)
       Reduce Operator Tree:
         Group By Operator
-          aggregations:
-                expr: sum(VALUE._col0)
-                expr: sum(VALUE._col1)
-          bucketGroup: false
-          keys:
-                expr: KEY._col0
-                type: int
+          aggregations: sum(VALUE._col0), sum(VALUE._col1)
+          keys: KEY._col0 (type: int)
           mode: final
           outputColumnNames: _col0, _col1, _col2
+          Statistics: Num rows: 1 Data size: 140 Basic stats: COMPLETE Column stats: NONE
           Select Operator
-            expressions:
-                  expr: _col0
-                  type: int
-                  expr: _col1
-                  type: double
-                  expr: _col2
-                  type: double
+            expressions: _col0 (type: int), UDFToInteger(_col1) (type: int), UDFToInteger(_col2) (type: int)
             outputColumnNames: _col0, _col1, _col2
-            Select Operator
-              expressions:
-                    expr: _col0
-                    type: int
-                    expr: UDFToInteger(_col1)
-                    type: int
-                    expr: UDFToInteger(_col2)
-                    type: int
-              outputColumnNames: _col0, _col1, _col2
-              File Output Operator
-                compressed: false
-                GlobalTableId: 2
-                table:
-                    input format: org.apache.hadoop.mapred.TextInputFormat
-                    output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-                    serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                    name: dest2
+            Statistics: Num rows: 1 Data size: 140 Basic stats: COMPLETE Column stats: NONE
+            File Output Operator
+              compressed: false
+              Statistics: Num rows: 1 Data size: 140 Basic stats: COMPLETE Column stats: NONE
+              table:
+                  input format: org.apache.hadoop.mapred.TextInputFormat
+                  output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                  serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                  name: default.dest2
 
   Stage: Stage-1
     Move Operator
@@ -227,11 +175,10 @@ STAGE PLANS:
               input format: org.apache.hadoop.mapred.TextInputFormat
               output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              name: dest2
+              name: default.dest2
 
   Stage: Stage-6
     Stats-Aggr Operator
-
 
 PREHOOK: query: FROM INPUT
 INSERT OVERWRITE TABLE dest1 SELECT INPUT.key, count(substr(INPUT.value,5)), count(distinct substr(INPUT.value,5)) GROUP BY INPUT.key
@@ -256,21 +203,11 @@ POSTHOOK: Lineage: dest2.val2 EXPRESSION [(input)input.FieldSchema(name:value, t
 PREHOOK: query: SELECT * from dest1
 PREHOOK: type: QUERY
 PREHOOK: Input: default@dest1
-PREHOOK: Output: file:/tmp/nzhang/hive_2010-09-14_16-13-04_432_5505854178165228004/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: SELECT * from dest1
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@dest1
-POSTHOOK: Output: file:/tmp/nzhang/hive_2010-09-14_16-13-04_432_5505854178165228004/-mr-10000
-POSTHOOK: Lineage: dest1.key SIMPLE [(input)input.FieldSchema(name:key, type:int, comment:null), ]
-POSTHOOK: Lineage: dest1.val1 EXPRESSION [(input)input.FieldSchema(name:value, type:string, comment:null), ]
-POSTHOOK: Lineage: dest1.val2 EXPRESSION [(input)input.FieldSchema(name:value, type:string, comment:null), ]
-POSTHOOK: Lineage: dest2.key SIMPLE [(input)input.FieldSchema(name:key, type:int, comment:null), ]
-POSTHOOK: Lineage: dest2.val1 EXPRESSION [(input)input.FieldSchema(name:value, type:string, comment:null), ]
-POSTHOOK: Lineage: dest2.val2 EXPRESSION [(input)input.FieldSchema(name:value, type:string, comment:null), ]
-27	1	1
-66	1	1
-86	1	1
-98	1	1
+#### A masked pattern was here ####
 128	1	1
 150	1	1
 165	1	1
@@ -280,6 +217,7 @@ POSTHOOK: Lineage: dest2.val2 EXPRESSION [(input)input.FieldSchema(name:value, t
 238	3	3
 255	1	1
 265	1	1
+27	1	1
 273	1	1
 278	1	1
 311	1	1
@@ -287,24 +225,17 @@ POSTHOOK: Lineage: dest2.val2 EXPRESSION [(input)input.FieldSchema(name:value, t
 401	1	1
 409	1	1
 484	1	1
+66	1	1
+86	1	1
+98	1	1
 PREHOOK: query: SELECT * from dest2
 PREHOOK: type: QUERY
 PREHOOK: Input: default@dest2
-PREHOOK: Output: file:/tmp/nzhang/hive_2010-09-14_16-13-04_860_4545965166949742953/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: SELECT * from dest2
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@dest2
-POSTHOOK: Output: file:/tmp/nzhang/hive_2010-09-14_16-13-04_860_4545965166949742953/-mr-10000
-POSTHOOK: Lineage: dest1.key SIMPLE [(input)input.FieldSchema(name:key, type:int, comment:null), ]
-POSTHOOK: Lineage: dest1.val1 EXPRESSION [(input)input.FieldSchema(name:value, type:string, comment:null), ]
-POSTHOOK: Lineage: dest1.val2 EXPRESSION [(input)input.FieldSchema(name:value, type:string, comment:null), ]
-POSTHOOK: Lineage: dest2.key SIMPLE [(input)input.FieldSchema(name:key, type:int, comment:null), ]
-POSTHOOK: Lineage: dest2.val1 EXPRESSION [(input)input.FieldSchema(name:value, type:string, comment:null), ]
-POSTHOOK: Lineage: dest2.val2 EXPRESSION [(input)input.FieldSchema(name:value, type:string, comment:null), ]
-27	27	27
-66	66	66
-86	86	86
-98	98	98
+#### A masked pattern was here ####
 128	128	128
 150	150	150
 165	165	165
@@ -314,6 +245,7 @@ POSTHOOK: Lineage: dest2.val2 EXPRESSION [(input)input.FieldSchema(name:value, t
 238	717	717
 255	255	255
 265	265	265
+27	27	27
 273	273	273
 278	278	278
 311	311	311
@@ -321,3 +253,452 @@ POSTHOOK: Lineage: dest2.val2 EXPRESSION [(input)input.FieldSchema(name:value, t
 401	401	401
 409	409	409
 484	484	484
+66	66	66
+86	86	86
+98	98	98
+PREHOOK: query: EXPLAIN
+FROM INPUT 
+INSERT OVERWRITE TABLE dest1 SELECT INPUT.key, count(substr(INPUT.value,5)), count(distinct substr(INPUT.value,5)) GROUP BY INPUT.key
+INSERT OVERWRITE TABLE dest2 SELECT INPUT.key, sum(substr(INPUT.value,5)), sum(distinct substr(INPUT.value,5))   GROUP BY INPUT.key
+PREHOOK: type: QUERY
+POSTHOOK: query: EXPLAIN
+FROM INPUT 
+INSERT OVERWRITE TABLE dest1 SELECT INPUT.key, count(substr(INPUT.value,5)), count(distinct substr(INPUT.value,5)) GROUP BY INPUT.key
+INSERT OVERWRITE TABLE dest2 SELECT INPUT.key, sum(substr(INPUT.value,5)), sum(distinct substr(INPUT.value,5))   GROUP BY INPUT.key
+POSTHOOK: type: QUERY
+STAGE DEPENDENCIES:
+  Stage-2 is a root stage
+  Stage-3 depends on stages: Stage-2
+  Stage-0 depends on stages: Stage-3
+  Stage-4 depends on stages: Stage-0
+  Stage-5 depends on stages: Stage-2
+  Stage-1 depends on stages: Stage-5
+  Stage-6 depends on stages: Stage-1
+
+STAGE PLANS:
+  Stage: Stage-2
+    Map Reduce
+      Map Operator Tree:
+          TableScan
+            alias: input
+            Statistics: Num rows: 2 Data size: 280 Basic stats: COMPLETE Column stats: NONE
+            Reduce Output Operator
+              key expressions: substr(value, 5) (type: string)
+              sort order: +
+              Map-reduce partition columns: substr(value, 5) (type: string)
+              Statistics: Num rows: 2 Data size: 280 Basic stats: COMPLETE Column stats: NONE
+              value expressions: key (type: int)
+      Reduce Operator Tree:
+        Forward
+          Statistics: Num rows: 2 Data size: 280 Basic stats: COMPLETE Column stats: NONE
+          Group By Operator
+            aggregations: count(KEY._col0), count(DISTINCT KEY._col0)
+            keys: VALUE._col0 (type: int)
+            mode: hash
+            outputColumnNames: _col0, _col1, _col2
+            Statistics: Num rows: 2 Data size: 280 Basic stats: COMPLETE Column stats: NONE
+            File Output Operator
+              compressed: false
+              table:
+                  input format: org.apache.hadoop.mapred.SequenceFileInputFormat
+                  output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                  serde: org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe
+          Group By Operator
+            aggregations: sum(KEY._col0), sum(DISTINCT KEY._col0)
+            keys: VALUE._col0 (type: int)
+            mode: hash
+            outputColumnNames: _col0, _col1, _col2
+            Statistics: Num rows: 2 Data size: 280 Basic stats: COMPLETE Column stats: NONE
+            File Output Operator
+              compressed: false
+              table:
+                  input format: org.apache.hadoop.mapred.SequenceFileInputFormat
+                  output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                  serde: org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe
+
+  Stage: Stage-3
+    Map Reduce
+      Map Operator Tree:
+          TableScan
+            Reduce Output Operator
+              key expressions: _col0 (type: int)
+              sort order: +
+              Map-reduce partition columns: _col0 (type: int)
+              Statistics: Num rows: 2 Data size: 280 Basic stats: COMPLETE Column stats: NONE
+              value expressions: _col1 (type: bigint), _col2 (type: bigint)
+      Reduce Operator Tree:
+        Group By Operator
+          aggregations: count(VALUE._col0), count(VALUE._col1)
+          keys: KEY._col0 (type: int)
+          mode: final
+          outputColumnNames: _col0, _col1, _col2
+          Statistics: Num rows: 1 Data size: 140 Basic stats: COMPLETE Column stats: NONE
+          Select Operator
+            expressions: _col0 (type: int), UDFToInteger(_col1) (type: int), UDFToInteger(_col2) (type: int)
+            outputColumnNames: _col0, _col1, _col2
+            Statistics: Num rows: 1 Data size: 140 Basic stats: COMPLETE Column stats: NONE
+            File Output Operator
+              compressed: false
+              Statistics: Num rows: 1 Data size: 140 Basic stats: COMPLETE Column stats: NONE
+              table:
+                  input format: org.apache.hadoop.mapred.TextInputFormat
+                  output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                  serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                  name: default.dest1
+
+  Stage: Stage-0
+    Move Operator
+      tables:
+          replace: true
+          table:
+              input format: org.apache.hadoop.mapred.TextInputFormat
+              output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+              serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+              name: default.dest1
+
+  Stage: Stage-4
+    Stats-Aggr Operator
+
+  Stage: Stage-5
+    Map Reduce
+      Map Operator Tree:
+          TableScan
+            Reduce Output Operator
+              key expressions: _col0 (type: int)
+              sort order: +
+              Map-reduce partition columns: _col0 (type: int)
+              Statistics: Num rows: 2 Data size: 280 Basic stats: COMPLETE Column stats: NONE
+              value expressions: _col1 (type: double), _col2 (type: double)
+      Reduce Operator Tree:
+        Group By Operator
+          aggregations: sum(VALUE._col0), sum(VALUE._col1)
+          keys: KEY._col0 (type: int)
+          mode: final
+          outputColumnNames: _col0, _col1, _col2
+          Statistics: Num rows: 1 Data size: 140 Basic stats: COMPLETE Column stats: NONE
+          Select Operator
+            expressions: _col0 (type: int), UDFToInteger(_col1) (type: int), UDFToInteger(_col2) (type: int)
+            outputColumnNames: _col0, _col1, _col2
+            Statistics: Num rows: 1 Data size: 140 Basic stats: COMPLETE Column stats: NONE
+            File Output Operator
+              compressed: false
+              Statistics: Num rows: 1 Data size: 140 Basic stats: COMPLETE Column stats: NONE
+              table:
+                  input format: org.apache.hadoop.mapred.TextInputFormat
+                  output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                  serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                  name: default.dest2
+
+  Stage: Stage-1
+    Move Operator
+      tables:
+          replace: true
+          table:
+              input format: org.apache.hadoop.mapred.TextInputFormat
+              output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+              serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+              name: default.dest2
+
+  Stage: Stage-6
+    Stats-Aggr Operator
+
+PREHOOK: query: FROM INPUT
+INSERT OVERWRITE TABLE dest1 SELECT INPUT.key, count(substr(INPUT.value,5)), count(distinct substr(INPUT.value,5)) GROUP BY INPUT.key
+INSERT OVERWRITE TABLE dest2 SELECT INPUT.key, sum(substr(INPUT.value,5)), sum(distinct substr(INPUT.value,5))   GROUP BY INPUT.key
+PREHOOK: type: QUERY
+PREHOOK: Input: default@input
+PREHOOK: Output: default@dest1
+PREHOOK: Output: default@dest2
+POSTHOOK: query: FROM INPUT
+INSERT OVERWRITE TABLE dest1 SELECT INPUT.key, count(substr(INPUT.value,5)), count(distinct substr(INPUT.value,5)) GROUP BY INPUT.key
+INSERT OVERWRITE TABLE dest2 SELECT INPUT.key, sum(substr(INPUT.value,5)), sum(distinct substr(INPUT.value,5))   GROUP BY INPUT.key
+POSTHOOK: type: QUERY
+POSTHOOK: Input: default@input
+POSTHOOK: Output: default@dest1
+POSTHOOK: Output: default@dest2
+POSTHOOK: Lineage: dest1.key SIMPLE [(input)input.FieldSchema(name:key, type:int, comment:null), ]
+POSTHOOK: Lineage: dest1.val1 EXPRESSION [(input)input.FieldSchema(name:value, type:string, comment:null), ]
+POSTHOOK: Lineage: dest1.val2 EXPRESSION [(input)input.FieldSchema(name:value, type:string, comment:null), ]
+POSTHOOK: Lineage: dest2.key SIMPLE [(input)input.FieldSchema(name:key, type:int, comment:null), ]
+POSTHOOK: Lineage: dest2.val1 EXPRESSION [(input)input.FieldSchema(name:value, type:string, comment:null), ]
+POSTHOOK: Lineage: dest2.val2 EXPRESSION [(input)input.FieldSchema(name:value, type:string, comment:null), ]
+PREHOOK: query: SELECT * from dest1
+PREHOOK: type: QUERY
+PREHOOK: Input: default@dest1
+#### A masked pattern was here ####
+POSTHOOK: query: SELECT * from dest1
+POSTHOOK: type: QUERY
+POSTHOOK: Input: default@dest1
+#### A masked pattern was here ####
+128	1	1
+150	1	1
+165	1	1
+193	1	1
+213	3	2
+224	1	1
+238	3	3
+255	1	1
+265	1	1
+27	1	1
+273	1	1
+278	1	1
+311	1	1
+369	1	1
+401	1	1
+409	1	1
+484	1	1
+66	1	1
+86	1	1
+98	1	1
+PREHOOK: query: SELECT * from dest2
+PREHOOK: type: QUERY
+PREHOOK: Input: default@dest2
+#### A masked pattern was here ####
+POSTHOOK: query: SELECT * from dest2
+POSTHOOK: type: QUERY
+POSTHOOK: Input: default@dest2
+#### A masked pattern was here ####
+128	128	128
+150	150	150
+165	165	165
+193	193	193
+213	640	427
+224	224	224
+238	717	717
+255	255	255
+265	265	265
+27	27	27
+273	273	273
+278	278	278
+311	311	311
+369	369	369
+401	401	401
+409	409	409
+484	484	484
+66	66	66
+86	86	86
+98	98	98
+PREHOOK: query: -- HIVE-3852 Multi-groupby optimization fails when same distinct column is used twice or more
+EXPLAIN
+FROM INPUT
+INSERT OVERWRITE TABLE dest1 SELECT INPUT.key, sum(distinct substr(INPUT.value,5)), count(distinct substr(INPUT.value,5)) GROUP BY INPUT.key
+INSERT OVERWRITE TABLE dest2 SELECT INPUT.key, sum(distinct substr(INPUT.value,5)), avg(distinct substr(INPUT.value,5)) GROUP BY INPUT.key
+PREHOOK: type: QUERY
+POSTHOOK: query: -- HIVE-3852 Multi-groupby optimization fails when same distinct column is used twice or more
+EXPLAIN
+FROM INPUT
+INSERT OVERWRITE TABLE dest1 SELECT INPUT.key, sum(distinct substr(INPUT.value,5)), count(distinct substr(INPUT.value,5)) GROUP BY INPUT.key
+INSERT OVERWRITE TABLE dest2 SELECT INPUT.key, sum(distinct substr(INPUT.value,5)), avg(distinct substr(INPUT.value,5)) GROUP BY INPUT.key
+POSTHOOK: type: QUERY
+STAGE DEPENDENCIES:
+  Stage-2 is a root stage
+  Stage-3 depends on stages: Stage-2
+  Stage-0 depends on stages: Stage-3
+  Stage-4 depends on stages: Stage-0
+  Stage-5 depends on stages: Stage-2
+  Stage-1 depends on stages: Stage-5
+  Stage-6 depends on stages: Stage-1
+
+STAGE PLANS:
+  Stage: Stage-2
+    Map Reduce
+      Map Operator Tree:
+          TableScan
+            alias: input
+            Statistics: Num rows: 2 Data size: 280 Basic stats: COMPLETE Column stats: NONE
+            Reduce Output Operator
+              key expressions: substr(value, 5) (type: string)
+              sort order: +
+              Map-reduce partition columns: substr(value, 5) (type: string)
+              Statistics: Num rows: 2 Data size: 280 Basic stats: COMPLETE Column stats: NONE
+              value expressions: key (type: int)
+      Reduce Operator Tree:
+        Forward
+          Statistics: Num rows: 2 Data size: 280 Basic stats: COMPLETE Column stats: NONE
+          Group By Operator
+            aggregations: sum(DISTINCT KEY._col0), count(DISTINCT KEY._col0)
+            keys: VALUE._col0 (type: int)
+            mode: hash
+            outputColumnNames: _col0, _col1, _col2
+            Statistics: Num rows: 2 Data size: 280 Basic stats: COMPLETE Column stats: NONE
+            File Output Operator
+              compressed: false
+              table:
+                  input format: org.apache.hadoop.mapred.SequenceFileInputFormat
+                  output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                  serde: org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe
+          Group By Operator
+            aggregations: sum(DISTINCT KEY._col0), avg(DISTINCT KEY._col0)
+            keys: VALUE._col0 (type: int)
+            mode: hash
+            outputColumnNames: _col0, _col1, _col2
+            Statistics: Num rows: 2 Data size: 280 Basic stats: COMPLETE Column stats: NONE
+            File Output Operator
+              compressed: false
+              table:
+                  input format: org.apache.hadoop.mapred.SequenceFileInputFormat
+                  output format: org.apache.hadoop.hive.ql.io.HiveSequenceFileOutputFormat
+                  serde: org.apache.hadoop.hive.serde2.lazybinary.LazyBinarySerDe
+
+  Stage: Stage-3
+    Map Reduce
+      Map Operator Tree:
+          TableScan
+            Reduce Output Operator
+              key expressions: _col0 (type: int)
+              sort order: +
+              Map-reduce partition columns: _col0 (type: int)
+              Statistics: Num rows: 2 Data size: 280 Basic stats: COMPLETE Column stats: NONE
+              value expressions: _col1 (type: double), _col2 (type: bigint)
+      Reduce Operator Tree:
+        Group By Operator
+          aggregations: sum(VALUE._col0), count(VALUE._col1)
+          keys: KEY._col0 (type: int)
+          mode: final
+          outputColumnNames: _col0, _col1, _col2
+          Statistics: Num rows: 1 Data size: 140 Basic stats: COMPLETE Column stats: NONE
+          Select Operator
+            expressions: _col0 (type: int), UDFToInteger(_col1) (type: int), UDFToInteger(_col2) (type: int)
+            outputColumnNames: _col0, _col1, _col2
+            Statistics: Num rows: 1 Data size: 140 Basic stats: COMPLETE Column stats: NONE
+            File Output Operator
+              compressed: false
+              Statistics: Num rows: 1 Data size: 140 Basic stats: COMPLETE Column stats: NONE
+              table:
+                  input format: org.apache.hadoop.mapred.TextInputFormat
+                  output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                  serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                  name: default.dest1
+
+  Stage: Stage-0
+    Move Operator
+      tables:
+          replace: true
+          table:
+              input format: org.apache.hadoop.mapred.TextInputFormat
+              output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+              serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+              name: default.dest1
+
+  Stage: Stage-4
+    Stats-Aggr Operator
+
+  Stage: Stage-5
+    Map Reduce
+      Map Operator Tree:
+          TableScan
+            Reduce Output Operator
+              key expressions: _col0 (type: int)
+              sort order: +
+              Map-reduce partition columns: _col0 (type: int)
+              Statistics: Num rows: 2 Data size: 280 Basic stats: COMPLETE Column stats: NONE
+              value expressions: _col1 (type: double), _col2 (type: struct<count:bigint,sum:double,input:string>)
+      Reduce Operator Tree:
+        Group By Operator
+          aggregations: sum(VALUE._col0), avg(VALUE._col1)
+          keys: KEY._col0 (type: int)
+          mode: final
+          outputColumnNames: _col0, _col1, _col2
+          Statistics: Num rows: 1 Data size: 140 Basic stats: COMPLETE Column stats: NONE
+          Select Operator
+            expressions: _col0 (type: int), UDFToInteger(_col1) (type: int), UDFToInteger(_col2) (type: int)
+            outputColumnNames: _col0, _col1, _col2
+            Statistics: Num rows: 1 Data size: 140 Basic stats: COMPLETE Column stats: NONE
+            File Output Operator
+              compressed: false
+              Statistics: Num rows: 1 Data size: 140 Basic stats: COMPLETE Column stats: NONE
+              table:
+                  input format: org.apache.hadoop.mapred.TextInputFormat
+                  output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                  serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                  name: default.dest2
+
+  Stage: Stage-1
+    Move Operator
+      tables:
+          replace: true
+          table:
+              input format: org.apache.hadoop.mapred.TextInputFormat
+              output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+              serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+              name: default.dest2
+
+  Stage: Stage-6
+    Stats-Aggr Operator
+
+PREHOOK: query: FROM INPUT
+INSERT OVERWRITE TABLE dest1 SELECT INPUT.key, sum(distinct substr(INPUT.value,5)), count(distinct substr(INPUT.value,5)) GROUP BY INPUT.key
+INSERT OVERWRITE TABLE dest2 SELECT INPUT.key, sum(distinct substr(INPUT.value,5)), avg(distinct substr(INPUT.value,5)) GROUP BY INPUT.key
+PREHOOK: type: QUERY
+PREHOOK: Input: default@input
+PREHOOK: Output: default@dest1
+PREHOOK: Output: default@dest2
+POSTHOOK: query: FROM INPUT
+INSERT OVERWRITE TABLE dest1 SELECT INPUT.key, sum(distinct substr(INPUT.value,5)), count(distinct substr(INPUT.value,5)) GROUP BY INPUT.key
+INSERT OVERWRITE TABLE dest2 SELECT INPUT.key, sum(distinct substr(INPUT.value,5)), avg(distinct substr(INPUT.value,5)) GROUP BY INPUT.key
+POSTHOOK: type: QUERY
+POSTHOOK: Input: default@input
+POSTHOOK: Output: default@dest1
+POSTHOOK: Output: default@dest2
+POSTHOOK: Lineage: dest1.key SIMPLE [(input)input.FieldSchema(name:key, type:int, comment:null), ]
+POSTHOOK: Lineage: dest1.val1 EXPRESSION [(input)input.FieldSchema(name:value, type:string, comment:null), ]
+POSTHOOK: Lineage: dest1.val2 EXPRESSION [(input)input.FieldSchema(name:value, type:string, comment:null), ]
+POSTHOOK: Lineage: dest2.key SIMPLE [(input)input.FieldSchema(name:key, type:int, comment:null), ]
+POSTHOOK: Lineage: dest2.val1 EXPRESSION [(input)input.FieldSchema(name:value, type:string, comment:null), ]
+POSTHOOK: Lineage: dest2.val2 EXPRESSION [(input)input.FieldSchema(name:value, type:string, comment:null), ]
+PREHOOK: query: SELECT * from dest1
+PREHOOK: type: QUERY
+PREHOOK: Input: default@dest1
+#### A masked pattern was here ####
+POSTHOOK: query: SELECT * from dest1
+POSTHOOK: type: QUERY
+POSTHOOK: Input: default@dest1
+#### A masked pattern was here ####
+128	128	1
+150	150	1
+165	165	1
+193	193	1
+213	427	2
+224	224	1
+238	717	3
+255	255	1
+265	265	1
+27	27	1
+273	273	1
+278	278	1
+311	311	1
+369	369	1
+401	401	1
+409	409	1
+484	484	1
+66	66	1
+86	86	1
+98	98	1
+PREHOOK: query: SELECT * from dest2
+PREHOOK: type: QUERY
+PREHOOK: Input: default@dest2
+#### A masked pattern was here ####
+POSTHOOK: query: SELECT * from dest2
+POSTHOOK: type: QUERY
+POSTHOOK: Input: default@dest2
+#### A masked pattern was here ####
+128	128	128
+150	150	150
+165	165	165
+193	193	193
+213	427	213
+224	224	224
+238	717	239
+255	255	255
+265	265	265
+27	27	27
+273	273	273
+278	278	278
+311	311	311
+369	369	369
+401	401	401
+409	409	409
+484	484	484
+66	66	66
+86	86	86
+98	98	98

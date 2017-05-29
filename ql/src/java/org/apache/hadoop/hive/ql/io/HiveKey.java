@@ -29,17 +29,24 @@ public class HiveKey extends BytesWritable {
 
   private static final int LENGTH_BYTES = 4;
 
-  boolean hashCodeValid;
+  private int hashCode;
+  private boolean hashCodeValid;
+
+  private transient int distKeyLength;
 
   public HiveKey() {
     hashCodeValid = false;
   }
 
-  protected int myHashCode;
+  public HiveKey(byte[] bytes, int hashcode) {
+    super(bytes);
+    hashCode = hashcode;
+    hashCodeValid = true;
+  }
 
   public void setHashCode(int myHashCode) {
     hashCodeValid = true;
-    this.myHashCode = myHashCode;
+    hashCode = myHashCode;
   }
 
   @Override
@@ -48,7 +55,15 @@ public class HiveKey extends BytesWritable {
       throw new RuntimeException("Cannot get hashCode() from deserialized "
           + HiveKey.class);
     }
-    return myHashCode;
+    return hashCode;
+  }
+
+  public void setDistKeyLength(int distKeyLength) {
+    this.distKeyLength = distKeyLength;
+  }
+
+  public int getDistKeyLength() {
+    return distKeyLength;
   }
 
   /** A Comparator optimized for HiveKey. */

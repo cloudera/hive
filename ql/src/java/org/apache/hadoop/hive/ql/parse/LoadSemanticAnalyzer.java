@@ -18,6 +18,27 @@
 
 package org.apache.hadoop.hive.ql.parse;
 
+import org.antlr.runtime.tree.Tree;
+import org.apache.commons.httpclient.util.URIUtil;
+import org.apache.commons.lang.StringUtils;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathFilter;
+import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
+import org.apache.hadoop.hive.ql.ErrorMsg;
+import org.apache.hadoop.hive.ql.exec.Task;
+import org.apache.hadoop.hive.ql.exec.TaskFactory;
+import org.apache.hadoop.hive.ql.exec.Utilities;
+import org.apache.hadoop.hive.ql.hooks.WriteEntity;
+import org.apache.hadoop.hive.ql.metadata.Hive;
+import org.apache.hadoop.hive.ql.metadata.HiveException;
+import org.apache.hadoop.hive.ql.metadata.Partition;
+import org.apache.hadoop.hive.ql.plan.LoadTableDesc;
+import org.apache.hadoop.hive.ql.plan.MoveWork;
+import org.apache.hadoop.hive.ql.plan.StatsWork;
+
 import java.io.IOException;
 import java.io.Serializable;
 import java.net.URI;
@@ -26,31 +47,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.antlr.runtime.tree.Tree;
-import org.apache.commons.lang.StringUtils;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.hadoop.hive.ql.exec.Task;
-import org.apache.hadoop.hive.ql.exec.TaskFactory;
-import org.apache.hadoop.hive.ql.exec.Utilities;
-import org.apache.hadoop.hive.ql.metadata.Hive;
-import org.apache.hadoop.hive.ql.metadata.HiveException;
-import org.apache.hadoop.hive.ql.metadata.Partition;
-import org.apache.hadoop.hive.ql.plan.CopyWork;
-import org.apache.hadoop.hive.ql.plan.LoadTableDesc;
-import org.apache.hadoop.hive.ql.plan.MoveWork;
-
 /**
  * LoadSemanticAnalyzer.
  *
  */
 public class LoadSemanticAnalyzer extends BaseSemanticAnalyzer {
-
-  private boolean isLocal;
-  private boolean isOverWrite;
 
   public LoadSemanticAnalyzer(HiveConf conf) throws SemanticException {
     super(conf);
@@ -58,16 +59,28 @@ public class LoadSemanticAnalyzer extends BaseSemanticAnalyzer {
 
   public static FileStatus[] matchFilesOrDir(FileSystem fs, Path path)
       throws IOException {
-    FileStatus[] srcs = fs.globStatus(path);
+    FileStatus[] srcs = fs.globStatus(path, new PathFilter() {
+              @Override
+              public boolean accept(Path p) {
+                String name = p.getName();
+                return name.equals("_metadata") ? true : !name.startsWith("_") && !name.startsWith(".");
+              }
+            });
     if ((srcs != null) && srcs.length == 1) {
       if (srcs[0].isDir()) {
-        srcs = fs.listStatus(srcs[0].getPath());
+        srcs = fs.listStatus(srcs[0].getPath(), new PathFilter() {
+          @Override
+          public boolean accept(Path p) {
+            String name = p.getName();
+            return !name.startsWith("_") && !name.startsWith(".");
+          }
+        });
       }
     }
     return (srcs);
   }
 
-  private URI initializeFromURI(String fromPath) throws IOException,
+  private URI initializeFromURI(String fromPath, boolean isLocal) throws IOException,
       URISyntaxException {
     URI fromURI = new Path(fromPath).toUri();
 
@@ -79,10 +92,11 @@ public class LoadSemanticAnalyzer extends BaseSemanticAnalyzer {
     // directory
     if (!path.startsWith("/")) {
       if (isLocal) {
-        path = new Path(System.getProperty("user.dir"), path).toString();
+        path = URIUtil.decode(
+            new Path(System.getProperty("user.dir"), fromPath).toUri().toString());
       } else {
         path = new Path(new Path("/user/" + System.getProperty("user.name")),
-            path).toString();
+          path).toString();
       }
     }
 
@@ -100,7 +114,7 @@ public class LoadSemanticAnalyzer extends BaseSemanticAnalyzer {
     }
 
     // if scheme is specified but not authority then use the default authority
-    if (fromScheme.equals("hdfs") && StringUtils.isEmpty(fromAuthority)) {
+    if ((!fromScheme.equals("file")) && StringUtils.isEmpty(fromAuthority)) {
       URI defaultURI = FileSystem.get(conf).getUri();
       fromAuthority = defaultURI.getAuthority();
     }
@@ -111,11 +125,6 @@ public class LoadSemanticAnalyzer extends BaseSemanticAnalyzer {
 
   private void applyConstraints(URI fromURI, URI toURI, Tree ast,
       boolean isLocal) throws SemanticException {
-    if (!fromURI.getScheme().equals("file")
-        && !fromURI.getScheme().equals("hdfs")) {
-      throw new SemanticException(ErrorMsg.INVALID_PATH.getMsg(ast,
-          "only \"file\" or \"hdfs\" file systems accepted"));
-    }
 
     // local mode implies that scheme should be "file"
     // we can change this going forward
@@ -125,10 +134,7 @@ public class LoadSemanticAnalyzer extends BaseSemanticAnalyzer {
     }
 
     try {
-      FileStatus[] srcs = matchFilesOrDir(FileSystem.get(fromURI, conf),
-          new Path(fromURI.getScheme(), fromURI.getAuthority(), fromURI
-          .getPath()));
-
+      FileStatus[] srcs = matchFilesOrDir(FileSystem.get(fromURI, conf), new Path(fromURI));
       if (srcs == null || srcs.length == 0) {
         throw new SemanticException(ErrorMsg.INVALID_PATH.getMsg(ast,
             "No files matching path " + fromURI));
@@ -161,8 +167,8 @@ public class LoadSemanticAnalyzer extends BaseSemanticAnalyzer {
 
   @Override
   public void analyzeInternal(ASTNode ast) throws SemanticException {
-    isLocal = false;
-    isOverWrite = false;
+    boolean isLocal = false;
+    boolean isOverWrite = false;
     Tree fromTree = ast.getChild(0);
     Tree tableTree = ast.getChild(1);
 
@@ -183,7 +189,7 @@ public class LoadSemanticAnalyzer extends BaseSemanticAnalyzer {
     URI fromURI;
     try {
       String fromPath = stripQuotes(fromTree.getText());
-      fromURI = initializeFromURI(fromPath);
+      fromURI = initializeFromURI(fromPath, isLocal);
     } catch (IOException e) {
       throw new SemanticException(ErrorMsg.INVALID_PATH.getMsg(fromTree, e
           .getMessage()), e);
@@ -206,39 +212,35 @@ public class LoadSemanticAnalyzer extends BaseSemanticAnalyzer {
     if (ts.tableHandle.isNonNative()) {
       throw new SemanticException(ErrorMsg.LOAD_INTO_NON_NATIVE.getMsg());
     }
-    URI toURI = (ts.partHandle != null) ? ts.partHandle.getDataLocation()
-        : ts.tableHandle.getDataLocation();
+
+    if(ts.tableHandle.isStoredAsSubDirectories()) {
+      throw new SemanticException(ErrorMsg.LOAD_INTO_STORED_AS_DIR.getMsg());
+    }
+
+    URI toURI = ((ts.partHandle != null) ? ts.partHandle.getDataLocation()
+        : ts.tableHandle.getDataLocation()).toUri();
 
     List<FieldSchema> parts = ts.tableHandle.getPartitionKeys();
-    if (isOverWrite && (parts != null && parts.size() > 0)
+    if ((parts != null && parts.size() > 0)
         && (ts.partSpec == null || ts.partSpec.size() == 0)) {
       throw new SemanticException(ErrorMsg.NEED_PARTITION_ERROR.getMsg());
     }
 
     // make sure the arguments make sense
     applyConstraints(fromURI, toURI, fromTree, isLocal);
-
+    inputs.add(toReadEntity(new Path(fromURI)));
     Task<? extends Serializable> rTask = null;
-
-    // create copy work
-    if (isLocal) {
-      // if the local keyword is specified - we will always make a copy. this
-      // might seem redundant in the case
-      // that the hive warehouse is also located in the local file system - but
-      // that's just a test case.
-      String copyURIStr = ctx.getExternalTmpFileURI(toURI);
-      URI copyURI = URI.create(copyURIStr);
-      rTask = TaskFactory.get(new CopyWork(fromURI.toString(), copyURIStr),
-          conf);
-      fromURI = copyURI;
-    }
 
     // create final load/move work
 
-    String loadTmpPath = ctx.getExternalTmpFileURI(toURI);
+    boolean preservePartitionSpecs = false;
+
     Map<String, String> partSpec = ts.getPartSpec();
     if (partSpec == null) {
       partSpec = new LinkedHashMap<String, String>();
+      outputs.add(new WriteEntity(ts.tableHandle,
+          (isOverWrite ? WriteEntity.WriteType.INSERT_OVERWRITE :
+              WriteEntity.WriteType.INSERT)));
     } else {
       try{
         Partition part = Hive.get().getPartition(ts.tableHandle, partSpec, false);
@@ -247,6 +249,18 @@ public class LoadSemanticAnalyzer extends BaseSemanticAnalyzer {
             throw new SemanticException(ErrorMsg.OFFLINE_TABLE_OR_PARTITION.
                 getMsg(ts.tableName + ":" + part.getName()));
           }
+          if (isOverWrite){
+            outputs.add(new WriteEntity(part, WriteEntity.WriteType.INSERT_OVERWRITE));
+          } else {
+            outputs.add(new WriteEntity(part, WriteEntity.WriteType.INSERT));
+            // If partition already exists and we aren't overwriting it, then respect
+            // its current location info rather than picking it from the parent TableDesc
+            preservePartitionSpecs = true;
+          }
+        } else {
+          outputs.add(new WriteEntity(ts.tableHandle,
+          (isOverWrite ? WriteEntity.WriteType.INSERT_OVERWRITE :
+              WriteEntity.WriteType.INSERT)));
         }
       } catch(HiveException e) {
         throw new SemanticException(e);
@@ -254,17 +268,59 @@ public class LoadSemanticAnalyzer extends BaseSemanticAnalyzer {
     }
 
 
-    LoadTableDesc loadTableWork = new LoadTableDesc(fromURI.toString(),
-        loadTmpPath, Utilities.getTableDesc(ts.tableHandle), partSpec, isOverWrite);
+    LoadTableDesc loadTableWork;
+    loadTableWork = new LoadTableDesc(new Path(fromURI),
+      Utilities.getTableDesc(ts.tableHandle), partSpec, isOverWrite);
+    if (preservePartitionSpecs){
+      // Note : preservePartitionSpecs=true implies inheritTableSpecs=false but
+      // but preservePartitionSpecs=false(default) here is not sufficient enough
+      // info to set inheritTableSpecs=true
+      loadTableWork.setInheritTableSpecs(false);
+    }
 
+    Task<? extends Serializable> childTask = TaskFactory.get(new MoveWork(getInputs(),
+        getOutputs(), loadTableWork, null, true, isLocal), conf);
     if (rTask != null) {
-      rTask.addDependentTask(TaskFactory.get(new MoveWork(getInputs(),
-          getOutputs(), loadTableWork, null, true), conf));
+      rTask.addDependentTask(childTask);
     } else {
-      rTask = TaskFactory.get(new MoveWork(getInputs(), getOutputs(),
-          loadTableWork, null, true), conf);
+      rTask = childTask;
     }
 
     rootTasks.add(rTask);
+
+    // The user asked for stats to be collected.
+    // Some stats like number of rows require a scan of the data
+    // However, some other stats, like number of files, do not require a complete scan
+    // Update the stats which do not require a complete scan.
+    Task<? extends Serializable> statTask = null;
+    if (conf.getBoolVar(HiveConf.ConfVars.HIVESTATSAUTOGATHER)) {
+      StatsWork statDesc = new StatsWork(loadTableWork);
+      statDesc.setNoStatsAggregator(true);
+      statDesc.setClearAggregatorStats(true);
+      statDesc.setStatsReliable(conf.getBoolVar(HiveConf.ConfVars.HIVE_STATS_RELIABLE));
+      statTask = TaskFactory.get(statDesc, conf);
+    }
+
+    // HIVE-3334 has been filed for load file with index auto update
+    if (HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVEINDEXAUTOUPDATE)) {
+      IndexUpdater indexUpdater = new IndexUpdater(loadTableWork, getInputs(), conf);
+      try {
+        List<Task<? extends Serializable>> indexUpdateTasks = indexUpdater.generateUpdateTasks();
+
+        for (Task<? extends Serializable> updateTask : indexUpdateTasks) {
+          //LOAD DATA will either have a copy & move or just a move,
+          // we always want the update to be dependent on the move
+          childTask.addDependentTask(updateTask);
+          if (statTask != null) {
+            updateTask.addDependentTask(statTask);
+          }
+        }
+      } catch (HiveException e) {
+        console.printInfo("WARNING: could not auto-update stale indexes, indexes are not out of sync");
+      }
+    }
+    else if (statTask != null) {
+      childTask.addDependentTask(statTask);
+    }
   }
 }

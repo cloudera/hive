@@ -23,6 +23,8 @@ import java.util.regex.Pattern;
 
 import org.apache.hadoop.hive.ql.exec.Description;
 import org.apache.hadoop.hive.ql.exec.UDF;
+import org.apache.hadoop.hive.ql.exec.vector.VectorizedExpressions;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.FilterStringColLikeStringScalar;
 import org.apache.hadoop.io.BooleanWritable;
 import org.apache.hadoop.io.Text;
 
@@ -35,6 +37,7 @@ import org.apache.hadoop.io.Text;
     extended = "Example:\n"
     + "  > SELECT a.* FROM srcpart a WHERE a.hr _FUNC_ '%2' LIMIT 1;\n"
     + "  27      val_27  2008-04-08      12")
+@VectorizedExpressions({FilterStringColLikeStringScalar.class})
 public class UDFLike extends UDF {
   private final Text lastLikePattern = new Text();
   private Pattern p = null;
@@ -49,7 +52,7 @@ public class UDFLike extends UDF {
     COMPLEX, // all other cases, such as "ab%c_de"
   }
 
-  private PatternType type = PatternType.COMPLEX;
+  private PatternType type = PatternType.NONE;
   private final Text simplePattern = new Text();
 
   private final BooleanWritable result = new BooleanWritable();
@@ -75,10 +78,7 @@ public class UDFLike extends UDF {
       } else if (n == '%') {
         sb.append(".*");
       } else {
-        if ("\\[](){}.*^$".indexOf(n) != -1) {
-          sb.append('\\');
-        }
-        sb.append(n);
+        sb.append(Pattern.quote(Character.toString(n)));
       }
     }
     return sb.toString();
@@ -91,16 +91,16 @@ public class UDFLike extends UDF {
    * string in it for later pattern matching if it is a simple pattern.
    * <p>
    * Examples: <blockquote>
-   * 
+   *
    * <pre>
    * parseSimplePattern("%abc%") changes {@link #type} to PatternType.MIDDLE
    * and changes {@link #simplePattern} to "abc"
    * parseSimplePattern("%ab_c%") changes {@link #type} to PatternType.COMPLEX
    * and does not change {@link #simplePattern}
    * </pre>
-   * 
+   *
    * </blockquote>
-   * 
+   *
    * @param likePattern
    *          the input LIKE query pattern
    */

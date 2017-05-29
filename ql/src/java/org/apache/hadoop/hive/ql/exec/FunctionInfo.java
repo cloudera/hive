@@ -18,11 +18,17 @@
 
 package org.apache.hadoop.hive.ql.exec;
 
+import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDAFBridge;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDAFResolver;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDF;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFBridge;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDTF;
+import org.apache.hadoop.hive.ql.udf.ptf.TableFunctionResolver;
+import org.apache.hadoop.hive.ql.udf.ptf.WindowingTableFunction;
+import org.apache.hive.common.util.AnnotationUtils;
+
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * FunctionInfo.
@@ -30,9 +36,19 @@ import org.apache.hadoop.hive.ql.udf.generic.GenericUDTF;
  */
 public class FunctionInfo {
 
-  private final boolean isNative;
+  public static enum FunctionType {
+    BUILTIN, PERSISTENT, TEMPORARY;
+  }
+
+  private final FunctionType functionType;
+
+  private final boolean isInternalTableFunction;
 
   private final String displayName;
+
+  private final FunctionResource[] resources;
+
+  private String className;
 
   private GenericUDF genericUDF;
 
@@ -40,25 +56,59 @@ public class FunctionInfo {
 
   private GenericUDAFResolver genericUDAFResolver;
 
+  private Class<? extends TableFunctionResolver>  tableFunctionResolver;
+
+  private boolean blockedFunction;
+
+  // for persistent function
+  // if the function is dropped, all functions registered to sessions are needed to be reloaded
+  private AtomicBoolean discarded;
+
+  public FunctionInfo(String displayName, String className, FunctionResource... resources) {
+    this.functionType = FunctionType.PERSISTENT;
+    this.displayName = displayName;
+    this.className = className;
+    this.isInternalTableFunction = false;
+    this.resources = resources;
+    this.discarded = new AtomicBoolean(false);  // shared to all session functions
+  }
+
   public FunctionInfo(boolean isNative, String displayName,
-      GenericUDF genericUDF) {
-    this.isNative = isNative;
+      GenericUDF genericUDF, FunctionResource... resources) {
+    this.functionType = isNative ? FunctionType.BUILTIN : FunctionType.TEMPORARY;
     this.displayName = displayName;
     this.genericUDF = genericUDF;
+    this.isInternalTableFunction = false;
+    this.resources = resources;
   }
 
   public FunctionInfo(boolean isNative, String displayName,
-      GenericUDAFResolver genericUDAFResolver) {
-    this.isNative = isNative;
+      GenericUDAFResolver genericUDAFResolver, FunctionResource... resources) {
+    this.functionType = isNative ? FunctionType.BUILTIN : FunctionType.TEMPORARY;
     this.displayName = displayName;
     this.genericUDAFResolver = genericUDAFResolver;
+    this.isInternalTableFunction = false;
+    this.resources = resources;
   }
 
   public FunctionInfo(boolean isNative, String displayName,
-      GenericUDTF genericUDTF) {
-    this.isNative = isNative;
+      GenericUDTF genericUDTF, FunctionResource... resources) {
+    this.functionType = isNative ? FunctionType.BUILTIN : FunctionType.TEMPORARY;
     this.displayName = displayName;
     this.genericUDTF = genericUDTF;
+    this.isInternalTableFunction = false;
+    this.resources = resources;
+  }
+
+  public FunctionInfo(boolean isNative, String displayName, Class<? extends TableFunctionResolver> tFnCls,
+      FunctionResource... resources) {
+    this.functionType = isNative ? FunctionType.BUILTIN : FunctionType.TEMPORARY;
+    this.displayName = displayName;
+    this.tableFunctionResolver = tFnCls;
+    PartitionTableFunctionDescription def = AnnotationUtils.getAnnotation(
+        tableFunctionResolver, PartitionTableFunctionDescription.class);
+    this.isInternalTableFunction = def != null && def.isInternal();
+    this.resources = resources;
   }
 
   /**
@@ -90,6 +140,8 @@ public class FunctionInfo {
     return genericUDAFResolver;
   }
 
+
+
   /**
    * Get the Class of the UDF.
    */
@@ -109,11 +161,14 @@ public class FunctionInfo {
     } else if (isGenericUDTF()) {
       return genericUDTF.getClass();
     }
+    if(isTableFunction()) {
+      return this.tableFunctionResolver;
+    }
     return null;
   }
 
   /**
-   * Get the display name for this function. This should be transfered into
+   * Get the display name for this function. This should be transferred into
    * exprNodeGenericUDFDesc, and will be used as the first parameter to
    * GenericUDF.getDisplayName() call, instead of hard-coding the function name.
    * This will solve the problem of displaying only one name when a udf is
@@ -127,7 +182,15 @@ public class FunctionInfo {
    * Native functions cannot be unregistered.
    */
   public boolean isNative() {
-    return isNative;
+    return functionType == FunctionType.BUILTIN || functionType == FunctionType.PERSISTENT;
+  }
+
+  /**
+   * Internal table functions cannot be used in the language.
+   * {@link WindowingTableFunction}
+   */
+  public boolean isInternalTableFunction() {
+    return isInternalTableFunction;
   }
 
   /**
@@ -149,5 +212,73 @@ public class FunctionInfo {
    */
   public boolean isGenericUDTF() {
     return null != genericUDTF;
+  }
+
+  /**
+   * @return TRUE if the function is a Table Function
+   */
+  public boolean isTableFunction() {
+    return null != tableFunctionResolver;
+  }
+
+  public boolean isBlockedFunction() {
+    return blockedFunction;
+  }
+
+  public void setBlockedFunction(boolean blockedFunction) {
+    this.blockedFunction = blockedFunction;
+  }
+
+  public boolean isBuiltIn() {
+    return functionType == FunctionType.BUILTIN;
+  }
+
+  public boolean isPersistent() {
+    return functionType == FunctionType.PERSISTENT;
+  }
+
+  public String getClassName() {
+    return className;
+  }
+
+  public FunctionResource[] getResources() {
+    return resources;
+  }
+
+  public void discarded() {
+    if (discarded != null) {
+      discarded.set(true);
+    }
+  }
+
+  // for persistent function
+  public boolean isDiscarded() {
+    return discarded != null && discarded.get();
+  }
+
+  // for persistent function
+  public void shareStateWith(FunctionInfo function) {
+    if (function != null) {
+      function.discarded = discarded;
+    }
+  }
+
+  public static class FunctionResource {
+    private final SessionState.ResourceType resourceType;
+    private final String resourceURI;
+    public FunctionResource(SessionState.ResourceType resourceType, String resourceURI) {
+      this.resourceType = resourceType;
+      this.resourceURI = resourceURI;
+    }
+    public SessionState.ResourceType getResourceType() {
+      return resourceType;
+    }
+    public String getResourceURI() {
+      return resourceURI;
+    }
+    @Override
+    public String toString() {
+      return resourceType + ":" + resourceURI;
+    }
   }
 }

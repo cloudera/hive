@@ -1,4 +1,5 @@
-
+set hive.exec.submitviachild=true;
+set hive.exec.submit.local.task.via.child=true;
 set hive.exec.dynamic.partition=true;
 set hive.exec.dynamic.partition.mode=nonstrict;
 set hive.enforce.bucketing=true;
@@ -14,12 +15,12 @@ create table srcpartbucket (key string, value string) partitioned by (ds string,
 insert overwrite table srcpartbucket partition(ds, hr) select * from srcpart where ds is not null and key < 10;
 
 explain extended
-select ds, count(1) from srcpartbucket tablesample (bucket 1 out of 4 on key) where ds is not null group by ds;
+select ds, count(1) from srcpartbucket tablesample (bucket 1 out of 4 on key) where ds is not null group by ds ORDER BY ds ASC;
 
-select ds, count(1) from srcpartbucket tablesample (bucket 1 out of 4 on key) where ds is not null group by ds;
+select ds, count(1) from srcpartbucket tablesample (bucket 1 out of 4 on key) where ds is not null group by ds ORDER BY ds ASC;
 
-select ds, count(1) from srcpartbucket tablesample (bucket 1 out of 2 on key) where ds is not null group by ds;
+select ds, count(1) from srcpartbucket tablesample (bucket 1 out of 2 on key) where ds is not null group by ds ORDER BY ds ASC;
 
-select * from srcpartbucket where ds is not null;
+select * from srcpartbucket where ds is not null ORDER BY key ASC, value ASC, ds ASC, hr ASC;
 
 

@@ -18,20 +18,28 @@
 
 package org.apache.hadoop.hive.ql.optimizer.lineage;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Stack;
 
+import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.exec.ColumnInfo;
 import org.apache.hadoop.hive.ql.exec.Operator;
+import org.apache.hadoop.hive.ql.exec.ReduceSinkOperator;
+import org.apache.hadoop.hive.ql.exec.RowSchema;
+import org.apache.hadoop.hive.ql.exec.TableScanOperator;
+import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.hooks.LineageInfo;
 import org.apache.hadoop.hive.ql.hooks.LineageInfo.BaseColumnInfo;
 import org.apache.hadoop.hive.ql.hooks.LineageInfo.Dependency;
+import org.apache.hadoop.hive.ql.hooks.LineageInfo.DependencyType;
+import org.apache.hadoop.hive.ql.hooks.LineageInfo.Predicate;
+import org.apache.hadoop.hive.ql.hooks.LineageInfo.TableAliasInfo;
 import org.apache.hadoop.hive.ql.lib.DefaultGraphWalker;
 import org.apache.hadoop.hive.ql.lib.DefaultRuleDispatcher;
 import org.apache.hadoop.hive.ql.lib.Dispatcher;
@@ -41,6 +49,7 @@ import org.apache.hadoop.hive.ql.lib.NodeProcessor;
 import org.apache.hadoop.hive.ql.lib.NodeProcessorCtx;
 import org.apache.hadoop.hive.ql.lib.Rule;
 import org.apache.hadoop.hive.ql.lib.RuleRegExp;
+import org.apache.hadoop.hive.ql.metadata.Table;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
@@ -48,6 +57,7 @@ import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeFieldDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeNullDesc;
+import org.apache.hadoop.hive.ql.plan.OperatorDesc;
 
 /**
  * Expression processor factory for lineage. Each processor is responsible to
@@ -70,20 +80,18 @@ public class ExprProcFactory {
 
       // assert that the input operator is not null as there are no
       // exprs associated with table scans.
-      assert (epc.getInputOperator() != null);
+      Operator<? extends OperatorDesc> operator = epc.getInputOperator();
+      assert (operator != null);
 
-      ColumnInfo inp_ci = null;
-      for (ColumnInfo tmp_ci : epc.getInputOperator().getSchema()
-          .getSignature()) {
-        if (tmp_ci.getInternalName().equals(cd.getColumn())) {
-          inp_ci = tmp_ci;
-          break;
-        }
+      RowSchema schema = epc.getSchema();
+      ColumnInfo ci = schema.getColumnInfo(cd.getColumn());
+      if (ci == null && operator instanceof ReduceSinkOperator) {
+        ci = schema.getColumnInfo(Utilities.removeValueTag(cd.getColumn()));
       }
 
       // Insert the dependencies of inp_ci to that of the current operator, ci
       LineageCtx lc = epc.getLineageCtx();
-      Dependency dep = lc.getIndex().getDependency(epc.getInputOperator(), inp_ci);
+      Dependency dep = lc.getIndex().getDependency(operator, ci);
 
       return dep;
     }
@@ -118,7 +126,7 @@ public class ExprProcFactory {
         bci_set.addAll(child_dep.getBaseCols());
       }
 
-      dep.setBaseCols(new ArrayList<BaseColumnInfo>(bci_set));
+      dep.setBaseCols(bci_set);
       dep.setType(new_type);
 
       return dep;
@@ -140,7 +148,8 @@ public class ExprProcFactory {
       // Create a dependency that has no basecols
       Dependency dep = new Dependency();
       dep.setType(LineageInfo.DependencyType.SIMPLE);
-      dep.setBaseCols(new ArrayList<BaseColumnInfo>());
+      dep.setBaseCols(new LinkedHashSet<BaseColumnInfo>());
+
       return dep;
     }
   }
@@ -161,6 +170,98 @@ public class ExprProcFactory {
     return new ColumnExprProcessor();
   }
 
+  private static boolean findSourceColumn(
+      LineageCtx lctx, Predicate cond, String tabAlias, String alias) {
+    for (Map.Entry<String, Operator<? extends OperatorDesc>> topOpMap: lctx
+        .getParseCtx().getTopOps().entrySet()) {
+      Operator<? extends OperatorDesc> topOp = topOpMap.getValue();
+      if (topOp instanceof TableScanOperator) {
+        TableScanOperator tableScanOp = (TableScanOperator) topOp;
+        Table tbl = tableScanOp.getConf().getTableMetadata();
+        if (tbl.getTableName().equals(tabAlias)
+            || tabAlias.equals(tableScanOp.getConf().getAlias())) {
+          for (FieldSchema column: tbl.getCols()) {
+            if (column.getName().equals(alias)) {
+              TableAliasInfo table = new TableAliasInfo();
+              table.setTable(tbl.getTTable());
+              table.setAlias(tabAlias);
+              BaseColumnInfo colInfo = new BaseColumnInfo();
+              colInfo.setColumn(column);
+              colInfo.setTabAlias(table);
+              cond.getBaseCols().add(colInfo);
+              return true;
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Get the expression string of an expression node.
+   */
+  public static String getExprString(RowSchema rs, ExprNodeDesc expr,
+      LineageCtx lctx, Operator<? extends OperatorDesc> inpOp, Predicate cond) {
+    if (expr instanceof ExprNodeColumnDesc) {
+      ExprNodeColumnDesc col = (ExprNodeColumnDesc) expr;
+      String internalName = col.getColumn();
+      String alias = internalName;
+      String tabAlias = col.getTabAlias();
+      ColumnInfo ci = rs.getColumnInfo(internalName);
+      if (ci != null) {
+        if (ci.getAlias() != null) {
+          alias = ci.getAlias();
+        }
+        if (ci.getTabAlias() != null) {
+          tabAlias = ci.getTabAlias();
+        }
+      }
+      Dependency dep = lctx.getIndex().getDependency(inpOp, internalName);
+      if ((tabAlias == null || tabAlias.startsWith("_") || tabAlias.startsWith("$"))
+          && (dep != null && dep.getType() == DependencyType.SIMPLE)) {
+        Set<BaseColumnInfo> baseCols = dep.getBaseCols();
+        if (baseCols != null && !baseCols.isEmpty()) {
+          BaseColumnInfo baseCol = baseCols.iterator().next();
+          tabAlias = baseCol.getTabAlias().getAlias();
+          alias = baseCol.getColumn().getName();
+        }
+      }
+      if (tabAlias != null && tabAlias.length() > 0
+          && !tabAlias.startsWith("_") && !tabAlias.startsWith("$")) {
+        if (cond != null && !findSourceColumn(lctx, cond, tabAlias, alias) && dep != null) {
+          cond.getBaseCols().addAll(dep.getBaseCols());
+        }
+        return tabAlias + "." + alias;
+      }
+
+      if (dep != null) {
+        if (cond != null) {
+          cond.getBaseCols().addAll(dep.getBaseCols());
+        }
+        if (dep.getExpr() != null) {
+          return dep.getExpr();
+        }
+      }
+      if (alias.startsWith("_")) {
+        ci = inpOp.getSchema().getColumnInfo(internalName);
+        if (ci != null && ci.getAlias() != null) {
+          alias = ci.getAlias();
+        }
+      }
+      return alias;
+    } else if (expr instanceof ExprNodeGenericFuncDesc) {
+      ExprNodeGenericFuncDesc func = (ExprNodeGenericFuncDesc) expr;
+      List<ExprNodeDesc> children = func.getChildren();
+      String[] childrenExprStrings = new String[children.size()];
+      for (int i = 0; i < childrenExprStrings.length; i++) {
+        childrenExprStrings[i] = getExprString(rs, children.get(i), lctx, inpOp, cond);
+      }
+      return func.getGenericUDF().getDisplayString(childrenExprStrings);
+    }
+    return expr.getExprString();
+  }
+
   /**
    * Gets the expression dependencies for the expression.
    *
@@ -173,7 +274,7 @@ public class ExprProcFactory {
    * @throws SemanticException
    */
   public static Dependency getExprDependency(LineageCtx lctx,
-      Operator<? extends Serializable> inpOp, ExprNodeDesc expr)
+      Operator<? extends OperatorDesc> inpOp, ExprNodeDesc expr)
       throws SemanticException {
 
     // Create the walker, the rules dispatcher and the context.

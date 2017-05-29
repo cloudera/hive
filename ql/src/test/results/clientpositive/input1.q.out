@@ -1,7 +1,10 @@
 PREHOOK: query: CREATE TABLE TEST1(A INT, B DOUBLE) STORED AS TEXTFILE
 PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:default
+PREHOOK: Output: default@TEST1
 POSTHOOK: query: CREATE TABLE TEST1(A INT, B DOUBLE) STORED AS TEXTFILE
 POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@TEST1
 PREHOOK: query: EXPLAIN
 DESCRIBE TEST1
@@ -9,12 +12,9 @@ PREHOOK: type: DESCTABLE
 POSTHOOK: query: EXPLAIN
 DESCRIBE TEST1
 POSTHOOK: type: DESCTABLE
-ABSTRACT SYNTAX TREE:
-  (TOK_DESCTABLE (TOK_TABTYPE TEST1))
-
 STAGE DEPENDENCIES:
   Stage-0 is a root stage
-  Stage-1 is a root stage
+  Stage-1 depends on stages: Stage-0
 
 STAGE PLANS:
   Stage: Stage-0
@@ -25,11 +25,14 @@ STAGE PLANS:
   Stage: Stage-1
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: DESCRIBE TEST1
 PREHOOK: type: DESCTABLE
+PREHOOK: Input: default@test1
 POSTHOOK: query: DESCRIBE TEST1
 POSTHOOK: type: DESCTABLE
-a	int	
-b	double	
+POSTHOOK: Input: default@test1
+a                   	int                 	                    
+b                   	double              	                    

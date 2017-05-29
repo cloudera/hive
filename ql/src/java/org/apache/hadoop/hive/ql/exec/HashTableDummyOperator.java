@@ -25,6 +25,7 @@ import org.apache.hadoop.hive.ql.plan.HashTableDummyDesc;
 import org.apache.hadoop.hive.ql.plan.TableDesc;
 import org.apache.hadoop.hive.ql.plan.api.OperatorType;
 import org.apache.hadoop.hive.serde2.Deserializer;
+import org.apache.hadoop.hive.serde2.SerDeUtils;
 
 public class HashTableDummyOperator extends Operator<HashTableDummyDesc> implements Serializable {
   private static final long serialVersionUID = 1L;
@@ -34,11 +35,11 @@ public class HashTableDummyOperator extends Operator<HashTableDummyDesc> impleme
     TableDesc tbl = this.getConf().getTbl();
     try {
       Deserializer serde = tbl.getDeserializerClass().newInstance();
-      serde.initialize(hconf, tbl.getProperties());
+      SerDeUtils.initializeSerDe(serde, hconf, tbl.getProperties(), null);
       this.outputObjInspector = serde.getObjectInspector();
       initializeChildren(hconf);
     } catch (Exception e) {
-      LOG.error("Generating output obj inspector from dummy object error");
+      LOG.error("Generating output obj inspector from dummy object error", e);
       e.printStackTrace();
     }
   }
@@ -54,6 +55,10 @@ public class HashTableDummyOperator extends Operator<HashTableDummyDesc> impleme
 
   @Override
   public String getName() {
+    return getOperatorName();
+  }
+
+  static public String getOperatorName() {
     return "HASHTABLEDUMMY";
   }
 

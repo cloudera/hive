@@ -19,8 +19,9 @@
 package org.apache.hadoop.hive.serde2.objectinspector;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.apache.hadoop.hive.serde2.ColumnSet;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory;
@@ -30,25 +31,47 @@ import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectIn
  * StructObjectInspector works on struct data that is stored as a Java List or
  * Java Array object. Basically, the fields are stored sequentially in the List
  * object.
- * 
+ *
  * The names of the struct fields and the internal structure of the struct
  * fields are specified in the ctor of the StructObjectInspector.
- * 
+ *
  */
 public class MetadataListStructObjectInspector extends
     StandardStructObjectInspector {
 
-  static HashMap<List<String>, MetadataListStructObjectInspector> cached = new HashMap<List<String>, MetadataListStructObjectInspector>();
+  static ConcurrentHashMap<List<List<String>>, MetadataListStructObjectInspector>
+      cached = new ConcurrentHashMap<List<List<String>>, MetadataListStructObjectInspector>();
 
   // public static MetadataListStructObjectInspector getInstance(int fields) {
   // return getInstance(ObjectInspectorUtils.getIntegerArray(fields));
   // }
   public static MetadataListStructObjectInspector getInstance(
       List<String> columnNames) {
+    ArrayList<List<String>> key = new ArrayList<List<String>>(1);
+    key.add(columnNames);
     MetadataListStructObjectInspector result = cached.get(columnNames);
     if (result == null) {
       result = new MetadataListStructObjectInspector(columnNames);
-      cached.put(columnNames, result);
+      MetadataListStructObjectInspector prev = cached.putIfAbsent(key, result);
+      if (prev != null) {
+        result = prev;
+      }
+    }
+    return result;
+  }
+
+  public static MetadataListStructObjectInspector getInstance(
+      List<String> columnNames, List<String> columnComments) {
+    ArrayList<List<String>> key = new ArrayList<List<String>>(2);
+    Collections.addAll(key, columnNames, columnComments);
+
+    MetadataListStructObjectInspector result = cached.get(key);
+    if (result == null) {
+      result = new MetadataListStructObjectInspector(columnNames, columnComments);
+      MetadataListStructObjectInspector prev = cached.putIfAbsent(key, result);
+      if (prev != null) {
+        result = prev;
+      }
     }
     return result;
   }
@@ -62,8 +85,17 @@ public class MetadataListStructObjectInspector extends
     return r;
   }
 
+  protected MetadataListStructObjectInspector() {
+    super();
+  }
   MetadataListStructObjectInspector(List<String> columnNames) {
     super(columnNames, getFieldObjectInspectors(columnNames.size()));
+  }
+
+  public MetadataListStructObjectInspector(List<String> columnNames,
+                                           List<String> columnComments) {
+    super(columnNames, getFieldObjectInspectors(columnNames.size()),
+          columnComments);
   }
 
   // Get col object out

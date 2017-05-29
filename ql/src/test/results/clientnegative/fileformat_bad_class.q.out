@@ -1,1 +1,1 @@
-FAILED: Error in semantic analysis: Output Format must implement HiveOutputFormat, otherwise it should be either IgnoreKeyTextOutputFormat or SequenceFileOutputFormat
+FAILED: SemanticException Cannot find class 'ClassDoesNotExist'

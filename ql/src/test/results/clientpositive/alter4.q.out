@@ -1,16 +1,21 @@
 PREHOOK: query: CREATE TABLE set_bucketing_test (key INT, value STRING) CLUSTERED BY (key) INTO 10 BUCKETS
 PREHOOK: type: CREATETABLE
+PREHOOK: Output: database:default
+PREHOOK: Output: default@set_bucketing_test
 POSTHOOK: query: CREATE TABLE set_bucketing_test (key INT, value STRING) CLUSTERED BY (key) INTO 10 BUCKETS
 POSTHOOK: type: CREATETABLE
+POSTHOOK: Output: database:default
 POSTHOOK: Output: default@set_bucketing_test
 PREHOOK: query: DESCRIBE EXTENDED set_bucketing_test
 PREHOOK: type: DESCTABLE
+PREHOOK: Input: default@set_bucketing_test
 POSTHOOK: query: DESCRIBE EXTENDED set_bucketing_test
 POSTHOOK: type: DESCTABLE
-key	int	
-value	string	
+POSTHOOK: Input: default@set_bucketing_test
+key                 	int                 	                    
+value               	string              	                    
 	 	 
-Detailed Table Information	Table(tableName:set_bucketing_test, dbName:default, owner:heyongqiang, createTime:1290068480, lastAccessTime:0, retention:0, sd:StorageDescriptor(cols:[FieldSchema(name:key, type:int, comment:null), FieldSchema(name:value, type:string, comment:null)], location:pfile:/Users/heyongqiang/Documents/workspace/Hive-2/build/ql/test/data/warehouse/set_bucketing_test, inputFormat:org.apache.hadoop.mapred.TextInputFormat, outputFormat:org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat, compressed:false, numBuckets:10, serdeInfo:SerDeInfo(name:null, serializationLib:org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe, parameters:{serialization.format=1}), bucketCols:[key], sortCols:[], parameters:{}), partitionKeys:[], parameters:{transient_lastDdlTime=1290068480}, viewOriginalText:null, viewExpandedText:null, tableType:MANAGED_TABLE)	
+#### A masked pattern was here ####
 PREHOOK: query: ALTER TABLE set_bucketing_test NOT CLUSTERED
 PREHOOK: type: ALTERTABLE_CLUSTER_SORT
 PREHOOK: Input: default@set_bucketing_test
@@ -21,12 +26,14 @@ POSTHOOK: Input: default@set_bucketing_test
 POSTHOOK: Output: default@set_bucketing_test
 PREHOOK: query: DESCRIBE EXTENDED set_bucketing_test
 PREHOOK: type: DESCTABLE
+PREHOOK: Input: default@set_bucketing_test
 POSTHOOK: query: DESCRIBE EXTENDED set_bucketing_test
 POSTHOOK: type: DESCTABLE
-key	int	
-value	string	
+POSTHOOK: Input: default@set_bucketing_test
+key                 	int                 	                    
+value               	string              	                    
 	 	 
-Detailed Table Information	Table(tableName:set_bucketing_test, dbName:default, owner:heyongqiang, createTime:1290068480, lastAccessTime:0, retention:0, sd:StorageDescriptor(cols:[FieldSchema(name:key, type:int, comment:null), FieldSchema(name:value, type:string, comment:null)], location:pfile:/Users/heyongqiang/Documents/workspace/Hive-2/build/ql/test/data/warehouse/set_bucketing_test, inputFormat:org.apache.hadoop.mapred.TextInputFormat, outputFormat:org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat, compressed:false, numBuckets:-1, serdeInfo:SerDeInfo(name:null, serializationLib:org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe, parameters:{serialization.format=1}), bucketCols:[], sortCols:[], parameters:{}), partitionKeys:[], parameters:{last_modified_by=heyongqiang, last_modified_time=1290068480, transient_lastDdlTime=1290068480}, viewOriginalText:null, viewExpandedText:null, tableType:MANAGED_TABLE)	
+#### A masked pattern was here ####
 PREHOOK: query: -- Cleanup
 DROP TABLE set_bucketing_test
 PREHOOK: type: DROPTABLE
@@ -41,8 +48,15 @@ PREHOOK: query: SHOW TABLES
 PREHOOK: type: SHOWTABLES
 POSTHOOK: query: SHOW TABLES
 POSTHOOK: type: SHOWTABLES
+alltypesorc
+cbo_t1
+cbo_t2
+cbo_t3
+lineitem
+part
 src
 src1
+src_cbo
 src_json
 src_sequencefile
 src_thrift
@@ -53,31 +67,40 @@ PREHOOK: query: -- with non-default Database
 
 CREATE DATABASE alter4_db
 PREHOOK: type: CREATEDATABASE
+PREHOOK: Output: database:alter4_db
 POSTHOOK: query: -- with non-default Database
 
 CREATE DATABASE alter4_db
 POSTHOOK: type: CREATEDATABASE
+POSTHOOK: Output: database:alter4_db
 PREHOOK: query: USE alter4_db
 PREHOOK: type: SWITCHDATABASE
+PREHOOK: Input: database:alter4_db
 POSTHOOK: query: USE alter4_db
 POSTHOOK: type: SWITCHDATABASE
+POSTHOOK: Input: database:alter4_db
 PREHOOK: query: SHOW TABLES
 PREHOOK: type: SHOWTABLES
 POSTHOOK: query: SHOW TABLES
 POSTHOOK: type: SHOWTABLES
 PREHOOK: query: CREATE TABLE set_bucketing_test (key INT, value STRING) CLUSTERED BY (key) INTO 10 BUCKETS
 PREHOOK: type: CREATETABLE
+PREHOOK: Output: alter4_db@set_bucketing_test
+PREHOOK: Output: database:alter4_db
 POSTHOOK: query: CREATE TABLE set_bucketing_test (key INT, value STRING) CLUSTERED BY (key) INTO 10 BUCKETS
 POSTHOOK: type: CREATETABLE
 POSTHOOK: Output: alter4_db@set_bucketing_test
+POSTHOOK: Output: database:alter4_db
 PREHOOK: query: DESCRIBE EXTENDED set_bucketing_test
 PREHOOK: type: DESCTABLE
+PREHOOK: Input: alter4_db@set_bucketing_test
 POSTHOOK: query: DESCRIBE EXTENDED set_bucketing_test
 POSTHOOK: type: DESCTABLE
-key	int	
-value	string	
+POSTHOOK: Input: alter4_db@set_bucketing_test
+key                 	int                 	                    
+value               	string              	                    
 	 	 
-Detailed Table Information	Table(tableName:set_bucketing_test, dbName:alter4_db, owner:heyongqiang, createTime:1290068481, lastAccessTime:0, retention:0, sd:StorageDescriptor(cols:[FieldSchema(name:key, type:int, comment:null), FieldSchema(name:value, type:string, comment:null)], location:pfile:/Users/heyongqiang/Documents/workspace/Hive-2/build/ql/test/data/warehouse/alter4_db.db/set_bucketing_test, inputFormat:org.apache.hadoop.mapred.TextInputFormat, outputFormat:org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat, compressed:false, numBuckets:10, serdeInfo:SerDeInfo(name:null, serializationLib:org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe, parameters:{serialization.format=1}), bucketCols:[key], sortCols:[], parameters:{}), partitionKeys:[], parameters:{transient_lastDdlTime=1290068481}, viewOriginalText:null, viewExpandedText:null, tableType:MANAGED_TABLE)	
+#### A masked pattern was here ####
 PREHOOK: query: ALTER TABLE set_bucketing_test NOT CLUSTERED
 PREHOOK: type: ALTERTABLE_CLUSTER_SORT
 PREHOOK: Input: alter4_db@set_bucketing_test
@@ -88,12 +111,14 @@ POSTHOOK: Input: alter4_db@set_bucketing_test
 POSTHOOK: Output: alter4_db@set_bucketing_test
 PREHOOK: query: DESCRIBE EXTENDED set_bucketing_test
 PREHOOK: type: DESCTABLE
+PREHOOK: Input: alter4_db@set_bucketing_test
 POSTHOOK: query: DESCRIBE EXTENDED set_bucketing_test
 POSTHOOK: type: DESCTABLE
-key	int	
-value	string	
+POSTHOOK: Input: alter4_db@set_bucketing_test
+key                 	int                 	                    
+value               	string              	                    
 	 	 
-Detailed Table Information	Table(tableName:set_bucketing_test, dbName:alter4_db, owner:heyongqiang, createTime:1290068481, lastAccessTime:0, retention:0, sd:StorageDescriptor(cols:[FieldSchema(name:key, type:int, comment:null), FieldSchema(name:value, type:string, comment:null)], location:pfile:/Users/heyongqiang/Documents/workspace/Hive-2/build/ql/test/data/warehouse/alter4_db.db/set_bucketing_test, inputFormat:org.apache.hadoop.mapred.TextInputFormat, outputFormat:org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat, compressed:false, numBuckets:-1, serdeInfo:SerDeInfo(name:null, serializationLib:org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe, parameters:{serialization.format=1}), bucketCols:[], sortCols:[], parameters:{}), partitionKeys:[], parameters:{last_modified_by=heyongqiang, last_modified_time=1290068481, transient_lastDdlTime=1290068481}, viewOriginalText:null, viewExpandedText:null, tableType:MANAGED_TABLE)	
+#### A masked pattern was here ####
 PREHOOK: query: DROP TABLE set_bucketing_test
 PREHOOK: type: DROPTABLE
 PREHOOK: Input: alter4_db@set_bucketing_test
@@ -104,12 +129,18 @@ POSTHOOK: Input: alter4_db@set_bucketing_test
 POSTHOOK: Output: alter4_db@set_bucketing_test
 PREHOOK: query: USE default
 PREHOOK: type: SWITCHDATABASE
+PREHOOK: Input: database:default
 POSTHOOK: query: USE default
 POSTHOOK: type: SWITCHDATABASE
+POSTHOOK: Input: database:default
 PREHOOK: query: DROP DATABASE alter4_db
 PREHOOK: type: DROPDATABASE
+PREHOOK: Input: database:alter4_db
+PREHOOK: Output: database:alter4_db
 POSTHOOK: query: DROP DATABASE alter4_db
 POSTHOOK: type: DROPDATABASE
+POSTHOOK: Input: database:alter4_db
+POSTHOOK: Output: database:alter4_db
 PREHOOK: query: SHOW DATABASES
 PREHOOK: type: SHOWDATABASES
 POSTHOOK: query: SHOW DATABASES

@@ -1,4 +1,6 @@
-PREHOOK: query: EXPLAIN EXTENDED
+PREHOOK: query: -- SORT_QUERY_RESULTS
+
+EXPLAIN EXTENDED
  FROM 
   src a
  RIGHT OUTER JOIN 
@@ -7,7 +9,9 @@ PREHOOK: query: EXPLAIN EXTENDED
  SELECT a.key, a.value, b.key, b.value
  WHERE a.key > 10 AND a.key < 20 AND b.key > 15 AND b.key < 25
 PREHOOK: type: QUERY
-POSTHOOK: query: EXPLAIN EXTENDED
+POSTHOOK: query: -- SORT_QUERY_RESULTS
+
+EXPLAIN EXTENDED
  FROM 
   src a
  RIGHT OUTER JOIN 
@@ -17,104 +21,185 @@ POSTHOOK: query: EXPLAIN EXTENDED
  WHERE a.key > 10 AND a.key < 20 AND b.key > 15 AND b.key < 25
 POSTHOOK: type: QUERY
 ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_RIGHTOUTERJOIN (TOK_TABREF src a) (TOK_TABREF srcpart b) (AND (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL b) key)) (= (. (TOK_TABLE_OR_COL b) ds) '2008-04-08')))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (. (TOK_TABLE_OR_COL a) key)) (TOK_SELEXPR (. (TOK_TABLE_OR_COL a) value)) (TOK_SELEXPR (. (TOK_TABLE_OR_COL b) key)) (TOK_SELEXPR (. (TOK_TABLE_OR_COL b) value))) (TOK_WHERE (AND (AND (AND (> (. (TOK_TABLE_OR_COL a) key) 10) (< (. (TOK_TABLE_OR_COL a) key) 20)) (> (. (TOK_TABLE_OR_COL b) key) 15)) (< (. (TOK_TABLE_OR_COL b) key) 25)))))
+  
+TOK_QUERY
+   TOK_FROM
+      TOK_RIGHTOUTERJOIN
+         TOK_TABREF
+            TOK_TABNAME
+               src
+            a
+         TOK_TABREF
+            TOK_TABNAME
+               srcpart
+            b
+         AND
+            =
+               .
+                  TOK_TABLE_OR_COL
+                     a
+                  key
+               .
+                  TOK_TABLE_OR_COL
+                     b
+                  key
+            =
+               .
+                  TOK_TABLE_OR_COL
+                     b
+                  ds
+               '2008-04-08'
+   TOK_INSERT
+      TOK_DESTINATION
+         TOK_DIR
+            TOK_TMP_FILE
+      TOK_SELECT
+         TOK_SELEXPR
+            .
+               TOK_TABLE_OR_COL
+                  a
+               key
+         TOK_SELEXPR
+            .
+               TOK_TABLE_OR_COL
+                  a
+               value
+         TOK_SELEXPR
+            .
+               TOK_TABLE_OR_COL
+                  b
+               key
+         TOK_SELEXPR
+            .
+               TOK_TABLE_OR_COL
+                  b
+               value
+      TOK_WHERE
+         AND
+            AND
+               AND
+                  >
+                     .
+                        TOK_TABLE_OR_COL
+                           a
+                        key
+                     10
+                  <
+                     .
+                        TOK_TABLE_OR_COL
+                           a
+                        key
+                     20
+               >
+                  .
+                     TOK_TABLE_OR_COL
+                        b
+                     key
+                  15
+            <
+               .
+                  TOK_TABLE_OR_COL
+                     b
+                  key
+               25
+
 
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        a 
-          TableScan
-            alias: a
-            GatherStats: false
-            Reduce Output Operator
-              key expressions:
-                    expr: key
-                    type: string
-              sort order: +
-              Map-reduce partition columns:
-                    expr: key
-                    type: string
-              tag: 0
-              value expressions:
-                    expr: key
-                    type: string
-                    expr: value
-                    type: string
-        b 
+      Map Operator Tree:
           TableScan
             alias: b
+            Statistics: Num rows: 2000 Data size: 21248 Basic stats: COMPLETE Column stats: NONE
             GatherStats: false
             Filter Operator
               isSamplingPred: false
-              predicate:
-                  expr: ((key > 15) and (key < 25))
-                  type: boolean
-              Reduce Output Operator
-                key expressions:
-                      expr: key
-                      type: string
-                sort order: +
-                Map-reduce partition columns:
-                      expr: key
-                      type: string
-                tag: 1
-                value expressions:
-                      expr: key
-                      type: string
-                      expr: value
-                      type: string
-                      expr: ds
-                      type: string
-      Needs Tagging: true
+              predicate: ((UDFToDouble(key) > 15.0) and (UDFToDouble(key) < 25.0)) (type: boolean)
+              Statistics: Num rows: 222 Data size: 2358 Basic stats: COMPLETE Column stats: NONE
+              Select Operator
+                expressions: key (type: string), value (type: string), ds (type: string)
+                outputColumnNames: _col0, _col1, _col2
+                Statistics: Num rows: 222 Data size: 2358 Basic stats: COMPLETE Column stats: NONE
+                Reduce Output Operator
+                  key expressions: _col0 (type: string)
+                  sort order: +
+                  Map-reduce partition columns: _col0 (type: string)
+                  Statistics: Num rows: 222 Data size: 2358 Basic stats: COMPLETE Column stats: NONE
+                  tag: 0
+                  value expressions: _col1 (type: string), _col2 (type: string)
+                  auto parallelism: false
+          TableScan
+            alias: a
+            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+            GatherStats: false
+            Filter Operator
+              isSamplingPred: false
+              predicate: ((UDFToDouble(key) > 15.0) and (UDFToDouble(key) < 25.0)) (type: boolean)
+              Statistics: Num rows: 55 Data size: 584 Basic stats: COMPLETE Column stats: NONE
+              Select Operator
+                expressions: key (type: string), value (type: string)
+                outputColumnNames: _col0, _col1
+                Statistics: Num rows: 55 Data size: 584 Basic stats: COMPLETE Column stats: NONE
+                Reduce Output Operator
+                  key expressions: _col0 (type: string)
+                  sort order: +
+                  Map-reduce partition columns: _col0 (type: string)
+                  Statistics: Num rows: 55 Data size: 584 Basic stats: COMPLETE Column stats: NONE
+                  tag: 1
+                  value expressions: _col1 (type: string)
+                  auto parallelism: false
       Path -> Alias:
-        pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/src [a]
-        pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart/ds=2008-04-08/hr=11 [b]
-        pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart/ds=2008-04-08/hr=12 [b]
-        pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart/ds=2008-04-09/hr=11 [b]
-        pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart/ds=2008-04-09/hr=12 [b]
+#### A masked pattern was here ####
       Path -> Partition:
-        pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/src 
+#### A masked pattern was here ####
           Partition
             base file name: src
             input format: org.apache.hadoop.mapred.TextInputFormat
             output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
+              columns.comments 'default','default'
               columns.types string:string
-              file.inputformat org.apache.hadoop.mapred.TextInputFormat
-              file.outputformat org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-              location pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/src
-              name src
+#### A masked pattern was here ####
+              name default.src
+              numFiles 1
+              numRows 500
+              rawDataSize 5312
               serialization.ddl struct src { string key, string value}
               serialization.format 1
               serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              transient_lastDdlTime 1288389296
+              totalSize 5812
+#### A masked pattern was here ####
             serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
           
               input format: org.apache.hadoop.mapred.TextInputFormat
               output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
               properties:
+                COLUMN_STATS_ACCURATE true
                 bucket_count -1
                 columns key,value
+                columns.comments 'default','default'
                 columns.types string:string
-                file.inputformat org.apache.hadoop.mapred.TextInputFormat
-                file.outputformat org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-                location pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/src
-                name src
+#### A masked pattern was here ####
+                name default.src
+                numFiles 1
+                numRows 500
+                rawDataSize 5312
                 serialization.ddl struct src { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                transient_lastDdlTime 1288389296
+                totalSize 5812
+#### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              name: src
-            name: src
-        pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart/ds=2008-04-08/hr=11 
+              name: default.src
+            name: default.src
+#### A masked pattern was here ####
           Partition
             base file name: hr=11
             input format: org.apache.hadoop.mapred.TextInputFormat
@@ -123,18 +208,23 @@ STAGE PLANS:
               ds 2008-04-08
               hr 11
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
+              columns.comments 'default','default'
               columns.types string:string
-              file.inputformat org.apache.hadoop.mapred.TextInputFormat
-              file.outputformat org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-              location pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart
-              name srcpart
+#### A masked pattern was here ####
+              name default.srcpart
+              numFiles 1
+              numRows 500
               partition_columns ds/hr
+              partition_columns.types string:string
+              rawDataSize 5312
               serialization.ddl struct srcpart { string key, string value}
               serialization.format 1
               serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              transient_lastDdlTime 1288389287
+              totalSize 5812
+#### A masked pattern was here ####
             serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
           
               input format: org.apache.hadoop.mapred.TextInputFormat
@@ -142,20 +232,20 @@ STAGE PLANS:
               properties:
                 bucket_count -1
                 columns key,value
+                columns.comments 'default','default'
                 columns.types string:string
-                file.inputformat org.apache.hadoop.mapred.TextInputFormat
-                file.outputformat org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-                location pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart
-                name srcpart
+#### A masked pattern was here ####
+                name default.srcpart
                 partition_columns ds/hr
+                partition_columns.types string:string
                 serialization.ddl struct srcpart { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                transient_lastDdlTime 1288389287
+#### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              name: srcpart
-            name: srcpart
-        pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart/ds=2008-04-08/hr=12 
+              name: default.srcpart
+            name: default.srcpart
+#### A masked pattern was here ####
           Partition
             base file name: hr=12
             input format: org.apache.hadoop.mapred.TextInputFormat
@@ -164,18 +254,23 @@ STAGE PLANS:
               ds 2008-04-08
               hr 12
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
+              columns.comments 'default','default'
               columns.types string:string
-              file.inputformat org.apache.hadoop.mapred.TextInputFormat
-              file.outputformat org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-              location pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart
-              name srcpart
+#### A masked pattern was here ####
+              name default.srcpart
+              numFiles 1
+              numRows 500
               partition_columns ds/hr
+              partition_columns.types string:string
+              rawDataSize 5312
               serialization.ddl struct srcpart { string key, string value}
               serialization.format 1
               serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              transient_lastDdlTime 1288389287
+              totalSize 5812
+#### A masked pattern was here ####
             serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
           
               input format: org.apache.hadoop.mapred.TextInputFormat
@@ -183,20 +278,20 @@ STAGE PLANS:
               properties:
                 bucket_count -1
                 columns key,value
+                columns.comments 'default','default'
                 columns.types string:string
-                file.inputformat org.apache.hadoop.mapred.TextInputFormat
-                file.outputformat org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-                location pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart
-                name srcpart
+#### A masked pattern was here ####
+                name default.srcpart
                 partition_columns ds/hr
+                partition_columns.types string:string
                 serialization.ddl struct srcpart { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                transient_lastDdlTime 1288389287
+#### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              name: srcpart
-            name: srcpart
-        pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart/ds=2008-04-09/hr=11 
+              name: default.srcpart
+            name: default.srcpart
+#### A masked pattern was here ####
           Partition
             base file name: hr=11
             input format: org.apache.hadoop.mapred.TextInputFormat
@@ -205,18 +300,23 @@ STAGE PLANS:
               ds 2008-04-09
               hr 11
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
+              columns.comments 'default','default'
               columns.types string:string
-              file.inputformat org.apache.hadoop.mapred.TextInputFormat
-              file.outputformat org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-              location pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart
-              name srcpart
+#### A masked pattern was here ####
+              name default.srcpart
+              numFiles 1
+              numRows 500
               partition_columns ds/hr
+              partition_columns.types string:string
+              rawDataSize 5312
               serialization.ddl struct srcpart { string key, string value}
               serialization.format 1
               serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              transient_lastDdlTime 1288389287
+              totalSize 5812
+#### A masked pattern was here ####
             serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
           
               input format: org.apache.hadoop.mapred.TextInputFormat
@@ -224,20 +324,20 @@ STAGE PLANS:
               properties:
                 bucket_count -1
                 columns key,value
+                columns.comments 'default','default'
                 columns.types string:string
-                file.inputformat org.apache.hadoop.mapred.TextInputFormat
-                file.outputformat org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-                location pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart
-                name srcpart
+#### A masked pattern was here ####
+                name default.srcpart
                 partition_columns ds/hr
+                partition_columns.types string:string
                 serialization.ddl struct srcpart { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                transient_lastDdlTime 1288389287
+#### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              name: srcpart
-            name: srcpart
-        pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart/ds=2008-04-09/hr=12 
+              name: default.srcpart
+            name: default.srcpart
+#### A masked pattern was here ####
           Partition
             base file name: hr=12
             input format: org.apache.hadoop.mapred.TextInputFormat
@@ -246,18 +346,23 @@ STAGE PLANS:
               ds 2008-04-09
               hr 12
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
+              columns.comments 'default','default'
               columns.types string:string
-              file.inputformat org.apache.hadoop.mapred.TextInputFormat
-              file.outputformat org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-              location pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart
-              name srcpart
+#### A masked pattern was here ####
+              name default.srcpart
+              numFiles 1
+              numRows 500
               partition_columns ds/hr
+              partition_columns.types string:string
+              rawDataSize 5312
               serialization.ddl struct srcpart { string key, string value}
               serialization.format 1
               serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              transient_lastDdlTime 1288389287
+              totalSize 5812
+#### A masked pattern was here ####
             serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
           
               input format: org.apache.hadoop.mapred.TextInputFormat
@@ -265,60 +370,66 @@ STAGE PLANS:
               properties:
                 bucket_count -1
                 columns key,value
+                columns.comments 'default','default'
                 columns.types string:string
-                file.inputformat org.apache.hadoop.mapred.TextInputFormat
-                file.outputformat org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-                location pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart
-                name srcpart
+#### A masked pattern was here ####
+                name default.srcpart
                 partition_columns ds/hr
+                partition_columns.types string:string
                 serialization.ddl struct srcpart { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                transient_lastDdlTime 1288389287
+#### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              name: srcpart
-            name: srcpart
+              name: default.srcpart
+            name: default.srcpart
+      Truncated Path -> Alias:
+        /src [$hdt$_0:$hdt$_1:a]
+        /srcpart/ds=2008-04-08/hr=11 [$hdt$_0:$hdt$_0:b]
+        /srcpart/ds=2008-04-08/hr=12 [$hdt$_0:$hdt$_0:b]
+        /srcpart/ds=2008-04-09/hr=11 [$hdt$_0:$hdt$_0:b]
+        /srcpart/ds=2008-04-09/hr=12 [$hdt$_0:$hdt$_0:b]
+      Needs Tagging: true
       Reduce Operator Tree:
         Join Operator
           condition map:
-               Right Outer Join0 to 1
-          condition expressions:
-            0 {VALUE._col0} {VALUE._col1}
-            1 {VALUE._col0} {VALUE._col1}
+               Left Outer Join0 to 1
+          filter mappings:
+            0 [1, 1]
           filter predicates:
-            0 
-            1 {(VALUE._col2 = '2008-04-08')}
-          handleSkewJoin: false
-          outputColumnNames: _col0, _col1, _col4, _col5
+            0 {(VALUE._col1 = '2008-04-08')}
+            1 
+          keys:
+            0 _col0 (type: string)
+            1 _col0 (type: string)
+          outputColumnNames: _col0, _col1, _col3, _col4
+          Statistics: Num rows: 244 Data size: 2593 Basic stats: COMPLETE Column stats: NONE
           Filter Operator
             isSamplingPred: false
-            predicate:
-                expr: ((((_col0 > 10) and (_col0 < 20)) and (_col4 > 15)) and (_col4 < 25))
-                type: boolean
+            predicate: ((UDFToDouble(_col3) > 10.0) and (UDFToDouble(_col3) < 20.0)) (type: boolean)
+            Statistics: Num rows: 27 Data size: 286 Basic stats: COMPLETE Column stats: NONE
             Select Operator
-              expressions:
-                    expr: _col0
-                    type: string
-                    expr: _col1
-                    type: string
-                    expr: _col4
-                    type: string
-                    expr: _col5
-                    type: string
+              expressions: _col3 (type: string), _col4 (type: string), _col0 (type: string), _col1 (type: string)
               outputColumnNames: _col0, _col1, _col2, _col3
+              Statistics: Num rows: 27 Data size: 286 Basic stats: COMPLETE Column stats: NONE
               File Output Operator
                 compressed: false
                 GlobalTableId: 0
-                directory: file:/tmp/sdong/hive_2010-10-29_16-24-29_880_2729403633177554645/-ext-10001
+#### A masked pattern was here ####
                 NumFilesPerFileSink: 1
-                Stats Publishing Key Prefix: file:/tmp/sdong/hive_2010-10-29_16-24-29_880_2729403633177554645/-ext-10001/
+                Statistics: Num rows: 27 Data size: 286 Basic stats: COMPLETE Column stats: NONE
+#### A masked pattern was here ####
                 table:
                     input format: org.apache.hadoop.mapred.TextInputFormat
                     output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
                     properties:
                       columns _col0,_col1,_col2,_col3
                       columns.types string:string:string:string
+                      escape.delim \
+                      hive.serialization.extend.additional.nesting.levels true
                       serialization.format 1
+                      serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                    serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
                 TotalFiles: 1
                 GatherStats: false
                 MultiFileSpray: false
@@ -326,7 +437,8 @@ STAGE PLANS:
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: FROM 
   src a
@@ -337,11 +449,12 @@ PREHOOK: query: FROM
  WHERE a.key > 10 AND a.key < 20 AND b.key > 15 AND b.key < 25
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src
+PREHOOK: Input: default@srcpart
 PREHOOK: Input: default@srcpart@ds=2008-04-08/hr=11
 PREHOOK: Input: default@srcpart@ds=2008-04-08/hr=12
 PREHOOK: Input: default@srcpart@ds=2008-04-09/hr=11
 PREHOOK: Input: default@srcpart@ds=2008-04-09/hr=12
-PREHOOK: Output: file:/tmp/sdong/hive_2010-10-29_16-24-30_041_1642456148331342612/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: FROM 
   src a
  RIGHT OUTER JOIN 
@@ -351,11 +464,12 @@ POSTHOOK: query: FROM
  WHERE a.key > 10 AND a.key < 20 AND b.key > 15 AND b.key < 25
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@src
+POSTHOOK: Input: default@srcpart
 POSTHOOK: Input: default@srcpart@ds=2008-04-08/hr=11
 POSTHOOK: Input: default@srcpart@ds=2008-04-08/hr=12
 POSTHOOK: Input: default@srcpart@ds=2008-04-09/hr=11
 POSTHOOK: Input: default@srcpart@ds=2008-04-09/hr=12
-POSTHOOK: Output: file:/tmp/sdong/hive_2010-10-29_16-24-30_041_1642456148331342612/-mr-10000
+#### A masked pattern was here ####
 17	val_17	17	val_17
 17	val_17	17	val_17
 18	val_18	18	val_18
@@ -387,105 +501,185 @@ POSTHOOK: query: EXPLAIN EXTENDED
  WHERE a.key > 10 AND a.key < 20 AND b.key > 15 AND b.key < 25
 POSTHOOK: type: QUERY
 ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_RIGHTOUTERJOIN (TOK_TABREF srcpart a) (TOK_TABREF src b) (AND (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL b) key)) (= (. (TOK_TABLE_OR_COL a) ds) '2008-04-08')))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (. (TOK_TABLE_OR_COL a) key)) (TOK_SELEXPR (. (TOK_TABLE_OR_COL a) value)) (TOK_SELEXPR (. (TOK_TABLE_OR_COL b) key)) (TOK_SELEXPR (. (TOK_TABLE_OR_COL b) value))) (TOK_WHERE (AND (AND (AND (> (. (TOK_TABLE_OR_COL a) key) 10) (< (. (TOK_TABLE_OR_COL a) key) 20)) (> (. (TOK_TABLE_OR_COL b) key) 15)) (< (. (TOK_TABLE_OR_COL b) key) 25)))))
+  
+TOK_QUERY
+   TOK_FROM
+      TOK_RIGHTOUTERJOIN
+         TOK_TABREF
+            TOK_TABNAME
+               srcpart
+            a
+         TOK_TABREF
+            TOK_TABNAME
+               src
+            b
+         AND
+            =
+               .
+                  TOK_TABLE_OR_COL
+                     a
+                  key
+               .
+                  TOK_TABLE_OR_COL
+                     b
+                  key
+            =
+               .
+                  TOK_TABLE_OR_COL
+                     a
+                  ds
+               '2008-04-08'
+   TOK_INSERT
+      TOK_DESTINATION
+         TOK_DIR
+            TOK_TMP_FILE
+      TOK_SELECT
+         TOK_SELEXPR
+            .
+               TOK_TABLE_OR_COL
+                  a
+               key
+         TOK_SELEXPR
+            .
+               TOK_TABLE_OR_COL
+                  a
+               value
+         TOK_SELEXPR
+            .
+               TOK_TABLE_OR_COL
+                  b
+               key
+         TOK_SELEXPR
+            .
+               TOK_TABLE_OR_COL
+                  b
+               value
+      TOK_WHERE
+         AND
+            AND
+               AND
+                  >
+                     .
+                        TOK_TABLE_OR_COL
+                           a
+                        key
+                     10
+                  <
+                     .
+                        TOK_TABLE_OR_COL
+                           a
+                        key
+                     20
+               >
+                  .
+                     TOK_TABLE_OR_COL
+                        b
+                     key
+                  15
+            <
+               .
+                  TOK_TABLE_OR_COL
+                     b
+                  key
+               25
+
 
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        a 
+      Map Operator Tree:
           TableScan
             alias: a
+            Statistics: Num rows: 1000 Data size: 10624 Basic stats: COMPLETE Column stats: NONE
             GatherStats: false
             Filter Operator
               isSamplingPred: false
-              predicate:
-                  expr: (ds = '2008-04-08')
-                  type: boolean
-              Reduce Output Operator
-                key expressions:
-                      expr: key
-                      type: string
-                sort order: +
-                Map-reduce partition columns:
-                      expr: key
-                      type: string
-                tag: 0
-                value expressions:
-                      expr: key
-                      type: string
-                      expr: value
-                      type: string
-        b 
+              predicate: ((UDFToDouble(key) > 15.0) and (UDFToDouble(key) < 25.0)) (type: boolean)
+              Statistics: Num rows: 111 Data size: 1179 Basic stats: COMPLETE Column stats: NONE
+              Select Operator
+                expressions: key (type: string), value (type: string)
+                outputColumnNames: _col0, _col1
+                Statistics: Num rows: 111 Data size: 1179 Basic stats: COMPLETE Column stats: NONE
+                Reduce Output Operator
+                  key expressions: _col0 (type: string)
+                  sort order: +
+                  Map-reduce partition columns: _col0 (type: string)
+                  Statistics: Num rows: 111 Data size: 1179 Basic stats: COMPLETE Column stats: NONE
+                  tag: 0
+                  value expressions: _col1 (type: string)
+                  auto parallelism: false
           TableScan
             alias: b
+            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
             GatherStats: false
             Filter Operator
               isSamplingPred: false
-              predicate:
-                  expr: ((key > 15) and (key < 25))
-                  type: boolean
-              Reduce Output Operator
-                key expressions:
-                      expr: key
-                      type: string
-                sort order: +
-                Map-reduce partition columns:
-                      expr: key
-                      type: string
-                tag: 1
-                value expressions:
-                      expr: key
-                      type: string
-                      expr: value
-                      type: string
-      Needs Tagging: true
+              predicate: ((UDFToDouble(key) > 15.0) and (UDFToDouble(key) < 25.0)) (type: boolean)
+              Statistics: Num rows: 55 Data size: 584 Basic stats: COMPLETE Column stats: NONE
+              Select Operator
+                expressions: key (type: string), value (type: string)
+                outputColumnNames: _col0, _col1
+                Statistics: Num rows: 55 Data size: 584 Basic stats: COMPLETE Column stats: NONE
+                Reduce Output Operator
+                  key expressions: _col0 (type: string)
+                  sort order: +
+                  Map-reduce partition columns: _col0 (type: string)
+                  Statistics: Num rows: 55 Data size: 584 Basic stats: COMPLETE Column stats: NONE
+                  tag: 1
+                  value expressions: _col1 (type: string)
+                  auto parallelism: false
       Path -> Alias:
-        pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/src [b]
-        pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart/ds=2008-04-08/hr=11 [a]
-        pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart/ds=2008-04-08/hr=12 [a]
+#### A masked pattern was here ####
       Path -> Partition:
-        pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/src 
+#### A masked pattern was here ####
           Partition
             base file name: src
             input format: org.apache.hadoop.mapred.TextInputFormat
             output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
+              columns.comments 'default','default'
               columns.types string:string
-              file.inputformat org.apache.hadoop.mapred.TextInputFormat
-              file.outputformat org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-              location pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/src
-              name src
+#### A masked pattern was here ####
+              name default.src
+              numFiles 1
+              numRows 500
+              rawDataSize 5312
               serialization.ddl struct src { string key, string value}
               serialization.format 1
               serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              transient_lastDdlTime 1288389296
+              totalSize 5812
+#### A masked pattern was here ####
             serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
           
               input format: org.apache.hadoop.mapred.TextInputFormat
               output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
               properties:
+                COLUMN_STATS_ACCURATE true
                 bucket_count -1
                 columns key,value
+                columns.comments 'default','default'
                 columns.types string:string
-                file.inputformat org.apache.hadoop.mapred.TextInputFormat
-                file.outputformat org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-                location pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/src
-                name src
+#### A masked pattern was here ####
+                name default.src
+                numFiles 1
+                numRows 500
+                rawDataSize 5312
                 serialization.ddl struct src { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                transient_lastDdlTime 1288389296
+                totalSize 5812
+#### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              name: src
-            name: src
-        pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart/ds=2008-04-08/hr=11 
+              name: default.src
+            name: default.src
+#### A masked pattern was here ####
           Partition
             base file name: hr=11
             input format: org.apache.hadoop.mapred.TextInputFormat
@@ -494,18 +688,23 @@ STAGE PLANS:
               ds 2008-04-08
               hr 11
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
+              columns.comments 'default','default'
               columns.types string:string
-              file.inputformat org.apache.hadoop.mapred.TextInputFormat
-              file.outputformat org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-              location pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart
-              name srcpart
+#### A masked pattern was here ####
+              name default.srcpart
+              numFiles 1
+              numRows 500
               partition_columns ds/hr
+              partition_columns.types string:string
+              rawDataSize 5312
               serialization.ddl struct srcpart { string key, string value}
               serialization.format 1
               serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              transient_lastDdlTime 1288389287
+              totalSize 5812
+#### A masked pattern was here ####
             serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
           
               input format: org.apache.hadoop.mapred.TextInputFormat
@@ -513,20 +712,20 @@ STAGE PLANS:
               properties:
                 bucket_count -1
                 columns key,value
+                columns.comments 'default','default'
                 columns.types string:string
-                file.inputformat org.apache.hadoop.mapred.TextInputFormat
-                file.outputformat org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-                location pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart
-                name srcpart
+#### A masked pattern was here ####
+                name default.srcpart
                 partition_columns ds/hr
+                partition_columns.types string:string
                 serialization.ddl struct srcpart { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                transient_lastDdlTime 1288389287
+#### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              name: srcpart
-            name: srcpart
-        pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart/ds=2008-04-08/hr=12 
+              name: default.srcpart
+            name: default.srcpart
+#### A masked pattern was here ####
           Partition
             base file name: hr=12
             input format: org.apache.hadoop.mapred.TextInputFormat
@@ -535,18 +734,23 @@ STAGE PLANS:
               ds 2008-04-08
               hr 12
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
+              columns.comments 'default','default'
               columns.types string:string
-              file.inputformat org.apache.hadoop.mapred.TextInputFormat
-              file.outputformat org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-              location pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart
-              name srcpart
+#### A masked pattern was here ####
+              name default.srcpart
+              numFiles 1
+              numRows 500
               partition_columns ds/hr
+              partition_columns.types string:string
+              rawDataSize 5312
               serialization.ddl struct srcpart { string key, string value}
               serialization.format 1
               serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              transient_lastDdlTime 1288389287
+              totalSize 5812
+#### A masked pattern was here ####
             serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
           
               input format: org.apache.hadoop.mapred.TextInputFormat
@@ -554,57 +758,59 @@ STAGE PLANS:
               properties:
                 bucket_count -1
                 columns key,value
+                columns.comments 'default','default'
                 columns.types string:string
-                file.inputformat org.apache.hadoop.mapred.TextInputFormat
-                file.outputformat org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-                location pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart
-                name srcpart
+#### A masked pattern was here ####
+                name default.srcpart
                 partition_columns ds/hr
+                partition_columns.types string:string
                 serialization.ddl struct srcpart { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                transient_lastDdlTime 1288389287
+#### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              name: srcpart
-            name: srcpart
+              name: default.srcpart
+            name: default.srcpart
+      Truncated Path -> Alias:
+        /src [$hdt$_1:b]
+        /srcpart/ds=2008-04-08/hr=11 [$hdt$_0:$hdt$_0:a]
+        /srcpart/ds=2008-04-08/hr=12 [$hdt$_0:$hdt$_0:a]
+      Needs Tagging: true
       Reduce Operator Tree:
         Join Operator
           condition map:
                Right Outer Join0 to 1
-          condition expressions:
-            0 {VALUE._col0} {VALUE._col1}
-            1 {VALUE._col0} {VALUE._col1}
-          handleSkewJoin: false
-          outputColumnNames: _col0, _col1, _col6, _col7
+          keys:
+            0 _col0 (type: string)
+            1 _col0 (type: string)
+          outputColumnNames: _col0, _col1, _col3, _col4
+          Statistics: Num rows: 122 Data size: 1296 Basic stats: COMPLETE Column stats: NONE
           Filter Operator
             isSamplingPred: false
-            predicate:
-                expr: ((((_col0 > 10) and (_col0 < 20)) and (_col6 > 15)) and (_col6 < 25))
-                type: boolean
+            predicate: ((UDFToDouble(_col0) > 10.0) and (UDFToDouble(_col0) < 20.0)) (type: boolean)
+            Statistics: Num rows: 13 Data size: 138 Basic stats: COMPLETE Column stats: NONE
             Select Operator
-              expressions:
-                    expr: _col0
-                    type: string
-                    expr: _col1
-                    type: string
-                    expr: _col6
-                    type: string
-                    expr: _col7
-                    type: string
+              expressions: _col0 (type: string), _col1 (type: string), _col3 (type: string), _col4 (type: string)
               outputColumnNames: _col0, _col1, _col2, _col3
+              Statistics: Num rows: 13 Data size: 138 Basic stats: COMPLETE Column stats: NONE
               File Output Operator
                 compressed: false
                 GlobalTableId: 0
-                directory: file:/tmp/sdong/hive_2010-10-29_16-24-35_634_7794037076839772421/-ext-10001
+#### A masked pattern was here ####
                 NumFilesPerFileSink: 1
-                Stats Publishing Key Prefix: file:/tmp/sdong/hive_2010-10-29_16-24-35_634_7794037076839772421/-ext-10001/
+                Statistics: Num rows: 13 Data size: 138 Basic stats: COMPLETE Column stats: NONE
+#### A masked pattern was here ####
                 table:
                     input format: org.apache.hadoop.mapred.TextInputFormat
                     output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
                     properties:
                       columns _col0,_col1,_col2,_col3
                       columns.types string:string:string:string
+                      escape.delim \
+                      hive.serialization.extend.additional.nesting.levels true
                       serialization.format 1
+                      serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                    serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
                 TotalFiles: 1
                 GatherStats: false
                 MultiFileSpray: false
@@ -612,7 +818,8 @@ STAGE PLANS:
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: FROM 
   srcpart a
@@ -623,9 +830,10 @@ PREHOOK: query: FROM
  WHERE a.key > 10 AND a.key < 20 AND b.key > 15 AND b.key < 25
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src
+PREHOOK: Input: default@srcpart
 PREHOOK: Input: default@srcpart@ds=2008-04-08/hr=11
 PREHOOK: Input: default@srcpart@ds=2008-04-08/hr=12
-PREHOOK: Output: file:/tmp/sdong/hive_2010-10-29_16-24-35_776_7185381771912949589/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: FROM 
   srcpart a
  RIGHT OUTER JOIN 
@@ -635,9 +843,10 @@ POSTHOOK: query: FROM
  WHERE a.key > 10 AND a.key < 20 AND b.key > 15 AND b.key < 25
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@src
+POSTHOOK: Input: default@srcpart
 POSTHOOK: Input: default@srcpart@ds=2008-04-08/hr=11
 POSTHOOK: Input: default@srcpart@ds=2008-04-08/hr=12
-POSTHOOK: Output: file:/tmp/sdong/hive_2010-10-29_16-24-35_776_7185381771912949589/-mr-10000
+#### A masked pattern was here ####
 17	val_17	17	val_17
 17	val_17	17	val_17
 18	val_18	18	val_18
@@ -669,102 +878,185 @@ POSTHOOK: query: EXPLAIN EXTENDED
  WHERE a.key > 10 AND a.key < 20 AND b.key > 15 AND b.key < 25 AND b.ds = '2008-04-08'
 POSTHOOK: type: QUERY
 ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_RIGHTOUTERJOIN (TOK_TABREF src a) (TOK_TABREF srcpart b) (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL b) key)))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (. (TOK_TABLE_OR_COL a) key)) (TOK_SELEXPR (. (TOK_TABLE_OR_COL a) value)) (TOK_SELEXPR (. (TOK_TABLE_OR_COL b) key)) (TOK_SELEXPR (. (TOK_TABLE_OR_COL b) value))) (TOK_WHERE (AND (AND (AND (AND (> (. (TOK_TABLE_OR_COL a) key) 10) (< (. (TOK_TABLE_OR_COL a) key) 20)) (> (. (TOK_TABLE_OR_COL b) key) 15)) (< (. (TOK_TABLE_OR_COL b) key) 25)) (= (. (TOK_TABLE_OR_COL b) ds) '2008-04-08')))))
+  
+TOK_QUERY
+   TOK_FROM
+      TOK_RIGHTOUTERJOIN
+         TOK_TABREF
+            TOK_TABNAME
+               src
+            a
+         TOK_TABREF
+            TOK_TABNAME
+               srcpart
+            b
+         =
+            .
+               TOK_TABLE_OR_COL
+                  a
+               key
+            .
+               TOK_TABLE_OR_COL
+                  b
+               key
+   TOK_INSERT
+      TOK_DESTINATION
+         TOK_DIR
+            TOK_TMP_FILE
+      TOK_SELECT
+         TOK_SELEXPR
+            .
+               TOK_TABLE_OR_COL
+                  a
+               key
+         TOK_SELEXPR
+            .
+               TOK_TABLE_OR_COL
+                  a
+               value
+         TOK_SELEXPR
+            .
+               TOK_TABLE_OR_COL
+                  b
+               key
+         TOK_SELEXPR
+            .
+               TOK_TABLE_OR_COL
+                  b
+               value
+      TOK_WHERE
+         AND
+            AND
+               AND
+                  AND
+                     >
+                        .
+                           TOK_TABLE_OR_COL
+                              a
+                           key
+                        10
+                     <
+                        .
+                           TOK_TABLE_OR_COL
+                              a
+                           key
+                        20
+                  >
+                     .
+                        TOK_TABLE_OR_COL
+                           b
+                        key
+                     15
+               <
+                  .
+                     TOK_TABLE_OR_COL
+                        b
+                     key
+                  25
+            =
+               .
+                  TOK_TABLE_OR_COL
+                     b
+                  ds
+               '2008-04-08'
+
 
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        a 
-          TableScan
-            alias: a
-            GatherStats: false
-            Reduce Output Operator
-              key expressions:
-                    expr: key
-                    type: string
-              sort order: +
-              Map-reduce partition columns:
-                    expr: key
-                    type: string
-              tag: 0
-              value expressions:
-                    expr: key
-                    type: string
-                    expr: value
-                    type: string
-        b 
+      Map Operator Tree:
           TableScan
             alias: b
+            Statistics: Num rows: 1000 Data size: 10624 Basic stats: COMPLETE Column stats: NONE
             GatherStats: false
             Filter Operator
               isSamplingPred: false
-              predicate:
-                  expr: ((key > 15) and (key < 25))
-                  type: boolean
-              Reduce Output Operator
-                key expressions:
-                      expr: key
-                      type: string
-                sort order: +
-                Map-reduce partition columns:
-                      expr: key
-                      type: string
-                tag: 1
-                value expressions:
-                      expr: key
-                      type: string
-                      expr: value
-                      type: string
-                      expr: ds
-                      type: string
-      Needs Tagging: true
+              predicate: ((UDFToDouble(key) > 15.0) and (UDFToDouble(key) < 25.0)) (type: boolean)
+              Statistics: Num rows: 111 Data size: 1179 Basic stats: COMPLETE Column stats: NONE
+              Select Operator
+                expressions: key (type: string), value (type: string)
+                outputColumnNames: _col0, _col1
+                Statistics: Num rows: 111 Data size: 1179 Basic stats: COMPLETE Column stats: NONE
+                Reduce Output Operator
+                  key expressions: _col0 (type: string)
+                  sort order: +
+                  Map-reduce partition columns: _col0 (type: string)
+                  Statistics: Num rows: 111 Data size: 1179 Basic stats: COMPLETE Column stats: NONE
+                  tag: 0
+                  value expressions: _col1 (type: string)
+                  auto parallelism: false
+          TableScan
+            alias: a
+            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+            GatherStats: false
+            Filter Operator
+              isSamplingPred: false
+              predicate: ((UDFToDouble(key) > 15.0) and (UDFToDouble(key) < 25.0)) (type: boolean)
+              Statistics: Num rows: 55 Data size: 584 Basic stats: COMPLETE Column stats: NONE
+              Select Operator
+                expressions: key (type: string), value (type: string)
+                outputColumnNames: _col0, _col1
+                Statistics: Num rows: 55 Data size: 584 Basic stats: COMPLETE Column stats: NONE
+                Reduce Output Operator
+                  key expressions: _col0 (type: string)
+                  sort order: +
+                  Map-reduce partition columns: _col0 (type: string)
+                  Statistics: Num rows: 55 Data size: 584 Basic stats: COMPLETE Column stats: NONE
+                  tag: 1
+                  value expressions: _col1 (type: string)
+                  auto parallelism: false
       Path -> Alias:
-        pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/src [a]
-        pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart/ds=2008-04-08/hr=11 [b]
-        pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart/ds=2008-04-08/hr=12 [b]
+#### A masked pattern was here ####
       Path -> Partition:
-        pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/src 
+#### A masked pattern was here ####
           Partition
             base file name: src
             input format: org.apache.hadoop.mapred.TextInputFormat
             output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
+              columns.comments 'default','default'
               columns.types string:string
-              file.inputformat org.apache.hadoop.mapred.TextInputFormat
-              file.outputformat org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-              location pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/src
-              name src
+#### A masked pattern was here ####
+              name default.src
+              numFiles 1
+              numRows 500
+              rawDataSize 5312
               serialization.ddl struct src { string key, string value}
               serialization.format 1
               serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              transient_lastDdlTime 1288389296
+              totalSize 5812
+#### A masked pattern was here ####
             serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
           
               input format: org.apache.hadoop.mapred.TextInputFormat
               output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
               properties:
+                COLUMN_STATS_ACCURATE true
                 bucket_count -1
                 columns key,value
+                columns.comments 'default','default'
                 columns.types string:string
-                file.inputformat org.apache.hadoop.mapred.TextInputFormat
-                file.outputformat org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-                location pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/src
-                name src
+#### A masked pattern was here ####
+                name default.src
+                numFiles 1
+                numRows 500
+                rawDataSize 5312
                 serialization.ddl struct src { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                transient_lastDdlTime 1288389296
+                totalSize 5812
+#### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              name: src
-            name: src
-        pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart/ds=2008-04-08/hr=11 
+              name: default.src
+            name: default.src
+#### A masked pattern was here ####
           Partition
             base file name: hr=11
             input format: org.apache.hadoop.mapred.TextInputFormat
@@ -773,18 +1065,23 @@ STAGE PLANS:
               ds 2008-04-08
               hr 11
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
+              columns.comments 'default','default'
               columns.types string:string
-              file.inputformat org.apache.hadoop.mapred.TextInputFormat
-              file.outputformat org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-              location pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart
-              name srcpart
+#### A masked pattern was here ####
+              name default.srcpart
+              numFiles 1
+              numRows 500
               partition_columns ds/hr
+              partition_columns.types string:string
+              rawDataSize 5312
               serialization.ddl struct srcpart { string key, string value}
               serialization.format 1
               serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              transient_lastDdlTime 1288389287
+              totalSize 5812
+#### A masked pattern was here ####
             serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
           
               input format: org.apache.hadoop.mapred.TextInputFormat
@@ -792,20 +1089,20 @@ STAGE PLANS:
               properties:
                 bucket_count -1
                 columns key,value
+                columns.comments 'default','default'
                 columns.types string:string
-                file.inputformat org.apache.hadoop.mapred.TextInputFormat
-                file.outputformat org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-                location pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart
-                name srcpart
+#### A masked pattern was here ####
+                name default.srcpart
                 partition_columns ds/hr
+                partition_columns.types string:string
                 serialization.ddl struct srcpart { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                transient_lastDdlTime 1288389287
+#### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              name: srcpart
-            name: srcpart
-        pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart/ds=2008-04-08/hr=12 
+              name: default.srcpart
+            name: default.srcpart
+#### A masked pattern was here ####
           Partition
             base file name: hr=12
             input format: org.apache.hadoop.mapred.TextInputFormat
@@ -814,18 +1111,23 @@ STAGE PLANS:
               ds 2008-04-08
               hr 12
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
+              columns.comments 'default','default'
               columns.types string:string
-              file.inputformat org.apache.hadoop.mapred.TextInputFormat
-              file.outputformat org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-              location pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart
-              name srcpart
+#### A masked pattern was here ####
+              name default.srcpart
+              numFiles 1
+              numRows 500
               partition_columns ds/hr
+              partition_columns.types string:string
+              rawDataSize 5312
               serialization.ddl struct srcpart { string key, string value}
               serialization.format 1
               serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              transient_lastDdlTime 1288389287
+              totalSize 5812
+#### A masked pattern was here ####
             serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
           
               input format: org.apache.hadoop.mapred.TextInputFormat
@@ -833,57 +1135,59 @@ STAGE PLANS:
               properties:
                 bucket_count -1
                 columns key,value
+                columns.comments 'default','default'
                 columns.types string:string
-                file.inputformat org.apache.hadoop.mapred.TextInputFormat
-                file.outputformat org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-                location pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart
-                name srcpart
+#### A masked pattern was here ####
+                name default.srcpart
                 partition_columns ds/hr
+                partition_columns.types string:string
                 serialization.ddl struct srcpart { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                transient_lastDdlTime 1288389287
+#### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              name: srcpart
-            name: srcpart
+              name: default.srcpart
+            name: default.srcpart
+      Truncated Path -> Alias:
+        /src [$hdt$_0:$hdt$_1:a]
+        /srcpart/ds=2008-04-08/hr=11 [$hdt$_0:$hdt$_0:b]
+        /srcpart/ds=2008-04-08/hr=12 [$hdt$_0:$hdt$_0:b]
+      Needs Tagging: true
       Reduce Operator Tree:
         Join Operator
           condition map:
-               Right Outer Join0 to 1
-          condition expressions:
-            0 {VALUE._col0} {VALUE._col1}
-            1 {VALUE._col0} {VALUE._col1} {VALUE._col2}
-          handleSkewJoin: false
-          outputColumnNames: _col0, _col1, _col4, _col5, _col6
+               Left Outer Join0 to 1
+          keys:
+            0 _col0 (type: string)
+            1 _col0 (type: string)
+          outputColumnNames: _col0, _col1, _col3, _col4
+          Statistics: Num rows: 122 Data size: 1296 Basic stats: COMPLETE Column stats: NONE
           Filter Operator
             isSamplingPred: false
-            predicate:
-                expr: (((((_col0 > 10) and (_col0 < 20)) and (_col4 > 15)) and (_col4 < 25)) and (_col6 = '2008-04-08'))
-                type: boolean
+            predicate: ((UDFToDouble(_col3) > 10.0) and (UDFToDouble(_col3) < 20.0)) (type: boolean)
+            Statistics: Num rows: 13 Data size: 138 Basic stats: COMPLETE Column stats: NONE
             Select Operator
-              expressions:
-                    expr: _col0
-                    type: string
-                    expr: _col1
-                    type: string
-                    expr: _col4
-                    type: string
-                    expr: _col5
-                    type: string
+              expressions: _col3 (type: string), _col4 (type: string), _col0 (type: string), _col1 (type: string)
               outputColumnNames: _col0, _col1, _col2, _col3
+              Statistics: Num rows: 13 Data size: 138 Basic stats: COMPLETE Column stats: NONE
               File Output Operator
                 compressed: false
                 GlobalTableId: 0
-                directory: file:/tmp/sdong/hive_2010-10-29_16-24-40_682_4113709267275252747/-ext-10001
+#### A masked pattern was here ####
                 NumFilesPerFileSink: 1
-                Stats Publishing Key Prefix: file:/tmp/sdong/hive_2010-10-29_16-24-40_682_4113709267275252747/-ext-10001/
+                Statistics: Num rows: 13 Data size: 138 Basic stats: COMPLETE Column stats: NONE
+#### A masked pattern was here ####
                 table:
                     input format: org.apache.hadoop.mapred.TextInputFormat
                     output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
                     properties:
                       columns _col0,_col1,_col2,_col3
                       columns.types string:string:string:string
+                      escape.delim \
+                      hive.serialization.extend.additional.nesting.levels true
                       serialization.format 1
+                      serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                    serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
                 TotalFiles: 1
                 GatherStats: false
                 MultiFileSpray: false
@@ -891,7 +1195,8 @@ STAGE PLANS:
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: FROM 
   src a
@@ -902,9 +1207,10 @@ PREHOOK: query: FROM
  WHERE a.key > 10 AND a.key < 20 AND b.key > 15 AND b.key < 25 AND b.ds = '2008-04-08'
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src
+PREHOOK: Input: default@srcpart
 PREHOOK: Input: default@srcpart@ds=2008-04-08/hr=11
 PREHOOK: Input: default@srcpart@ds=2008-04-08/hr=12
-PREHOOK: Output: file:/tmp/sdong/hive_2010-10-29_16-24-40_825_2669951250781595832/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: FROM 
   src a
  RIGHT OUTER JOIN 
@@ -914,9 +1220,10 @@ POSTHOOK: query: FROM
  WHERE a.key > 10 AND a.key < 20 AND b.key > 15 AND b.key < 25 AND b.ds = '2008-04-08'
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@src
+POSTHOOK: Input: default@srcpart
 POSTHOOK: Input: default@srcpart@ds=2008-04-08/hr=11
 POSTHOOK: Input: default@srcpart@ds=2008-04-08/hr=12
-POSTHOOK: Output: file:/tmp/sdong/hive_2010-10-29_16-24-40_825_2669951250781595832/-mr-10000
+#### A masked pattern was here ####
 17	val_17	17	val_17
 17	val_17	17	val_17
 18	val_18	18	val_18
@@ -948,104 +1255,185 @@ POSTHOOK: query: EXPLAIN EXTENDED
  WHERE a.key > 10 AND a.key < 20 AND b.key > 15 AND b.key < 25 AND a.ds = '2008-04-08'
 POSTHOOK: type: QUERY
 ABSTRACT SYNTAX TREE:
-  (TOK_QUERY (TOK_FROM (TOK_RIGHTOUTERJOIN (TOK_TABREF srcpart a) (TOK_TABREF src b) (= (. (TOK_TABLE_OR_COL a) key) (. (TOK_TABLE_OR_COL b) key)))) (TOK_INSERT (TOK_DESTINATION (TOK_DIR TOK_TMP_FILE)) (TOK_SELECT (TOK_SELEXPR (. (TOK_TABLE_OR_COL a) key)) (TOK_SELEXPR (. (TOK_TABLE_OR_COL a) value)) (TOK_SELEXPR (. (TOK_TABLE_OR_COL b) key)) (TOK_SELEXPR (. (TOK_TABLE_OR_COL b) value))) (TOK_WHERE (AND (AND (AND (AND (> (. (TOK_TABLE_OR_COL a) key) 10) (< (. (TOK_TABLE_OR_COL a) key) 20)) (> (. (TOK_TABLE_OR_COL b) key) 15)) (< (. (TOK_TABLE_OR_COL b) key) 25)) (= (. (TOK_TABLE_OR_COL a) ds) '2008-04-08')))))
+  
+TOK_QUERY
+   TOK_FROM
+      TOK_RIGHTOUTERJOIN
+         TOK_TABREF
+            TOK_TABNAME
+               srcpart
+            a
+         TOK_TABREF
+            TOK_TABNAME
+               src
+            b
+         =
+            .
+               TOK_TABLE_OR_COL
+                  a
+               key
+            .
+               TOK_TABLE_OR_COL
+                  b
+               key
+   TOK_INSERT
+      TOK_DESTINATION
+         TOK_DIR
+            TOK_TMP_FILE
+      TOK_SELECT
+         TOK_SELEXPR
+            .
+               TOK_TABLE_OR_COL
+                  a
+               key
+         TOK_SELEXPR
+            .
+               TOK_TABLE_OR_COL
+                  a
+               value
+         TOK_SELEXPR
+            .
+               TOK_TABLE_OR_COL
+                  b
+               key
+         TOK_SELEXPR
+            .
+               TOK_TABLE_OR_COL
+                  b
+               value
+      TOK_WHERE
+         AND
+            AND
+               AND
+                  AND
+                     >
+                        .
+                           TOK_TABLE_OR_COL
+                              a
+                           key
+                        10
+                     <
+                        .
+                           TOK_TABLE_OR_COL
+                              a
+                           key
+                        20
+                  >
+                     .
+                        TOK_TABLE_OR_COL
+                           b
+                        key
+                     15
+               <
+                  .
+                     TOK_TABLE_OR_COL
+                        b
+                     key
+                  25
+            =
+               .
+                  TOK_TABLE_OR_COL
+                     a
+                  ds
+               '2008-04-08'
+
 
 STAGE DEPENDENCIES:
   Stage-1 is a root stage
-  Stage-0 is a root stage
+  Stage-0 depends on stages: Stage-1
 
 STAGE PLANS:
   Stage: Stage-1
     Map Reduce
-      Alias -> Map Operator Tree:
-        a 
+      Map Operator Tree:
           TableScan
             alias: a
-            GatherStats: false
-            Reduce Output Operator
-              key expressions:
-                    expr: key
-                    type: string
-              sort order: +
-              Map-reduce partition columns:
-                    expr: key
-                    type: string
-              tag: 0
-              value expressions:
-                    expr: key
-                    type: string
-                    expr: value
-                    type: string
-                    expr: ds
-                    type: string
-        b 
-          TableScan
-            alias: b
+            Statistics: Num rows: 1000 Data size: 10624 Basic stats: COMPLETE Column stats: NONE
             GatherStats: false
             Filter Operator
               isSamplingPred: false
-              predicate:
-                  expr: ((key > 15) and (key < 25))
-                  type: boolean
-              Reduce Output Operator
-                key expressions:
-                      expr: key
-                      type: string
-                sort order: +
-                Map-reduce partition columns:
-                      expr: key
-                      type: string
-                tag: 1
-                value expressions:
-                      expr: key
-                      type: string
-                      expr: value
-                      type: string
-      Needs Tagging: true
+              predicate: (((((UDFToDouble(key) > 10.0) and (UDFToDouble(key) < 20.0)) and (UDFToDouble(key) > 15.0)) and (UDFToDouble(key) < 25.0)) and key is not null) (type: boolean)
+              Statistics: Num rows: 6 Data size: 63 Basic stats: COMPLETE Column stats: NONE
+              Select Operator
+                expressions: key (type: string), value (type: string)
+                outputColumnNames: _col0, _col1
+                Statistics: Num rows: 6 Data size: 63 Basic stats: COMPLETE Column stats: NONE
+                Reduce Output Operator
+                  key expressions: _col0 (type: string)
+                  sort order: +
+                  Map-reduce partition columns: _col0 (type: string)
+                  Statistics: Num rows: 6 Data size: 63 Basic stats: COMPLETE Column stats: NONE
+                  tag: 0
+                  value expressions: _col1 (type: string)
+                  auto parallelism: false
+          TableScan
+            alias: b
+            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+            GatherStats: false
+            Filter Operator
+              isSamplingPred: false
+              predicate: (((((UDFToDouble(key) > 15.0) and (UDFToDouble(key) < 25.0)) and (UDFToDouble(key) > 10.0)) and (UDFToDouble(key) < 20.0)) and key is not null) (type: boolean)
+              Statistics: Num rows: 3 Data size: 31 Basic stats: COMPLETE Column stats: NONE
+              Select Operator
+                expressions: key (type: string), value (type: string)
+                outputColumnNames: _col0, _col1
+                Statistics: Num rows: 3 Data size: 31 Basic stats: COMPLETE Column stats: NONE
+                Reduce Output Operator
+                  key expressions: _col0 (type: string)
+                  sort order: +
+                  Map-reduce partition columns: _col0 (type: string)
+                  Statistics: Num rows: 3 Data size: 31 Basic stats: COMPLETE Column stats: NONE
+                  tag: 1
+                  value expressions: _col1 (type: string)
+                  auto parallelism: false
       Path -> Alias:
-        pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/src [b]
-        pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart/ds=2008-04-08/hr=11 [a]
-        pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart/ds=2008-04-08/hr=12 [a]
-        pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart/ds=2008-04-09/hr=11 [a]
-        pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart/ds=2008-04-09/hr=12 [a]
+#### A masked pattern was here ####
       Path -> Partition:
-        pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/src 
+#### A masked pattern was here ####
           Partition
             base file name: src
             input format: org.apache.hadoop.mapred.TextInputFormat
             output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
+              columns.comments 'default','default'
               columns.types string:string
-              file.inputformat org.apache.hadoop.mapred.TextInputFormat
-              file.outputformat org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-              location pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/src
-              name src
+#### A masked pattern was here ####
+              name default.src
+              numFiles 1
+              numRows 500
+              rawDataSize 5312
               serialization.ddl struct src { string key, string value}
               serialization.format 1
               serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              transient_lastDdlTime 1288389296
+              totalSize 5812
+#### A masked pattern was here ####
             serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
           
               input format: org.apache.hadoop.mapred.TextInputFormat
               output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
               properties:
+                COLUMN_STATS_ACCURATE true
                 bucket_count -1
                 columns key,value
+                columns.comments 'default','default'
                 columns.types string:string
-                file.inputformat org.apache.hadoop.mapred.TextInputFormat
-                file.outputformat org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-                location pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/src
-                name src
+#### A masked pattern was here ####
+                name default.src
+                numFiles 1
+                numRows 500
+                rawDataSize 5312
                 serialization.ddl struct src { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                transient_lastDdlTime 1288389296
+                totalSize 5812
+#### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              name: src
-            name: src
-        pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart/ds=2008-04-08/hr=11 
+              name: default.src
+            name: default.src
+#### A masked pattern was here ####
           Partition
             base file name: hr=11
             input format: org.apache.hadoop.mapred.TextInputFormat
@@ -1054,18 +1442,23 @@ STAGE PLANS:
               ds 2008-04-08
               hr 11
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
+              columns.comments 'default','default'
               columns.types string:string
-              file.inputformat org.apache.hadoop.mapred.TextInputFormat
-              file.outputformat org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-              location pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart
-              name srcpart
+#### A masked pattern was here ####
+              name default.srcpart
+              numFiles 1
+              numRows 500
               partition_columns ds/hr
+              partition_columns.types string:string
+              rawDataSize 5312
               serialization.ddl struct srcpart { string key, string value}
               serialization.format 1
               serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              transient_lastDdlTime 1288389287
+              totalSize 5812
+#### A masked pattern was here ####
             serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
           
               input format: org.apache.hadoop.mapred.TextInputFormat
@@ -1073,20 +1466,20 @@ STAGE PLANS:
               properties:
                 bucket_count -1
                 columns key,value
+                columns.comments 'default','default'
                 columns.types string:string
-                file.inputformat org.apache.hadoop.mapred.TextInputFormat
-                file.outputformat org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-                location pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart
-                name srcpart
+#### A masked pattern was here ####
+                name default.srcpart
                 partition_columns ds/hr
+                partition_columns.types string:string
                 serialization.ddl struct srcpart { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                transient_lastDdlTime 1288389287
+#### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              name: srcpart
-            name: srcpart
-        pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart/ds=2008-04-08/hr=12 
+              name: default.srcpart
+            name: default.srcpart
+#### A masked pattern was here ####
           Partition
             base file name: hr=12
             input format: org.apache.hadoop.mapred.TextInputFormat
@@ -1095,18 +1488,23 @@ STAGE PLANS:
               ds 2008-04-08
               hr 12
             properties:
+              COLUMN_STATS_ACCURATE true
               bucket_count -1
               columns key,value
+              columns.comments 'default','default'
               columns.types string:string
-              file.inputformat org.apache.hadoop.mapred.TextInputFormat
-              file.outputformat org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-              location pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart
-              name srcpart
+#### A masked pattern was here ####
+              name default.srcpart
+              numFiles 1
+              numRows 500
               partition_columns ds/hr
+              partition_columns.types string:string
+              rawDataSize 5312
               serialization.ddl struct srcpart { string key, string value}
               serialization.format 1
               serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              transient_lastDdlTime 1288389287
+              totalSize 5812
+#### A masked pattern was here ####
             serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
           
               input format: org.apache.hadoop.mapred.TextInputFormat
@@ -1114,147 +1512,64 @@ STAGE PLANS:
               properties:
                 bucket_count -1
                 columns key,value
+                columns.comments 'default','default'
                 columns.types string:string
-                file.inputformat org.apache.hadoop.mapred.TextInputFormat
-                file.outputformat org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-                location pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart
-                name srcpart
+#### A masked pattern was here ####
+                name default.srcpart
                 partition_columns ds/hr
+                partition_columns.types string:string
                 serialization.ddl struct srcpart { string key, string value}
                 serialization.format 1
                 serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                transient_lastDdlTime 1288389287
+#### A masked pattern was here ####
               serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              name: srcpart
-            name: srcpart
-        pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart/ds=2008-04-09/hr=11 
-          Partition
-            base file name: hr=11
-            input format: org.apache.hadoop.mapred.TextInputFormat
-            output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-            partition values:
-              ds 2008-04-09
-              hr 11
-            properties:
-              bucket_count -1
-              columns key,value
-              columns.types string:string
-              file.inputformat org.apache.hadoop.mapred.TextInputFormat
-              file.outputformat org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-              location pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart
-              name srcpart
-              partition_columns ds/hr
-              serialization.ddl struct srcpart { string key, string value}
-              serialization.format 1
-              serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              transient_lastDdlTime 1288389287
-            serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-          
-              input format: org.apache.hadoop.mapred.TextInputFormat
-              output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-              properties:
-                bucket_count -1
-                columns key,value
-                columns.types string:string
-                file.inputformat org.apache.hadoop.mapred.TextInputFormat
-                file.outputformat org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-                location pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart
-                name srcpart
-                partition_columns ds/hr
-                serialization.ddl struct srcpart { string key, string value}
-                serialization.format 1
-                serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                transient_lastDdlTime 1288389287
-              serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              name: srcpart
-            name: srcpart
-        pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart/ds=2008-04-09/hr=12 
-          Partition
-            base file name: hr=12
-            input format: org.apache.hadoop.mapred.TextInputFormat
-            output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-            partition values:
-              ds 2008-04-09
-              hr 12
-            properties:
-              bucket_count -1
-              columns key,value
-              columns.types string:string
-              file.inputformat org.apache.hadoop.mapred.TextInputFormat
-              file.outputformat org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-              location pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart
-              name srcpart
-              partition_columns ds/hr
-              serialization.ddl struct srcpart { string key, string value}
-              serialization.format 1
-              serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              transient_lastDdlTime 1288389287
-            serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-          
-              input format: org.apache.hadoop.mapred.TextInputFormat
-              output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-              properties:
-                bucket_count -1
-                columns key,value
-                columns.types string:string
-                file.inputformat org.apache.hadoop.mapred.TextInputFormat
-                file.outputformat org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-                location pfile:/data/users/sdong/www/hive-trunk/build/ql/test/data/warehouse/srcpart
-                name srcpart
-                partition_columns ds/hr
-                serialization.ddl struct srcpart { string key, string value}
-                serialization.format 1
-                serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-                transient_lastDdlTime 1288389287
-              serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
-              name: srcpart
-            name: srcpart
+              name: default.srcpart
+            name: default.srcpart
+      Truncated Path -> Alias:
+        /src [$hdt$_1:$hdt$_1:b]
+        /srcpart/ds=2008-04-08/hr=11 [$hdt$_0:$hdt$_0:a]
+        /srcpart/ds=2008-04-08/hr=12 [$hdt$_0:$hdt$_0:a]
+      Needs Tagging: true
       Reduce Operator Tree:
         Join Operator
           condition map:
-               Right Outer Join0 to 1
-          condition expressions:
-            0 {VALUE._col0} {VALUE._col1} {VALUE._col2}
-            1 {VALUE._col0} {VALUE._col1}
-          handleSkewJoin: false
-          outputColumnNames: _col0, _col1, _col2, _col6, _col7
-          Filter Operator
-            isSamplingPred: false
-            predicate:
-                expr: (((((_col0 > 10) and (_col0 < 20)) and (_col6 > 15)) and (_col6 < 25)) and (_col2 = '2008-04-08'))
-                type: boolean
-            Select Operator
-              expressions:
-                    expr: _col0
-                    type: string
-                    expr: _col1
-                    type: string
-                    expr: _col6
-                    type: string
-                    expr: _col7
-                    type: string
-              outputColumnNames: _col0, _col1, _col2, _col3
-              File Output Operator
-                compressed: false
-                GlobalTableId: 0
-                directory: file:/tmp/sdong/hive_2010-10-29_16-24-45_779_8110194100957996087/-ext-10001
-                NumFilesPerFileSink: 1
-                Stats Publishing Key Prefix: file:/tmp/sdong/hive_2010-10-29_16-24-45_779_8110194100957996087/-ext-10001/
-                table:
-                    input format: org.apache.hadoop.mapred.TextInputFormat
-                    output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
-                    properties:
-                      columns _col0,_col1,_col2,_col3
-                      columns.types string:string:string:string
-                      serialization.format 1
-                TotalFiles: 1
-                GatherStats: false
-                MultiFileSpray: false
+               Inner Join 0 to 1
+          keys:
+            0 _col0 (type: string)
+            1 _col0 (type: string)
+          outputColumnNames: _col0, _col1, _col3, _col4
+          Statistics: Num rows: 6 Data size: 69 Basic stats: COMPLETE Column stats: NONE
+          Select Operator
+            expressions: _col0 (type: string), _col1 (type: string), _col3 (type: string), _col4 (type: string)
+            outputColumnNames: _col0, _col1, _col2, _col3
+            Statistics: Num rows: 6 Data size: 69 Basic stats: COMPLETE Column stats: NONE
+            File Output Operator
+              compressed: false
+              GlobalTableId: 0
+#### A masked pattern was here ####
+              NumFilesPerFileSink: 1
+              Statistics: Num rows: 6 Data size: 69 Basic stats: COMPLETE Column stats: NONE
+#### A masked pattern was here ####
+              table:
+                  input format: org.apache.hadoop.mapred.TextInputFormat
+                  output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                  properties:
+                    columns _col0,_col1,_col2,_col3
+                    columns.types string:string:string:string
+                    escape.delim \
+                    hive.serialization.extend.additional.nesting.levels true
+                    serialization.format 1
+                    serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                  serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+              TotalFiles: 1
+              GatherStats: false
+              MultiFileSpray: false
 
   Stage: Stage-0
     Fetch Operator
       limit: -1
-
+      Processor Tree:
+        ListSink
 
 PREHOOK: query: FROM 
   srcpart a
@@ -1265,11 +1580,10 @@ PREHOOK: query: FROM
  WHERE a.key > 10 AND a.key < 20 AND b.key > 15 AND b.key < 25 AND a.ds = '2008-04-08'
 PREHOOK: type: QUERY
 PREHOOK: Input: default@src
+PREHOOK: Input: default@srcpart
 PREHOOK: Input: default@srcpart@ds=2008-04-08/hr=11
 PREHOOK: Input: default@srcpart@ds=2008-04-08/hr=12
-PREHOOK: Input: default@srcpart@ds=2008-04-09/hr=11
-PREHOOK: Input: default@srcpart@ds=2008-04-09/hr=12
-PREHOOK: Output: file:/tmp/sdong/hive_2010-10-29_16-24-45_957_3952542311322296389/-mr-10000
+#### A masked pattern was here ####
 POSTHOOK: query: FROM 
   srcpart a
  RIGHT OUTER JOIN 
@@ -1279,11 +1593,10 @@ POSTHOOK: query: FROM
  WHERE a.key > 10 AND a.key < 20 AND b.key > 15 AND b.key < 25 AND a.ds = '2008-04-08'
 POSTHOOK: type: QUERY
 POSTHOOK: Input: default@src
+POSTHOOK: Input: default@srcpart
 POSTHOOK: Input: default@srcpart@ds=2008-04-08/hr=11
 POSTHOOK: Input: default@srcpart@ds=2008-04-08/hr=12
-POSTHOOK: Input: default@srcpart@ds=2008-04-09/hr=11
-POSTHOOK: Input: default@srcpart@ds=2008-04-09/hr=12
-POSTHOOK: Output: file:/tmp/sdong/hive_2010-10-29_16-24-45_957_3952542311322296389/-mr-10000
+#### A masked pattern was here ####
 17	val_17	17	val_17
 17	val_17	17	val_17
 18	val_18	18	val_18

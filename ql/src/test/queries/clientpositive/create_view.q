@@ -120,6 +120,17 @@ SELECT * FROM view8;
 -- test usage of a UDAF within a view
 CREATE TEMPORARY FUNCTION test_max AS
 'org.apache.hadoop.hive.ql.udf.UDAFTestMax';
+set hive.map.aggr=false;
+-- disable map-side aggregation
+CREATE VIEW view9(m) AS
+SELECT test_max(length(value))
+FROM src;
+DESCRIBE EXTENDED view9;
+DESCRIBE FORMATTED view9;
+SELECT * FROM view9;
+DROP VIEW view9;
+set hive.map.aggr=true;
+-- enable map-side aggregation
 CREATE VIEW view9(m) AS
 SELECT test_max(length(value))
 FROM src;
@@ -202,6 +213,14 @@ DESCRIBE FORMATTED view16;
 SELECT * FROM view16
 ORDER BY value
 LIMIT 10;
+
+-- HIVE-2133:  DROP TABLE IF EXISTS should ignore a matching view name
+DROP TABLE IF EXISTS view16;
+DESCRIBE view16;
+
+-- Likewise, DROP VIEW IF EXISTS should ignore a matching table name
+DROP VIEW IF EXISTS table1;
+DESCRIBE table1;
 
 -- this should work since currently we don't track view->table
 -- dependencies for implementing RESTRICT

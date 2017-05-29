@@ -22,13 +22,17 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+
+import org.apache.hadoop.hive.ql.exec.Operator;
+import org.apache.hadoop.hive.ql.plan.OperatorDesc;
 
 /**
  * Internal representation of the join tree.
  *
  */
-public class QBJoinTree implements Serializable{
+public class QBJoinTree implements Serializable, Cloneable {
   private static final long serialVersionUID = 1L;
   private String leftAlias;
   private String[] rightAliases;
@@ -39,19 +43,30 @@ public class QBJoinTree implements Serializable{
   private JoinCond[] joinCond;
   private boolean noOuterJoin;
   private boolean noSemiJoin;
+  private Map<String, Operator<? extends OperatorDesc>> aliasToOpInfo;
+
+  // The subquery identifier from QB.
+  // It is of the form topSubQuery:innerSubQuery:....:innerMostSubQuery
+  private String id;
 
   // keeps track of the right-hand-side table name of the left-semi-join, and
   // its list of join keys
-  private final HashMap<String, ArrayList<ASTNode>> rhsSemijoin;
+  private transient final HashMap<String, ArrayList<ASTNode>> rhsSemijoin;
 
   // join conditions
-  private ArrayList<ArrayList<ASTNode>> expressions;
+  private transient ArrayList<ArrayList<ASTNode>> expressions;
+
+  // key index to nullsafe join flag
+  private ArrayList<Boolean> nullsafes;
 
   // filters
-  private ArrayList<ArrayList<ASTNode>> filters;
+  private transient ArrayList<ArrayList<ASTNode>> filters;
+
+  // outerjoin-pos = other-pos:filter-len, other-pos:filter-len, ...
+  private int[][] filterMap;
 
   // filters for pushing
-  private ArrayList<ArrayList<ASTNode>> filtersForPushing;
+  private transient ArrayList<ArrayList<ASTNode>> filtersForPushing;
 
   // user asked for map-side join
   private boolean mapSideJoin;
@@ -59,6 +74,14 @@ public class QBJoinTree implements Serializable{
 
   // big tables that should be streamed
   private List<String> streamAliases;
+
+  /*
+   * when a QBJoinTree is merged into this one, its left(pos =0) filters can
+   * refer to any of the srces in this QBJoinTree. If a particular filterForPushing refers
+   * to multiple srces in this QBJoinTree, we collect them into 'postJoinFilters'
+   * We then add a Filter Operator after the Join Operator for this QBJoinTree.
+   */
+  private final List<ASTNode> postJoinFilters;
 
   /**
    * constructor.
@@ -68,6 +91,8 @@ public class QBJoinTree implements Serializable{
     noOuterJoin = true;
     noSemiJoin = true;
     rhsSemijoin = new HashMap<String, ArrayList<ASTNode>>();
+    aliasToOpInfo = new HashMap<String, Operator<? extends OperatorDesc>>();
+    postJoinFilters = new ArrayList<ASTNode>();
   }
 
   /**
@@ -86,7 +111,11 @@ public class QBJoinTree implements Serializable{
    *          String
    */
   public void setLeftAlias(String leftAlias) {
-    this.leftAlias = leftAlias;
+    if ( this.leftAlias != null && !this.leftAlias.equals(leftAlias) ) {
+      this.leftAlias = null;
+    } else {
+      this.leftAlias = leftAlias;
+    }
   }
 
   public String[] getRightAliases() {
@@ -131,10 +160,6 @@ public class QBJoinTree implements Serializable{
 
   public int getNextTag() {
     return nextTag++;
-  }
-
-  public String getJoinStreamDesc() {
-    return "$INTNAME";
   }
 
   public JoinCond[] getJoinCond() {
@@ -260,7 +285,7 @@ public class QBJoinTree implements Serializable{
    * Remeber the mapping of table alias to set of columns.
    *
    * @param alias
-   * @param columns
+   * @param column
    */
   public void addRHSSemijoinColumns(String alias, ASTNode column) {
     ArrayList<ASTNode> cols = rhsSemijoin.get(alias);
@@ -293,5 +318,115 @@ public class QBJoinTree implements Serializable{
         value.addAll(e.getValue());
       }
     }
+  }
+
+  public ArrayList<Boolean> getNullSafes() {
+    return nullsafes;
+  }
+
+  public void setNullSafes(ArrayList<Boolean> nullSafes) {
+    this.nullsafes = nullSafes;
+  }
+
+  public void addFilterMapping(int outer, int target, int length) {
+    filterMap[outer] = new int[] { target, length };
+  }
+
+  public int[][] getFilterMap() {
+    return filterMap;
+  }
+
+  public void setFilterMap(int[][] filterMap) {
+    this.filterMap = filterMap;
+  }
+
+  public Map<String, Operator<? extends OperatorDesc>> getAliasToOpInfo() {
+    return aliasToOpInfo;
+  }
+
+  public void setAliasToOpInfo(Map<String, Operator<? extends OperatorDesc>> aliasToOpInfo) {
+    this.aliasToOpInfo = aliasToOpInfo;
+  }
+
+  public String getId() {
+    return id;
+  }
+
+  public void setId(String id) {
+    this.id = id;
+  }
+
+  public void addPostJoinFilter(ASTNode filter) {
+    postJoinFilters.add(filter);
+  }
+
+  public List<ASTNode> getPostJoinFilters() {
+    return postJoinFilters;
+  }
+
+  @Override
+  public QBJoinTree clone() throws CloneNotSupportedException {
+    QBJoinTree cloned = new QBJoinTree();
+
+    // shallow copy aliasToOpInfo, we won't want to clone the operator tree here
+    cloned.setAliasToOpInfo(aliasToOpInfo == null ? null :
+        new HashMap<String, Operator<? extends OperatorDesc>>(aliasToOpInfo));
+
+    cloned.setBaseSrc(baseSrc == null ? null : baseSrc.clone());
+
+    // shallow copy ASTNode
+    cloned.setExpressions(expressions);
+    cloned.setFilters(filters);
+    cloned.setFiltersForPushing(filtersForPushing);
+
+    // clone filterMap
+    int[][] clonedFilterMap = filterMap == null ? null : new int[filterMap.length][];
+    if (filterMap != null) {
+      for (int i = 0; i < filterMap.length; i++) {
+        clonedFilterMap[i] = filterMap[i] == null ? null : filterMap[i].clone();
+      }
+    }
+    cloned.setFilterMap(clonedFilterMap);
+
+    cloned.setId(id);
+
+    // clone joinCond
+    JoinCond[] clonedJoinCond = joinCond == null ? null : new JoinCond[joinCond.length];
+    if (joinCond != null) {
+      for (int i = 0; i < joinCond.length; i++) {
+        if(joinCond[i] == null) {
+          continue;
+        }
+        JoinCond clonedCond = new JoinCond();
+        clonedCond.setJoinType(joinCond[i].getJoinType());
+        clonedCond.setLeft(joinCond[i].getLeft());
+        clonedCond.setPreserved(joinCond[i].getPreserved());
+        clonedCond.setRight(joinCond[i].getRight());
+        clonedJoinCond[i] = clonedCond;
+      }
+    }
+    cloned.setJoinCond(clonedJoinCond);
+
+    cloned.setJoinSrc(joinSrc == null ? null : joinSrc.clone());
+    cloned.setLeftAlias(leftAlias);
+    cloned.setLeftAliases(leftAliases == null ? null : leftAliases.clone());
+    cloned.setMapAliases(mapAliases == null ? null : new ArrayList<String>(mapAliases));
+    cloned.setMapSideJoin(mapSideJoin);
+    cloned.setNoOuterJoin(noOuterJoin);
+    cloned.setNoSemiJoin(noSemiJoin);
+    cloned.setNullSafes(nullsafes == null ? null : new ArrayList<Boolean>(nullsafes));
+    cloned.setRightAliases(rightAliases == null ? null : rightAliases.clone());
+    cloned.setStreamAliases(streamAliases == null ? null : new ArrayList<String>(streamAliases));
+
+    // clone postJoinFilters
+    for (ASTNode filter : postJoinFilters) {
+      cloned.getPostJoinFilters().add(filter);
+    }
+    // clone rhsSemijoin
+    for (Entry<String, ArrayList<ASTNode>> entry : rhsSemijoin.entrySet()) {
+      cloned.addRHSSemijoinColumns(entry.getKey(), entry.getValue());
+    }
+
+    return cloned;
   }
 }

@@ -18,7 +18,8 @@
 package org.apache.hadoop.hive.serde2.objectinspector.primitive;
 
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorUtils.PrimitiveTypeEntry;
+import org.apache.hadoop.hive.serde2.typeinfo.HiveDecimalUtils;
+import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 
 /**
  * An AbstractPrimitiveObjectInspector is based on
@@ -27,13 +28,16 @@ import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectIn
 public abstract class AbstractPrimitiveObjectInspector implements
     PrimitiveObjectInspector {
 
-  PrimitiveTypeEntry typeEntry;
+  protected PrimitiveTypeInfo typeInfo;
 
+  protected AbstractPrimitiveObjectInspector() {
+    super();
+  }
   /**
    * Construct a AbstractPrimitiveObjectInspector.
    */
-  protected AbstractPrimitiveObjectInspector(PrimitiveTypeEntry typeEntry) {
-    this.typeEntry = typeEntry;
+  protected AbstractPrimitiveObjectInspector(PrimitiveTypeInfo typeInfo) {
+    this.typeInfo = typeInfo;
   }
 
   /**
@@ -42,7 +46,7 @@ public abstract class AbstractPrimitiveObjectInspector implements
    */
   @Override
   public Class<?> getJavaPrimitiveClass() {
-    return typeEntry.primitiveJavaClass;
+    return typeInfo.getPrimitiveJavaClass();
   }
 
   /**
@@ -51,7 +55,7 @@ public abstract class AbstractPrimitiveObjectInspector implements
    */
   @Override
   public PrimitiveCategory getPrimitiveCategory() {
-    return typeEntry.primitiveCategory;
+    return typeInfo.getPrimitiveCategory();
   }
 
   /**
@@ -60,7 +64,7 @@ public abstract class AbstractPrimitiveObjectInspector implements
    */
   @Override
   public Class<?> getPrimitiveWritableClass() {
-    return typeEntry.primitiveWritableClass;
+    return typeInfo.getPrimitiveWritableClass();
   }
 
   /**
@@ -76,7 +80,27 @@ public abstract class AbstractPrimitiveObjectInspector implements
    */
   @Override
   public String getTypeName() {
-    return typeEntry.typeName;
+    return typeInfo.getTypeName();
+  }
+
+  public PrimitiveTypeInfo getTypeInfo() {
+    return this.typeInfo;
+  }
+
+  /**
+   * Default implementation.  Maybe overridden by exact types.
+   */
+  @Override
+  public int precision() {
+    return HiveDecimalUtils.getPrecisionForType(typeInfo);
+  }
+
+  /**
+   * Default implementation.  Maybe overridden by exact types.
+   */
+  @Override
+  public int scale() {
+    return HiveDecimalUtils.getScaleForType(typeInfo);
   }
 
 }

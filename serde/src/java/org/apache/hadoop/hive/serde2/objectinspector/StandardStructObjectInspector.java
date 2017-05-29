@@ -29,10 +29,10 @@ import org.apache.commons.logging.LogFactory;
  * ListStructObjectInspector works on struct data that is stored as a Java List
  * or Java Array object. Basically, the fields are stored sequentially in the
  * List object.
- * 
+ *
  * The names of the struct fields and the internal structure of the struct
  * fields are specified in the ctor of the StructObjectInspector.
- * 
+ *
  * Always use the ObjectInspectorFactory to create new ObjectInspector objects,
  * instead of directly creating an instance of this class.
  */
@@ -46,12 +46,23 @@ public class StandardStructObjectInspector extends
     protected int fieldID;
     protected String fieldName;
     protected ObjectInspector fieldObjectInspector;
+    protected String fieldComment;
 
+    protected MyField() {
+      super();
+    }
+    
     public MyField(int fieldID, String fieldName,
         ObjectInspector fieldObjectInspector) {
       this.fieldID = fieldID;
       this.fieldName = fieldName.toLowerCase();
       this.fieldObjectInspector = fieldObjectInspector;
+    }
+
+    public MyField(int fieldID, String fieldName,
+        ObjectInspector fieldObjectInspector, String fieldComment) {
+      this(fieldID, fieldName, fieldObjectInspector);
+      this.fieldComment = fieldComment;
     }
 
     public int getFieldID() {
@@ -66,6 +77,10 @@ public class StandardStructObjectInspector extends
       return fieldObjectInspector;
     }
 
+    public String getFieldComment() {
+      return fieldComment;
+    }
+
     @Override
     public String toString() {
       return "" + fieldID + ":" + fieldName;
@@ -74,26 +89,35 @@ public class StandardStructObjectInspector extends
 
   protected List<MyField> fields;
 
-  public String getTypeName() {
-    return ObjectInspectorUtils.getStandardStructTypeName(this);
+  protected StandardStructObjectInspector() {
+    super();
   }
-
   /**
    * Call ObjectInspectorFactory.getStandardListObjectInspector instead.
    */
   protected StandardStructObjectInspector(List<String> structFieldNames,
       List<ObjectInspector> structFieldObjectInspectors) {
-    init(structFieldNames, structFieldObjectInspectors);
+    init(structFieldNames, structFieldObjectInspectors, null);
+  }
+
+  /**
+  * Call ObjectInspectorFactory.getStandardListObjectInspector instead.
+  */
+  protected StandardStructObjectInspector(List<String> structFieldNames,
+      List<ObjectInspector> structFieldObjectInspectors,
+      List<String> structFieldComments) {
+    init(structFieldNames, structFieldObjectInspectors, structFieldComments);
   }
 
   protected void init(List<String> structFieldNames,
-      List<ObjectInspector> structFieldObjectInspectors) {
-    assert (structFieldNames.size() == structFieldObjectInspectors.size());
+      List<ObjectInspector> structFieldObjectInspectors,
+      List<String> structFieldComments) {
 
     fields = new ArrayList<MyField>(structFieldNames.size());
     for (int i = 0; i < structFieldNames.size(); i++) {
       fields.add(new MyField(i, structFieldNames.get(i),
-          structFieldObjectInspectors.get(i)));
+          structFieldObjectInspectors.get(i),
+          structFieldComments == null ? null : structFieldComments.get(i)));
     }
   }
 
@@ -107,6 +131,10 @@ public class StandardStructObjectInspector extends
       this.fields.add(new MyField(i, fields.get(i).getFieldName(), fields
           .get(i).getFieldObjectInspector()));
     }
+  }
+
+  public String getTypeName() {
+    return ObjectInspectorUtils.getStandardStructTypeName(this);
   }
 
   public final Category getCategory() {
@@ -151,7 +179,6 @@ public class StandardStructObjectInspector extends
       LOG.warn("ignoring similar errors.");
     }
     int fieldID = f.getFieldID();
-    assert (fieldID >= 0 && fieldID < fields.size());
 
     if (fieldID >= listSize) {
       return null;
@@ -174,7 +201,6 @@ public class StandardStructObjectInspector extends
       data = java.util.Arrays.asList((Object[]) data);
     }
     List<Object> list = (List<Object>) data;
-    assert (list.size() == fields.size());
     return list;
   }
 

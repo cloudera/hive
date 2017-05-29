@@ -1,0 +1,310 @@
+Warning: Shuffle Join JOIN[8][tables = [$hdt$_0, $hdt$_1]] in Stage 'Stage-1:MAPRED' is a cross product
+PREHOOK: query: -- SORT_QUERY_RESULTS
+
+explain extended
+ select * from (select a.key as ak, a.value as av, b.key as bk, b.value as bv from src a join src1 b where a.key = '429' ) c
+PREHOOK: type: QUERY
+POSTHOOK: query: -- SORT_QUERY_RESULTS
+
+explain extended
+ select * from (select a.key as ak, a.value as av, b.key as bk, b.value as bv from src a join src1 b where a.key = '429' ) c
+POSTHOOK: type: QUERY
+ABSTRACT SYNTAX TREE:
+  
+TOK_QUERY
+   TOK_FROM
+      TOK_SUBQUERY
+         TOK_QUERY
+            TOK_FROM
+               TOK_JOIN
+                  TOK_TABREF
+                     TOK_TABNAME
+                        src
+                     a
+                  TOK_TABREF
+                     TOK_TABNAME
+                        src1
+                     b
+            TOK_INSERT
+               TOK_DESTINATION
+                  TOK_DIR
+                     TOK_TMP_FILE
+               TOK_SELECT
+                  TOK_SELEXPR
+                     .
+                        TOK_TABLE_OR_COL
+                           a
+                        key
+                     ak
+                  TOK_SELEXPR
+                     .
+                        TOK_TABLE_OR_COL
+                           a
+                        value
+                     av
+                  TOK_SELEXPR
+                     .
+                        TOK_TABLE_OR_COL
+                           b
+                        key
+                     bk
+                  TOK_SELEXPR
+                     .
+                        TOK_TABLE_OR_COL
+                           b
+                        value
+                     bv
+               TOK_WHERE
+                  =
+                     .
+                        TOK_TABLE_OR_COL
+                           a
+                        key
+                     '429'
+         c
+   TOK_INSERT
+      TOK_DESTINATION
+         TOK_DIR
+            TOK_TMP_FILE
+      TOK_SELECT
+         TOK_SELEXPR
+            TOK_ALLCOLREF
+
+
+STAGE DEPENDENCIES:
+  Stage-1 is a root stage
+  Stage-0 depends on stages: Stage-1
+
+STAGE PLANS:
+  Stage: Stage-1
+    Map Reduce
+      Map Operator Tree:
+          TableScan
+            alias: b
+            Statistics: Num rows: 25 Data size: 191 Basic stats: COMPLETE Column stats: NONE
+            GatherStats: false
+            Select Operator
+              expressions: key (type: string), value (type: string)
+              outputColumnNames: _col0, _col1
+              Statistics: Num rows: 25 Data size: 191 Basic stats: COMPLETE Column stats: NONE
+              Reduce Output Operator
+                sort order: 
+                Statistics: Num rows: 25 Data size: 191 Basic stats: COMPLETE Column stats: NONE
+                tag: 0
+                value expressions: _col0 (type: string), _col1 (type: string)
+                auto parallelism: false
+          TableScan
+            alias: a
+            Statistics: Num rows: 500 Data size: 5312 Basic stats: COMPLETE Column stats: NONE
+            GatherStats: false
+            Filter Operator
+              isSamplingPred: false
+              predicate: (key = '429') (type: boolean)
+              Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+              Select Operator
+                expressions: value (type: string)
+                outputColumnNames: _col1
+                Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+                Reduce Output Operator
+                  sort order: 
+                  Statistics: Num rows: 250 Data size: 2656 Basic stats: COMPLETE Column stats: NONE
+                  tag: 1
+                  value expressions: _col1 (type: string)
+                  auto parallelism: false
+      Path -> Alias:
+#### A masked pattern was here ####
+      Path -> Partition:
+#### A masked pattern was here ####
+          Partition
+            base file name: src
+            input format: org.apache.hadoop.mapred.TextInputFormat
+            output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+            properties:
+              COLUMN_STATS_ACCURATE true
+              bucket_count -1
+              columns key,value
+              columns.comments 'default','default'
+              columns.types string:string
+#### A masked pattern was here ####
+              name default.src
+              numFiles 1
+              numRows 500
+              rawDataSize 5312
+              serialization.ddl struct src { string key, string value}
+              serialization.format 1
+              serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+              totalSize 5812
+#### A masked pattern was here ####
+            serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+          
+              input format: org.apache.hadoop.mapred.TextInputFormat
+              output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+              properties:
+                COLUMN_STATS_ACCURATE true
+                bucket_count -1
+                columns key,value
+                columns.comments 'default','default'
+                columns.types string:string
+#### A masked pattern was here ####
+                name default.src
+                numFiles 1
+                numRows 500
+                rawDataSize 5312
+                serialization.ddl struct src { string key, string value}
+                serialization.format 1
+                serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                totalSize 5812
+#### A masked pattern was here ####
+              serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+              name: default.src
+            name: default.src
+#### A masked pattern was here ####
+          Partition
+            base file name: src1
+            input format: org.apache.hadoop.mapred.TextInputFormat
+            output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+            properties:
+              COLUMN_STATS_ACCURATE true
+              bucket_count -1
+              columns key,value
+              columns.comments 'default','default'
+              columns.types string:string
+#### A masked pattern was here ####
+              name default.src1
+              numFiles 1
+              numRows 25
+              rawDataSize 191
+              serialization.ddl struct src1 { string key, string value}
+              serialization.format 1
+              serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+              totalSize 216
+#### A masked pattern was here ####
+            serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+          
+              input format: org.apache.hadoop.mapred.TextInputFormat
+              output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+              properties:
+                COLUMN_STATS_ACCURATE true
+                bucket_count -1
+                columns key,value
+                columns.comments 'default','default'
+                columns.types string:string
+#### A masked pattern was here ####
+                name default.src1
+                numFiles 1
+                numRows 25
+                rawDataSize 191
+                serialization.ddl struct src1 { string key, string value}
+                serialization.format 1
+                serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                totalSize 216
+#### A masked pattern was here ####
+              serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+              name: default.src1
+            name: default.src1
+      Truncated Path -> Alias:
+        /src [$hdt$_0:$hdt$_1:a]
+        /src1 [$hdt$_0:$hdt$_0:b]
+      Needs Tagging: true
+      Reduce Operator Tree:
+        Join Operator
+          condition map:
+               Inner Join 0 to 1
+          keys:
+            0 
+            1 
+          outputColumnNames: _col0, _col1, _col3
+          Statistics: Num rows: 275 Data size: 2921 Basic stats: COMPLETE Column stats: NONE
+          Select Operator
+            expressions: '429' (type: string), _col3 (type: string), _col0 (type: string), _col1 (type: string)
+            outputColumnNames: _col0, _col1, _col2, _col3
+            Statistics: Num rows: 275 Data size: 2921 Basic stats: COMPLETE Column stats: NONE
+            File Output Operator
+              compressed: false
+              GlobalTableId: 0
+#### A masked pattern was here ####
+              NumFilesPerFileSink: 1
+              Statistics: Num rows: 275 Data size: 2921 Basic stats: COMPLETE Column stats: NONE
+#### A masked pattern was here ####
+              table:
+                  input format: org.apache.hadoop.mapred.TextInputFormat
+                  output format: org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat
+                  properties:
+                    columns _col0,_col1,_col2,_col3
+                    columns.types string:string:string:string
+                    escape.delim \
+                    hive.serialization.extend.additional.nesting.levels true
+                    serialization.format 1
+                    serialization.lib org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+                  serde: org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe
+              TotalFiles: 1
+              GatherStats: false
+              MultiFileSpray: false
+
+  Stage: Stage-0
+    Fetch Operator
+      limit: -1
+      Processor Tree:
+        ListSink
+
+Warning: Shuffle Join JOIN[8][tables = [$hdt$_0, $hdt$_1]] in Stage 'Stage-1:MAPRED' is a cross product
+PREHOOK: query: select * from (select a.key as ak, a.value as av, b.key as bk, b.value as bv from src a join src1 b where a.key = '429' ) c
+PREHOOK: type: QUERY
+PREHOOK: Input: default@src
+PREHOOK: Input: default@src1
+#### A masked pattern was here ####
+POSTHOOK: query: select * from (select a.key as ak, a.value as av, b.key as bk, b.value as bv from src a join src1 b where a.key = '429' ) c
+POSTHOOK: type: QUERY
+POSTHOOK: Input: default@src
+POSTHOOK: Input: default@src1
+#### A masked pattern was here ####
+429	val_429		
+429	val_429		
+429	val_429		
+429	val_429		
+429	val_429		
+429	val_429		
+429	val_429		
+429	val_429		
+429	val_429		val_165
+429	val_429		val_165
+429	val_429		val_193
+429	val_429		val_193
+429	val_429		val_265
+429	val_429		val_265
+429	val_429		val_27
+429	val_429		val_27
+429	val_429		val_409
+429	val_429		val_409
+429	val_429		val_484
+429	val_429		val_484
+429	val_429	128	
+429	val_429	128	
+429	val_429	146	val_146
+429	val_429	146	val_146
+429	val_429	150	val_150
+429	val_429	150	val_150
+429	val_429	213	val_213
+429	val_429	213	val_213
+429	val_429	224	
+429	val_429	224	
+429	val_429	238	val_238
+429	val_429	238	val_238
+429	val_429	255	val_255
+429	val_429	255	val_255
+429	val_429	273	val_273
+429	val_429	273	val_273
+429	val_429	278	val_278
+429	val_429	278	val_278
+429	val_429	311	val_311
+429	val_429	311	val_311
+429	val_429	369	
+429	val_429	369	
+429	val_429	401	val_401
+429	val_429	401	val_401
+429	val_429	406	val_406
+429	val_429	406	val_406
+429	val_429	66	val_66
+429	val_429	66	val_66
+429	val_429	98	val_98
+429	val_429	98	val_98

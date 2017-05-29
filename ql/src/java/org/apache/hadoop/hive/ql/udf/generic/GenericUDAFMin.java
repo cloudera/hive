@@ -23,6 +23,10 @@ import org.apache.hadoop.hive.ql.exec.Description;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentTypeException;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
+import org.apache.hadoop.hive.ql.plan.ptf.BoundaryDef;
+import org.apache.hadoop.hive.ql.plan.ptf.WindowFrameDef;
+import org.apache.hadoop.hive.ql.udf.UDFType;
+import org.apache.hadoop.hive.ql.udf.generic.GenericUDAFMax.MaxStreamingFixedWindow;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorUtils;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorUtils.ObjectInspectorCopyOption;
@@ -49,10 +53,11 @@ public class GenericUDAFMin extends AbstractGenericUDAFResolver {
     return new GenericUDAFMinEvaluator();
   }
 
+  @UDFType(distinctLike=true)
   public static class GenericUDAFMinEvaluator extends GenericUDAFEvaluator {
 
-    ObjectInspector inputOI;
-    ObjectInspector outputOI;
+    private transient ObjectInspector inputOI;
+    private transient ObjectInspector outputOI;
 
     @Override
     public ObjectInspector init(Mode m, ObjectInspector[] parameters)
@@ -69,7 +74,7 @@ public class GenericUDAFMin extends AbstractGenericUDAFResolver {
     }
 
     /** class for storing the current max value */
-    static class MinAgg implements AggregationBuffer {
+    static class MinAgg extends AbstractAggregationBuffer {
       Object o;
     }
 
@@ -116,6 +121,42 @@ public class GenericUDAFMin extends AbstractGenericUDAFResolver {
     public Object terminate(AggregationBuffer agg) throws HiveException {
       MinAgg myagg = (MinAgg) agg;
       return myagg.o;
+    }
+
+    @Override
+    public GenericUDAFEvaluator getWindowingEvaluator(WindowFrameDef wFrmDef) {
+      return new MinStreamingFixedWindow(this, wFrmDef);
+    }
+
+  }
+
+  static class MinStreamingFixedWindow extends MaxStreamingFixedWindow {
+
+    public MinStreamingFixedWindow(GenericUDAFEvaluator wrappedEval,
+        WindowFrameDef wFrmDef) {
+      super(wrappedEval, wFrmDef);
+    }
+
+    protected ObjectInspector inputOI() {
+      return ((GenericUDAFMinEvaluator) wrappedEval).inputOI;
+    }
+
+    protected ObjectInspector outputOI() {
+      return ((GenericUDAFMinEvaluator) wrappedEval).outputOI;
+    }
+
+    protected boolean removeLast(Object in, Object last) {
+      return isLess(in, last);
+    }
+
+    private boolean isLess(Object in, Object last) {
+      if (in == null) {
+        return false;
+      }
+      if (last == null) {
+        return true;
+      }
+      return ObjectInspectorUtils.compare(in, inputOI(), last, outputOI()) < 0;
     }
 
   }

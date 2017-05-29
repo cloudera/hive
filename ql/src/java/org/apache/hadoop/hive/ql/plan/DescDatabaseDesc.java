@@ -38,15 +38,15 @@ public class DescDatabaseDesc extends DDLDesc implements Serializable {
   /**
    * thrift ddl for the result of describe database.
    */
-  private static final String schema = "db_name,comment,location,parameters#string:string:string:string";
+  private static final String schema = "db_name,comment,location,owner_name,owner_type,parameters#string:string:string:string:string:string";
 
   public DescDatabaseDesc() {
   }
 
   /**
-   * @param partSpec
    * @param resFile
-   * @param tableName
+   * @param dbName
+   * @param isExt
    */
   public DescDatabaseDesc(Path resFile, String dbName, boolean isExt) {
     this.isExt = isExt;
@@ -82,8 +82,8 @@ public class DescDatabaseDesc extends DDLDesc implements Serializable {
   }
 
   /**
-   * @param tableName
-   *          the tableName to set
+   * @param db
+   *          the database name to set
    */
   public void setDatabaseName(String db) {
     this.dbName = db;

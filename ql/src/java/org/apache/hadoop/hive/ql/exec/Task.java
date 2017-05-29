@@ -21,6 +21,8 @@ package org.apache.hadoop.hive.ql.exec;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -28,12 +30,13 @@ import java.util.List;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.ql.Context;
 import org.apache.hadoop.hive.ql.DriverContext;
 import org.apache.hadoop.hive.ql.QueryPlan;
 import org.apache.hadoop.hive.ql.lib.Node;
 import org.apache.hadoop.hive.ql.metadata.Hive;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
+import org.apache.hadoop.hive.ql.plan.MapWork;
+import org.apache.hadoop.hive.ql.plan.OperatorDesc;
 import org.apache.hadoop.hive.ql.plan.api.StageType;
 import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.hive.ql.session.SessionState.LogHelper;
@@ -45,53 +48,80 @@ import org.apache.hadoop.util.StringUtils;
 
 public abstract class Task<T extends Serializable> implements Serializable, Node {
 
+  static {
+    PTFUtils.makeTransient(Task.class, "fetchSource");
+  }
+
   private static final long serialVersionUID = 1L;
+  public transient HashMap<String, Long> taskCounters;
+  public transient TaskHandle taskHandle;
   protected transient boolean started;
   protected transient boolean initialized;
   protected transient boolean isdone;
   protected transient boolean queued;
   protected transient HiveConf conf;
   protected transient Hive db;
-  protected transient Log LOG;
   protected transient LogHelper console;
   protected transient QueryPlan queryPlan;
-  protected transient TaskHandle taskHandle;
-  protected transient HashMap<String, Long> taskCounters;
   protected transient DriverContext driverContext;
   protected transient boolean clonedConf = false;
+  protected transient String jobID;
   protected Task<? extends Serializable> backupTask;
   protected List<Task<? extends Serializable>> backupChildrenTasks = new ArrayList<Task<? extends Serializable>>();
+  protected static transient Log LOG = LogFactory.getLog(Task.class);
   protected int taskTag;
   private boolean isLocalMode =false;
+  private boolean retryCmdWhenFail = false;
 
   public static final int NO_TAG = 0;
   public static final int COMMON_JOIN = 1;
-  public static final int CONVERTED_MAPJOIN = 2;
-  public static final int CONVERTED_LOCAL_MAPJOIN = 3;
-  public static final int BACKUP_COMMON_JOIN = 4;
-  public static final int LOCAL_MAPJOIN=5;
-
+  public static final int HINTED_MAPJOIN = 2;
+  public static final int HINTED_MAPJOIN_LOCAL = 3;
+  public static final int CONVERTED_MAPJOIN = 4;
+  public static final int CONVERTED_MAPJOIN_LOCAL = 5;
+  public static final int BACKUP_COMMON_JOIN = 6;
+  // The join task is converted to a mapjoin task. This can only happen if
+  // hive.auto.convert.join.noconditionaltask is set to true. No conditional task was
+  // created in case the mapjoin failed.
+  public static final int MAPJOIN_ONLY_NOBACKUP = 7;
+  public static final int CONVERTED_SORTMERGEJOIN = 8;
 
   // Descendants tasks who subscribe feeds from this task
   protected transient List<Task<? extends Serializable>> feedSubscribers;
 
+  protected String id;
+  protected T work;
+
+  private transient boolean fetchSource;
+
   public static enum FeedType {
     DYNAMIC_PARTITIONS, // list of dynamic partitions
-  };
+  }
 
   // Bean methods
 
+  protected boolean rootTask;
+
   protected List<Task<? extends Serializable>> childTasks;
   protected List<Task<? extends Serializable>> parentTasks;
+  /**
+   * this can be set by the Task, to provide more info about the failure in TaskResult
+   * where the Driver can find it.  This is checked if {@link Task#execute(org.apache.hadoop.hive.ql.DriverContext)}
+   * returns non-0 code.
+   */
+  private Throwable exception;
 
   public Task() {
     isdone = false;
     started = false;
     initialized = false;
     queued = false;
-    LOG = LogFactory.getLog(this.getClass().getName());
     this.taskCounters = new HashMap<String, Long>();
     taskTag = Task.NO_TAG;
+  }
+
+  public TaskHandle getTaskHandle() {
+    return taskHandle;
   }
 
   public void initialize(HiveConf conf, QueryPlan queryPlan, DriverContext driverContext) {
@@ -134,7 +164,7 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
       }
       return retval;
     } catch (IOException e) {
-      throw new RuntimeException(e.getMessage());
+      throw new RuntimeException("Unexpected error: " + e.getMessage(), e);
     }
   }
 
@@ -145,10 +175,12 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
    */
   protected abstract int execute(DriverContext driverContext);
 
-  // dummy method - FetchTask overwrites this
-  public boolean fetch(ArrayList<String> res) throws IOException {
-    assert false;
-    return false;
+  public boolean isRootTask() {
+    return rootTask;
+  }
+
+  public void setRootTask(boolean rootTask) {
+    this.rootTask = rootTask;
   }
 
   public void setChildTasks(List<Task<? extends Serializable>> childTasks) {
@@ -163,6 +195,10 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
     return childTasks;
   }
 
+  public int getNumChild() {
+    return childTasks == null ? 0 : childTasks.size();
+  }
+
   public void setParentTasks(List<Task<? extends Serializable>> parentTasks) {
     this.parentTasks = parentTasks;
   }
@@ -171,10 +207,13 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
     return parentTasks;
   }
 
+  public int getNumParent() {
+    return parentTasks == null ? 0 : parentTasks.size();
+  }
+
   public Task<? extends Serializable> getBackupTask() {
     return backupTask;
   }
-
 
   public void setBackupTask(Task<? extends Serializable> backupTask) {
     this.backupTask = backupTask;
@@ -191,8 +230,10 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
   public Task<? extends Serializable> getAndInitBackupTask() {
     if (backupTask != null) {
       // first set back the backup task with its children task.
-      for (Task<? extends Serializable> backupChild : backupChildrenTasks) {
-        backupChild.getParentTasks().add(backupTask);
+      if( backupChildrenTasks!= null) {
+        for (Task<? extends Serializable> backupChild : backupChildrenTasks) {
+          backupChild.getParentTasks().add(backupTask);
+        }
       }
 
       // recursively remove task from its children tasks if this task doesn't have any parent task
@@ -218,8 +259,6 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
         childTsk.removeFromChildrenTasks();
       }
     }
-
-    return;
   }
 
 
@@ -317,8 +356,7 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
     return isrunnable;
   }
 
-  protected String id;
-  protected T work;
+
 
   public void setWork(T work) {
     this.work = work;
@@ -326,6 +364,10 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
 
   public T getWork() {
     return work;
+  }
+
+  public Collection<MapWork> getMapWork() {
+    return Collections.<MapWork>emptyList();
   }
 
   public void setId(String id) {
@@ -344,8 +386,16 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
     return false;
   }
 
+  public Collection<Operator<? extends OperatorDesc>> getTopOperators() {
+    return new LinkedList<Operator<? extends OperatorDesc>>();
+  }
+
   public boolean hasReduce() {
     return false;
+  }
+
+  public Operator<? extends OperatorDesc> getReducer(MapWork work) {
+    return null;
   }
 
   public HashMap<String, Long> getCounters() {
@@ -358,37 +408,6 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
    * @return StageType.* or null if not overridden
    */
   public abstract StageType getType();
-
-  /**
-   * If this task uses any map-reduce intermediate data (either for reading or for writing),
-   * localize them (using the supplied Context). Map-Reduce intermediate directories are allocated
-   * using Context.getMRTmpFileURI() and can be localized using localizeMRTmpFileURI().
-   *
-   * This method is declared abstract to force any task code to explicitly deal with this aspect of
-   * execution.
-   *
-   * @param ctx
-   *          context object with which to localize
-   */
-  abstract protected void localizeMRTmpFilesImpl(Context ctx);
-
-  /**
-   * Localize a task tree
-   *
-   * @param ctx
-   *          context object with which to localize
-   */
-  public final void localizeMRTmpFiles(Context ctx) {
-    localizeMRTmpFilesImpl(ctx);
-
-    if (childTasks == null) {
-      return;
-    }
-
-    for (Task<? extends Serializable> t : childTasks) {
-      t.localizeMRTmpFiles(ctx);
-    }
-  }
 
   /**
    * Subscribe the feed of publisher. To prevent cycles, a task can only subscribe to its ancestor.
@@ -469,5 +488,65 @@ public abstract class Task<T extends Serializable> implements Serializable, Node
 
   public void setLocalMode(boolean isLocalMode) {
     this.isLocalMode = isLocalMode;
+  }
+
+  public boolean requireLock() {
+    return false;
+  }
+
+  public boolean ifRetryCmdWhenFail() {
+    return retryCmdWhenFail;
+  }
+
+  public void setRetryCmdWhenFail(boolean retryCmdWhenFail) {
+    this.retryCmdWhenFail = retryCmdWhenFail;
+  }
+
+  public QueryPlan getQueryPlan() {
+    return queryPlan;
+  }
+
+  public void setQueryPlan(QueryPlan queryPlan) {
+    this.queryPlan = queryPlan;
+  }
+
+  public String getJobID() {
+    return jobID;
+  }
+
+  public void shutdown() {
+  }
+
+  Throwable getException() {
+    return exception;
+  }
+
+  void setException(Throwable ex) {
+    exception = ex;
+  }
+
+  public void setConsole(LogHelper console) {
+    this.console = console;
+  }
+
+  public boolean isFetchSource() {
+    return fetchSource;
+  }
+
+  public void setFetchSource(boolean fetchSource) {
+    this.fetchSource = fetchSource;
+  }
+
+  @Override
+  public String toString() {
+    return getId() + ":" + getType();
+  }
+
+  public int hashCode() {
+    return toString().hashCode();
+  }
+
+  public boolean equals(Object obj) {
+    return toString().equals(String.valueOf(obj));
   }
 }

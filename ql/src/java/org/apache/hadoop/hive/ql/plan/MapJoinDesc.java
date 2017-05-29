@@ -25,8 +25,8 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.Map.Entry;
+import java.util.Set;
 
 /**
  * Map Join operator Descriptor implementation.
@@ -43,15 +43,36 @@ public class MapJoinDesc extends JoinDesc implements Serializable {
 
   private int posBigTable;
 
+  private Map<Byte, int[]> valueIndices;
   private Map<Byte, List<Integer>> retainList;
 
   private transient String bigTableAlias;
 
-  private LinkedHashMap<String, LinkedHashMap<String, ArrayList<String>>> aliasBucketFileNameMapping;
-  private LinkedHashMap<String, Integer> bucketFileNameMapping;
+  // for tez. used to remember which position maps to which logical input
+  // TODO: should these rather be arrays?
+  private Map<Integer, String> parentToInput = new HashMap<Integer, String>();
+  private Map<Integer, Long> parentKeyCounts = new HashMap<Integer, Long>();
+
+  // for tez. used to remember which type of a Bucket Map Join this is.
+  private boolean customBucketMapJoin;
+
+  // table alias (small) --> input file name (big) --> target file names (small)
+  private Map<String, Map<String, List<String>>> aliasBucketFileNameMapping;
+  private Map<String, Integer> bigTableBucketNumMapping;
+  private Map<String, List<String>> bigTablePartSpecToFileMapping;
+
+  //map join dump file name
+  private String dumpFilePrefix;
+
+  // flag for bucket map join. One usage is to set BucketizedHiveInputFormat
+  private boolean isBucketMapJoin;
+
+  // Hash table memory usage allowed; used in case of non-staged mapjoin.
+  private float hashtableMemoryUsage;
+  protected boolean genJoinKeys = true;
 
   public MapJoinDesc() {
-    bucketFileNameMapping = new LinkedHashMap<String, Integer>();
+    bigTableBucketNumMapping = new LinkedHashMap<String, Integer>();
   }
 
   public MapJoinDesc(MapJoinDesc clone) {
@@ -60,24 +81,31 @@ public class MapJoinDesc extends JoinDesc implements Serializable {
     this.keyTblDesc = clone.keyTblDesc;
     this.valueTblDescs = clone.valueTblDescs;
     this.posBigTable = clone.posBigTable;
+    this.valueIndices = clone.valueIndices;
     this.retainList = clone.retainList;
     this.bigTableAlias = clone.bigTableAlias;
     this.aliasBucketFileNameMapping = clone.aliasBucketFileNameMapping;
-    this.bucketFileNameMapping = clone.bucketFileNameMapping;
+    this.bigTableBucketNumMapping = clone.bigTableBucketNumMapping;
+    this.bigTablePartSpecToFileMapping = clone.bigTablePartSpecToFileMapping;
+    this.dumpFilePrefix = clone.dumpFilePrefix;
+    this.parentToInput = clone.parentToInput;
+    this.parentKeyCounts = clone.parentKeyCounts;
+    this.customBucketMapJoin = clone.customBucketMapJoin;
   }
 
   public MapJoinDesc(final Map<Byte, List<ExprNodeDesc>> keys,
       final TableDesc keyTblDesc, final Map<Byte, List<ExprNodeDesc>> values,
       final List<TableDesc> valueTblDescs,final List<TableDesc> valueFilteredTblDescs,  List<String> outputColumnNames,
       final int posBigTable, final JoinCondDesc[] conds,
-      final Map<Byte, List<ExprNodeDesc>> filters, boolean noOuterJoin) {
-    super(values, outputColumnNames, noOuterJoin, conds, filters);
+      final Map<Byte, List<ExprNodeDesc>> filters, boolean noOuterJoin, String dumpFilePrefix) {
+    super(values, outputColumnNames, noOuterJoin, conds, filters, null);
     this.keys = keys;
     this.keyTblDesc = keyTblDesc;
     this.valueTblDescs = valueTblDescs;
     this.valueFilteredTblDescs = valueFilteredTblDescs;
     this.posBigTable = posBigTable;
-    this.bucketFileNameMapping = new LinkedHashMap<String, Integer>();
+    this.bigTableBucketNumMapping = new LinkedHashMap<String, Integer>();
+    this.dumpFilePrefix = dumpFilePrefix;
     initRetainExprList();
   }
 
@@ -95,6 +123,49 @@ public class MapJoinDesc extends JoinDesc implements Serializable {
     }
   }
 
+  @Explain(displayName = "input vertices")
+  public Map<Integer, String> getParentToInput() {
+    return parentToInput;
+  }
+
+  public void setParentToInput(Map<Integer, String> parentToInput) {
+    this.parentToInput = parentToInput;
+  }
+
+  public Map<Integer, Long> getParentKeyCounts() {
+    return parentKeyCounts;
+  }
+
+  @Explain(displayName = "Estimated key counts", normalExplain = false)
+  public String getKeyCountsExplainDesc() {
+    StringBuilder result = null;
+    for (Map.Entry<Integer, Long> entry : parentKeyCounts.entrySet()) {
+      if (result == null) {
+        result = new StringBuilder();
+      } else {
+        result.append(", ");
+      }
+      result.append(parentToInput.get(entry.getKey())).append(" => ").append(entry.getValue());
+    }
+    return result == null ? null : result.toString();
+  }
+
+  public void setParentKeyCount(Map<Integer, Long> parentKeyCounts) {
+    this.parentKeyCounts = parentKeyCounts;
+  }
+
+  public Map<Byte, int[]> getValueIndices() {
+    return valueIndices;
+  }
+
+  public void setValueIndices(Map<Byte, int[]> valueIndices) {
+    this.valueIndices = valueIndices;
+  }
+
+  public int[] getValueIndex(byte alias) {
+    return valueIndices == null ? null : valueIndices.get(alias);
+  }
+
   public Map<Byte, List<Integer>> getRetainList() {
     return retainList;
   }
@@ -104,9 +175,36 @@ public class MapJoinDesc extends JoinDesc implements Serializable {
   }
 
   /**
+   * @return the dumpFilePrefix
+   */
+  public String getDumpFilePrefix() {
+    return dumpFilePrefix;
+  }
+
+  /**
+   * @param dumpFilePrefix
+   *          the dumpFilePrefix to set
+   */
+  public void setDumpFilePrefix(String dumpFilePrefix) {
+    this.dumpFilePrefix = dumpFilePrefix;
+  }
+
+  /**
+   * @return the keys in string form
+   */
+  @Override
+  @Explain(displayName = "keys")
+  public Map<Byte, String> getKeysString() {
+    Map<Byte, String> keyMap = new LinkedHashMap<Byte, String>();
+    for (Map.Entry<Byte, List<ExprNodeDesc>> k: getKeys().entrySet()) {
+      keyMap.put(k.getKey(), PlanUtils.getExprListString(k.getValue()));
+    }
+    return keyMap;
+  }
+
+  /**
    * @return the keys
    */
-  @Explain(displayName = "keys")
   public Map<Byte, List<ExprNodeDesc>> getKeys() {
     return keys;
   }
@@ -122,7 +220,7 @@ public class MapJoinDesc extends JoinDesc implements Serializable {
   /**
    * @return the position of the big table not in memory
    */
-  @Explain(displayName = "Position of Big Table")
+  @Explain(displayName = "Position of Big Table", normalExplain = false)
   public int getPosBigTable() {
     return posBigTable;
   }
@@ -187,20 +285,65 @@ public class MapJoinDesc extends JoinDesc implements Serializable {
     this.bigTableAlias = bigTableAlias;
   }
 
-  public LinkedHashMap<String, LinkedHashMap<String, ArrayList<String>>> getAliasBucketFileNameMapping() {
+  public Map<String, Map<String, List<String>>> getAliasBucketFileNameMapping() {
     return aliasBucketFileNameMapping;
   }
 
   public void setAliasBucketFileNameMapping(
-      LinkedHashMap<String, LinkedHashMap<String, ArrayList<String>>> aliasBucketFileNameMapping) {
+      Map<String, Map<String, List<String>>> aliasBucketFileNameMapping) {
     this.aliasBucketFileNameMapping = aliasBucketFileNameMapping;
   }
 
-  public LinkedHashMap<String, Integer> getBucketFileNameMapping() {
-    return bucketFileNameMapping;
+  public Map<String, Integer> getBigTableBucketNumMapping() {
+    return bigTableBucketNumMapping;
   }
 
-  public void setBucketFileNameMapping(LinkedHashMap<String, Integer> bucketFileNameMapping) {
-    this.bucketFileNameMapping = bucketFileNameMapping;
+  public void setBigTableBucketNumMapping(Map<String, Integer> bigTableBucketNumMapping) {
+    this.bigTableBucketNumMapping = bigTableBucketNumMapping;
+  }
+
+  public Map<String, List<String>> getBigTablePartSpecToFileMapping() {
+    return bigTablePartSpecToFileMapping;
+  }
+
+  public void setBigTablePartSpecToFileMapping(Map<String, List<String>> partToFileMapping) {
+    this.bigTablePartSpecToFileMapping = partToFileMapping;
+  }
+
+  @Explain(displayName = "BucketMapJoin", normalExplain = false, displayOnlyOnTrue = true)
+  public boolean isBucketMapJoin() {
+    return isBucketMapJoin;
+  }
+
+  public void setBucketMapJoin(boolean isBucketMapJoin) {
+    this.isBucketMapJoin = isBucketMapJoin;
+  }
+
+  public void setHashTableMemoryUsage(float hashtableMemoryUsage) {
+    this.hashtableMemoryUsage = hashtableMemoryUsage;
+  }
+
+  public float getHashTableMemoryUsage() {
+    return hashtableMemoryUsage;
+  }
+
+  public void setCustomBucketMapJoin(boolean customBucketMapJoin) {
+    this.customBucketMapJoin = customBucketMapJoin;
+  }
+
+  public boolean getCustomBucketMapJoin() {
+    return this.customBucketMapJoin;
+  }
+
+  public boolean isMapSideJoin() {
+    return true;
+  }
+
+  public void setGenJoinKeys(boolean genJoinKeys) {
+    this.genJoinKeys = genJoinKeys;
+  }
+
+  public boolean getGenJoinKeys() {
+    return genJoinKeys;
   }
 }

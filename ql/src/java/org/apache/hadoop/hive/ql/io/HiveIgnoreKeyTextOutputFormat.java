@@ -24,9 +24,9 @@ import java.util.Properties;
 
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.exec.FileSinkOperator.RecordWriter;
-import org.apache.hadoop.hive.serde.Constants;
+import org.apache.hadoop.hive.ql.exec.Utilities;
+import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.Writable;
@@ -39,7 +39,7 @@ import org.apache.hadoop.util.Progressable;
 /**
  * HiveIgnoreKeyTextOutputFormat replaces key with null before feeding the <key,
  * value> to TextOutputFormat.RecordWriter.
- * 
+ *
  */
 public class HiveIgnoreKeyTextOutputFormat<K extends WritableComparable, V extends Writable>
     extends TextOutputFormat<K, V> implements HiveOutputFormat<K, V> {
@@ -47,7 +47,7 @@ public class HiveIgnoreKeyTextOutputFormat<K extends WritableComparable, V exten
   /**
    * create the final out file, and output row by row. After one row is
    * appended, a configured row separator is appended
-   * 
+   *
    * @param jc
    *          the job configuration file
    * @param outPath
@@ -68,7 +68,7 @@ public class HiveIgnoreKeyTextOutputFormat<K extends WritableComparable, V exten
       Properties tableProperties, Progressable progress) throws IOException {
     int rowSeparator = 0;
     String rowSeparatorString = tableProperties.getProperty(
-        Constants.LINE_DELIM, "\n");
+        serdeConstants.LINE_DELIM, "\n");
     try {
       rowSeparator = Byte.parseByte(rowSeparatorString);
     } catch (NumberFormatException e) {
@@ -77,9 +77,10 @@ public class HiveIgnoreKeyTextOutputFormat<K extends WritableComparable, V exten
 
     final int finalRowSeparator = rowSeparator;
     FileSystem fs = outPath.getFileSystem(jc);
-    final OutputStream outStream = Utilities.createCompressedStream(jc, fs
-        .create(outPath), isCompressed);
+    final OutputStream outStream = Utilities.createCompressedStream(jc,
+    fs.create(outPath, progress), isCompressed);
     return new RecordWriter() {
+      @Override
       public void write(Writable r) throws IOException {
         if (r instanceof Text) {
           Text tr = (Text) r;
@@ -93,6 +94,7 @@ public class HiveIgnoreKeyTextOutputFormat<K extends WritableComparable, V exten
         }
       }
 
+      @Override
       public void close(boolean abort) throws IOException {
         outStream.close();
       }
@@ -108,10 +110,12 @@ public class HiveIgnoreKeyTextOutputFormat<K extends WritableComparable, V exten
       this.mWriter = writer;
     }
 
+    @Override
     public synchronized void write(K key, V value) throws IOException {
       this.mWriter.write(null, value);
     }
 
+    @Override
     public void close(Reporter reporter) throws IOException {
       this.mWriter.close(reporter);
     }

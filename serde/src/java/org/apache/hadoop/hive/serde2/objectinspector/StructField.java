@@ -19,8 +19,6 @@
 package org.apache.hadoop.hive.serde2.objectinspector;
 
 /**
- * StructField is an empty interface.
- * 
  * Classes implementing this interface are considered to represent a field of a
  * struct for this serde package.
  */
@@ -36,4 +34,13 @@ public interface StructField {
    */
   ObjectInspector getFieldObjectInspector();
 
+  /**
+   * Get the fieldID for the field.
+   */
+  int getFieldID();
+
+  /**
+   * Get the comment for the field. May be null if no comment provided.
+   */
+  String getFieldComment();
 }

@@ -19,11 +19,13 @@
 package org.apache.hadoop.hive.hbase;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
-import java.util.NavigableMap;
 import java.util.Map.Entry;
+import java.util.NavigableMap;
 
 import org.apache.hadoop.hbase.client.Result;
+import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hive.serde2.lazy.ByteArrayRef;
 import org.apache.hadoop.hive.serde2.lazy.LazyFactory;
 import org.apache.hadoop.hive.serde2.lazy.LazyMap;
@@ -41,6 +43,8 @@ public class LazyHBaseCellMap extends LazyMap {
 
   private Result result;
   private byte [] columnFamilyBytes;
+  private byte[] qualPrefix;
+  private List<Boolean> binaryStorage;
 
   /**
    * Construct a LazyCellMap object with the ObjectInspector.
@@ -50,9 +54,23 @@ public class LazyHBaseCellMap extends LazyMap {
     super(oi);
   }
 
-  public void init(Result r, byte [] columnFamilyBytes) {
-    result = r;
+  public void init(
+      Result r,
+      byte[] columnFamilyBytes,
+      List<Boolean> binaryStorage) {
+
+    init(r, columnFamilyBytes, binaryStorage, null);
+  }
+
+  public void init(
+      Result r,
+      byte [] columnFamilyBytes,
+      List<Boolean> binaryStorage, byte[] qualPrefix) {
+    this.isNull = false;
+    this.result = r;
     this.columnFamilyBytes = columnFamilyBytes;
+    this.binaryStorage = binaryStorage;
+    this.qualPrefix = qualPrefix;
     setParsed(false);
   }
 
@@ -73,10 +91,19 @@ public class LazyHBaseCellMap extends LazyMap {
           continue;
         }
 
+        if (qualPrefix != null && !Bytes.startsWith(e.getKey(), qualPrefix)) {
+          // since we were provided a qualifier prefix, only accept qualifiers that start with this
+          // prefix
+          continue;
+        }
+
+        LazyMapObjectInspector lazyMoi = getInspector();
+
         // Keys are always primitive
         LazyPrimitive<? extends ObjectInspector, ? extends Writable> key =
           LazyFactory.createLazyPrimitiveClass(
-              (PrimitiveObjectInspector) getInspector().getMapKeyObjectInspector());
+              (PrimitiveObjectInspector) lazyMoi.getMapKeyObjectInspector(),
+              binaryStorage.get(0));
 
         ByteArrayRef keyRef = new ByteArrayRef();
         keyRef.setData(e.getKey());
@@ -84,12 +111,18 @@ public class LazyHBaseCellMap extends LazyMap {
 
         // Value
         LazyObject<?> value =
-          LazyFactory.createLazyObject(
-              getInspector().getMapValueObjectInspector());
+          LazyFactory.createLazyObject(lazyMoi.getMapValueObjectInspector(),
+              binaryStorage.get(1));
 
-        ByteArrayRef valueRef = new ByteArrayRef();
-        valueRef.setData(e.getValue());
-        value.init(valueRef, 0, valueRef.getData().length);
+        byte[] bytes = e.getValue();
+
+        if (isNull(oi.getNullSequence(), bytes, 0, bytes.length)) {
+          value.setNull();
+        } else {
+          ByteArrayRef valueRef = new ByteArrayRef();
+          valueRef.setData(bytes);
+          value.init(valueRef, 0, valueRef.getData().length);
+        }
 
         // Put the key/value into the map
         cachedMap.put(key.getObject(), value.getObject());
@@ -122,8 +155,16 @@ public class LazyHBaseCellMap extends LazyMap {
       }
       if (keyI.equals(key)) {
         // Got a match, return the value
-        LazyObject<?> v = (LazyObject<?>) entry.getValue();
-        return v == null ? v : v.getObject();
+        Object _value = entry.getValue();
+
+        // If the given value is a type of LazyObject, then only try and convert it to that form.
+        // Else return it as it is.
+        if (_value instanceof LazyObject) {
+          LazyObject<?> v = (LazyObject<?>) entry.getValue();
+          return v == null ? v : v.getObject();
+        } else {
+          return _value;
+        }
       }
     }
 

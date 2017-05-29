@@ -1,3 +1,18 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 THISSERVICE=metastore
 export SERVICE_LIST="${SERVICE_LIST}${THISSERVICE} "
 
@@ -9,33 +24,28 @@ metastore() {
   fi
   JAR=${HIVE_LIB}/hive-service-*.jar
 
-  version=$($HADOOP version | awk '{if (NR == 1) {print $2;}}');
-
-  # Save the regex to a var to workaround quoting incompatabilities
-  # between Bash 3.1 and 3.2
-  version_re="^([[:digit:]]+)\.([[:digit:]]+)(\.([[:digit:]]+))?.*$"
-
-  if [[ "$version" =~ $version_re ]]; then
-      major_ver=${BASH_REMATCH[1]}
-      minor_ver=${BASH_REMATCH[2]}
-      patch_ver=${BASH_REMATCH[4]}
-  else
-      echo "Unable to determine Hadoop version information."
-      echo "'hadoop version' returned:"
-      echo `$HADOOP version`
-      exit 6
+  # Set SENTRY_HOME if possible and add Sentry jars to classpath
+  if [[ -z "$SENTRY_HOME" ]]
+  then
+    if [[ -d ${HIVE_HOME}/../sentry ]]
+    then
+      export SENTRY_HOME=`readlink -m ${HIVE_HOME}/../sentry`
+    fi
+  fi
+  if [[ -n "$SENTRY_HOME" ]]
+  then
+    for f in ${SENTRY_HOME}/lib/*.jar ${SENTRY_HOME}/lib/plugins/*.jar; do
+      export HADOOP_CLASSPATH=${HADOOP_CLASSPATH}:${f}
+    done
   fi
 
-  if [ $minor_ver -lt 20 ]; then
-    exec $HADOOP jar $AUX_JARS_CMD_LINE $JAR $CLASS $METASTORE_PORT "$@"
-  else
-    # hadoop 20 or newer - skip the aux_jars option and hiveconf
-    exec $HADOOP jar $JAR $CLASS $METASTORE_PORT "$@"
-  fi
+  # hadoop 20 or newer - skip the aux_jars option and hiveconf
+
+  export HADOOP_OPTS="$HIVE_METASTORE_HADOOP_OPTS $HADOOP_OPTS"
+  exec $HADOOP jar $JAR $CLASS "$@"
 }
 
 metastore_help() {
-  echo "usage METASTORE_PORT=xxxx ./hive --service metastore"
-  echo "  METASTORE_PORT : Specify the metastore server port"
+  metastore -h
 }
 

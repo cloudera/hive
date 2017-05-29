@@ -19,33 +19,33 @@
 package org.apache.hadoop.hive.ql.udf;
 
 import org.apache.hadoop.hive.ql.exec.Description;
-import org.apache.hadoop.hive.ql.exec.UDF;
+import org.apache.hadoop.hive.ql.exec.vector.VectorizedExpressions;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.FuncLog10DoubleToDouble;
+import org.apache.hadoop.hive.ql.exec.vector.expressions.gen.FuncLog10LongToDouble;
 import org.apache.hadoop.hive.serde2.io.DoubleWritable;
 
 /**
  * UDFLog10.
- *
  */
 @Description(name = "log10",
-    value = "_FUNC_(x) - Returns the logarithm of x with base 10",
-    extended = "Example:\n"
-    + "  > SELECT _FUNC_(10) FROM src LIMIT 1;\n" + "  1")
-public class UDFLog10 extends UDF {
-  private static double log10 = Math.log(10.0);
+             value = "_FUNC_(x) - Returns the logarithm of x with base 10",
+             extended = "Example:\n"
+                        + "  > SELECT _FUNC_(10) FROM src LIMIT 1;\n"
+                        + "  1")
+@VectorizedExpressions({FuncLog10LongToDouble.class, FuncLog10DoubleToDouble.class})
+public class UDFLog10 extends UDFMath {
 
-  private DoubleWritable result = new DoubleWritable();
-
-  public UDFLog10() {
-  }
+  private final DoubleWritable result = new DoubleWritable();
 
   /**
    * Returns the logarithm of "a" with base 10.
    */
-  public DoubleWritable evaluate(DoubleWritable a) {
-    if (a == null || a.get() <= 0.0) {
+  @Override
+  protected DoubleWritable doEvaluate(DoubleWritable a) {
+    if (a.get() <= 0.0) {
       return null;
     } else {
-      result.set(Math.log(a.get()) / log10);
+      result.set(Math.log10(a.get()));
       return result;
     }
   }

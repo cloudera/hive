@@ -18,20 +18,26 @@
 
 package org.apache.hadoop.hive.ql.optimizer;
 
-import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.hadoop.hive.ql.exec.ColumnInfo;
 import org.apache.hadoop.hive.ql.exec.CommonJoinOperator;
+import org.apache.hadoop.hive.ql.exec.FilterOperator;
 import org.apache.hadoop.hive.ql.exec.Operator;
+import org.apache.hadoop.hive.ql.exec.OperatorFactory;
+import org.apache.hadoop.hive.ql.exec.RowSchema;
 import org.apache.hadoop.hive.ql.exec.SelectOperator;
+import org.apache.hadoop.hive.ql.exec.UnionOperator;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.lib.NodeProcessorCtx;
-import org.apache.hadoop.hive.ql.parse.OpParseContext;
+import org.apache.hadoop.hive.ql.parse.ParseContext;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
+import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
+import org.apache.hadoop.hive.ql.plan.OperatorDesc;
 import org.apache.hadoop.hive.ql.plan.SelectDesc;
 
 /**
@@ -39,35 +45,41 @@ import org.apache.hadoop.hive.ql.plan.SelectDesc;
  */
 public class ColumnPrunerProcCtx implements NodeProcessorCtx {
 
-  private final Map<Operator<? extends Serializable>, List<String>> prunedColLists;
+  private final ParseContext pctx;
 
-  private final HashMap<Operator<? extends Serializable>, OpParseContext> opToParseCtxMap;
+  private final Map<Operator<? extends OperatorDesc>, List<String>> prunedColLists;
 
   private final Map<CommonJoinOperator, Map<Byte, List<String>>> joinPrunedColLists;
 
-  public ColumnPrunerProcCtx(
-      HashMap<Operator<? extends Serializable>, OpParseContext> opToParseContextMap) {
-    prunedColLists = new HashMap<Operator<? extends Serializable>, List<String>>();
-    opToParseCtxMap = opToParseContextMap;
+  private final Map<UnionOperator, List<Integer>> unionPrunedColLists;
+
+  public ColumnPrunerProcCtx(ParseContext pctx) {
+    this.pctx = pctx;
+    prunedColLists = new HashMap<Operator<? extends OperatorDesc>, List<String>>();
     joinPrunedColLists = new HashMap<CommonJoinOperator, Map<Byte, List<String>>>();
+    unionPrunedColLists = new HashMap<>();
+  }
+
+  public ParseContext getParseContext() {
+    return pctx;
   }
 
   public Map<CommonJoinOperator, Map<Byte, List<String>>> getJoinPrunedColLists() {
     return joinPrunedColLists;
   }
 
+  public Map<UnionOperator, List<Integer>> getUnionPrunedColLists() {
+    return unionPrunedColLists;
+  }
+
   /**
    * @return the prunedColLists
    */
-  public List<String> getPrunedColList(Operator<? extends Serializable> op) {
+  public List<String> getPrunedColList(Operator<? extends OperatorDesc> op) {
     return prunedColLists.get(op);
   }
 
-  public HashMap<Operator<? extends Serializable>, OpParseContext> getOpToParseCtxMap() {
-    return opToParseCtxMap;
-  }
-
-  public Map<Operator<? extends Serializable>, List<String>> getPrunedColLists() {
+  public Map<Operator<? extends OperatorDesc>, List<String>> getPrunedColLists() {
     return prunedColLists;
   }
 
@@ -76,35 +88,91 @@ public class ColumnPrunerProcCtx implements NodeProcessorCtx {
    * RowResolver and are different from the external column names) that are
    * needed in the subtree. These columns eventually have to be selected from
    * the table scan.
-   * 
+   *
    * @param curOp
    *          The root of the operator subtree.
    * @return List<String> of the internal column names.
    * @throws SemanticException
    */
-  public List<String> genColLists(Operator<? extends Serializable> curOp)
+  public List<String> genColLists(Operator<? extends OperatorDesc> curOp)
       throws SemanticException {
-    List<String> colList = new ArrayList<String>();
-    if (curOp.getChildOperators() != null) {
-      for (Operator<? extends Serializable> child : curOp.getChildOperators()) {
-        if (child instanceof CommonJoinOperator) {
-          int tag = child.getParentOperators().indexOf(curOp);
-          List<String> prunList = joinPrunedColLists.get(child).get((byte) tag);
-          colList = Utilities.mergeUniqElems(colList, prunList);
-        } else {
-          colList = Utilities
-              .mergeUniqElems(colList, prunedColLists.get(child));
+    if (curOp.getChildOperators() == null) {
+      return null;
+    }
+    List<String> colList = null;
+    for (Operator<? extends OperatorDesc> child : curOp.getChildOperators()) {
+      List<String> prunList = null;
+      if (child instanceof CommonJoinOperator) {
+        int tag = child.getParentOperators().indexOf(curOp);
+        prunList = joinPrunedColLists.get(child).get((byte) tag);
+      } else if (child instanceof UnionOperator) {
+        List<Integer> positions = unionPrunedColLists.get(child);
+        if (positions != null && positions.size() > 0) {
+          prunList = new ArrayList<>();
+          RowSchema oldRS = curOp.getSchema();
+          for (Integer pos : positions) {
+            ColumnInfo colInfo = oldRS.getSignature().get(pos);
+            prunList.add(colInfo.getInternalName());
+          }
         }
+      } else {
+        prunList = prunedColLists.get(child);
+      }
+      if (prunList == null) {
+        continue;
+      }
+      if (colList == null) {
+        colList = new ArrayList<String>(prunList);
+      } else {
+        colList = Utilities.mergeUniqElems(colList, prunList);
       }
     }
     return colList;
   }
 
   /**
+   * Creates the list of internal column names(these names are used in the
+   * RowResolver and are different from the external column names) that are
+   * needed in the subtree. These columns eventually have to be selected from
+   * the table scan.
+   *
+   * @param curOp
+   *          The root of the operator subtree.
+   * @param child
+   *          The consumer.
+   * @return List<String> of the internal column names.
+   * @throws SemanticException
+   */
+  public List<String> genColLists(Operator<? extends OperatorDesc> curOp,
+          Operator<? extends OperatorDesc> child)
+      throws SemanticException {
+    if (curOp.getChildOperators() == null) {
+      return null;
+    }
+    if (child instanceof CommonJoinOperator) {
+      int tag = child.getParentOperators().indexOf(curOp);
+      return joinPrunedColLists.get(child).get((byte) tag);
+    } else if (child instanceof UnionOperator) {
+      List<Integer> positions = unionPrunedColLists.get(child);
+      List<String> prunList = new ArrayList<>();
+      if (positions != null && positions.size() > 0) {
+        RowSchema oldRS = curOp.getSchema();
+        for (Integer pos : positions) {
+          ColumnInfo colInfo = oldRS.getSignature().get(pos);
+          prunList.add(colInfo.getInternalName());
+        }
+      }
+      return prunList;
+    } else {
+      return prunedColLists.get(child);
+    }
+  }
+
+  /**
    * Creates the list of internal column names from select expressions in a
    * select operator. This function is used for the select operator instead of
    * the genColLists function (which is used by the rest of the operators).
-   * 
+   *
    * @param op
    *          The select operator.
    * @return List<String> of the internal column names.
@@ -112,16 +180,23 @@ public class ColumnPrunerProcCtx implements NodeProcessorCtx {
   public List<String> getColsFromSelectExpr(SelectOperator op) {
     List<String> cols = new ArrayList<String>();
     SelectDesc conf = op.getConf();
-    ArrayList<ExprNodeDesc> exprList = conf.getColList();
-    for (ExprNodeDesc expr : exprList) {
-      cols = Utilities.mergeUniqElems(cols, expr.getCols());
+    if(conf.isSelStarNoCompute()) {
+      for (ColumnInfo colInfo : op.getSchema().getSignature()) {
+        cols.add(colInfo.getInternalName());
+      }
+    }
+    else {
+      List<ExprNodeDesc> exprList = conf.getColList();
+        for (ExprNodeDesc expr : exprList) {
+          cols = Utilities.mergeUniqElems(cols, expr.getCols());
+        }
     }
     return cols;
   }
 
   /**
    * Creates the list of internal column names for select * expressions.
-   * 
+   *
    * @param op
    *          The select operator.
    * @param colList
@@ -134,20 +209,20 @@ public class ColumnPrunerProcCtx implements NodeProcessorCtx {
     List<String> cols = new ArrayList<String>();
     SelectDesc conf = op.getConf();
 
-    if (conf.isSelStarNoCompute()) {
+    if (colList != null  && conf.isSelStarNoCompute()) {
       cols.addAll(colList);
       return cols;
     }
 
-    ArrayList<ExprNodeDesc> selectExprs = conf.getColList();
+    List<ExprNodeDesc> selectExprs = conf.getColList();
 
     // The colList is the output columns used by child operators, they are
     // different
     // from input columns of the current operator. we need to find out which
     // input columns are used.
-    ArrayList<String> outputColumnNames = conf.getOutputColumnNames();
+    List<String> outputColumnNames = conf.getOutputColumnNames();
     for (int i = 0; i < outputColumnNames.size(); i++) {
-      if (colList.contains(outputColumnNames.get(i))) {
+      if (colList == null || colList.contains(outputColumnNames.get(i))) {
         ExprNodeDesc expr = selectExprs.get(i);
         cols = Utilities.mergeUniqElems(cols, expr.getCols());
       }
@@ -155,4 +230,79 @@ public class ColumnPrunerProcCtx implements NodeProcessorCtx {
 
     return cols;
   }
+
+  /**
+   * Create the list of internal columns for select tag of LV
+   */
+  public List<String> getSelectColsFromLVJoin(RowSchema rs,
+      List<String> colList) throws SemanticException {
+    List<String> columns = new ArrayList<String>();
+    for (String col : colList) {
+      if (rs.getColumnInfo(col) != null) {
+        columns.add(col);
+      }
+    }
+    return columns;
+  }
+
+  /**
+   * If the input filter operator has direct child(ren) which are union operator,
+   * and the filter's column is not the same as union's
+   * create select operator between them. The select operator has same number of columns as
+   * pruned child operator.
+   *
+   * @param curOp
+   *          The filter operator which need to handle children.
+   * @throws SemanticException
+   */
+  public void handleFilterUnionChildren(Operator<? extends OperatorDesc> curOp)
+      throws SemanticException {
+    if (curOp.getChildOperators() == null || !(curOp instanceof FilterOperator)) {
+      return;
+    }
+    List<String> parentPrunList = prunedColLists.get(curOp);
+    if(parentPrunList == null || parentPrunList.size() == 0) {
+      return;
+    }
+    FilterOperator filOp = (FilterOperator)curOp;
+    List<String> prunList = null;
+    List<Integer>[] childToParentIndex = null;
+
+    for (Operator<? extends OperatorDesc> child : curOp.getChildOperators()) {
+      if (child instanceof UnionOperator) {
+        prunList = genColLists(curOp, child);
+        if (prunList == null || prunList.size() == 0 || parentPrunList.size() == prunList.size()) {
+          continue;
+        }
+
+        ArrayList<ExprNodeDesc> exprs = new ArrayList<ExprNodeDesc>();
+        ArrayList<String> outputColNames = new ArrayList<String>();
+        Map<String, ExprNodeDesc> colExprMap = new HashMap<String, ExprNodeDesc>();
+        ArrayList<ColumnInfo> outputRS = new ArrayList<ColumnInfo>();
+        for (ColumnInfo colInfo : child.getSchema().getSignature()) {
+          if (!prunList.contains(colInfo.getInternalName())) {
+            continue;
+          }
+          ExprNodeDesc colDesc = new ExprNodeColumnDesc(colInfo.getType(),
+              colInfo.getInternalName(), colInfo.getTabAlias(), colInfo.getIsVirtualCol());
+          exprs.add(colDesc);
+          outputColNames.add(colInfo.getInternalName());
+          ColumnInfo newCol = new ColumnInfo(colInfo.getInternalName(), colInfo.getType(),
+                  colInfo.getTabAlias(), colInfo.getIsVirtualCol(), colInfo.isHiddenVirtualCol());
+          newCol.setAlias(colInfo.getAlias());
+          outputRS.add(newCol);
+          colExprMap.put(colInfo.getInternalName(), colDesc);
+        }
+        SelectDesc select = new SelectDesc(exprs, outputColNames, false);
+        curOp.removeChild(child);
+        SelectOperator sel = (SelectOperator) OperatorFactory.getAndMakeChild(
+            select, new RowSchema(outputRS), curOp);
+        OperatorFactory.makeChild(sel, child);
+        sel.setColumnExprMap(colExprMap);
+
+      }
+
+    }
+  }
+
 }

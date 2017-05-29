@@ -19,21 +19,29 @@ package org.apache.hadoop.hive.ql.index;
 
 import org.apache.hadoop.hive.ql.plan.ExprNodeColumnDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeConstantDesc;
-import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
+import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 
 /**
  * IndexSearchCondition represents an individual search condition
  * found by {@link IndexPredicateAnalyzer}.
  *
- * @author John Sichi
- * @version $Id:$
  */
 public class IndexSearchCondition
 {
   private ExprNodeColumnDesc columnDesc;
   private String comparisonOp;
   private ExprNodeConstantDesc constantDesc;
-  private ExprNodeDesc comparisonExpr;
+  private ExprNodeGenericFuncDesc comparisonExpr;
+
+  private String[] fields;
+
+  public IndexSearchCondition(
+      ExprNodeColumnDesc columnDesc,
+      String comparisonOp,
+      ExprNodeConstantDesc constantDesc,
+      ExprNodeGenericFuncDesc comparisonExpr) {
+    this(columnDesc, comparisonOp, constantDesc, comparisonExpr, null);
+  }
 
   /**
    * Constructs a search condition, which takes the form
@@ -46,24 +54,26 @@ public class IndexSearchCondition
    *
    * @param constantDesc constant value to search for
    *
-   * @Param comparisonExpr the original comparison expression
+   * @param comparisonExpr the original comparison expression
    */
   public IndexSearchCondition(
     ExprNodeColumnDesc columnDesc,
     String comparisonOp,
     ExprNodeConstantDesc constantDesc,
-    ExprNodeDesc comparisonExpr) {
+    ExprNodeGenericFuncDesc comparisonExpr,
+    String[] fields) {
 
     this.columnDesc = columnDesc;
     this.comparisonOp = comparisonOp;
     this.constantDesc = constantDesc;
     this.comparisonExpr = comparisonExpr;
+    this.fields = fields;
   }
 
   public void setColumnDesc(ExprNodeColumnDesc columnDesc) {
     this.columnDesc = columnDesc;
   }
-  
+
   public ExprNodeColumnDesc getColumnDesc() {
     return columnDesc;
   }
@@ -84,14 +94,18 @@ public class IndexSearchCondition
     return constantDesc;
   }
 
-  public void setComparisonExpr(ExprNodeDesc comparisonExpr) {
+  public void setComparisonExpr(ExprNodeGenericFuncDesc comparisonExpr) {
     this.comparisonExpr = comparisonExpr;
   }
 
-  public ExprNodeDesc getComparisonExpr() {
+  public ExprNodeGenericFuncDesc getComparisonExpr() {
     return comparisonExpr;
   }
-  
+
+  public String[] getFields() {
+    return fields;
+  }
+
   @Override
   public String toString() {
     return comparisonExpr.getExprString();
