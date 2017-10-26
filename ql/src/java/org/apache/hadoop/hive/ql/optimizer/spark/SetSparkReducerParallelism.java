@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hive.ql.optimizer.spark;
 
+import java.util.List;
 import java.util.Stack;
 
 import org.apache.commons.logging.Log;
@@ -26,8 +27,10 @@ import org.apache.hadoop.hive.common.ObjectPair;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.hive_metastoreConstants;
 import org.apache.hadoop.hive.ql.exec.FileSinkOperator;
+import org.apache.hadoop.hive.ql.exec.LimitOperator;
 import org.apache.hadoop.hive.ql.exec.Operator;
 import org.apache.hadoop.hive.ql.exec.ReduceSinkOperator;
+import org.apache.hadoop.hive.ql.exec.TerminalOperator;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.exec.spark.SparkUtilities;
 import org.apache.hadoop.hive.ql.exec.spark.session.SparkSession;
@@ -75,7 +78,7 @@ public class SetSparkReducerParallelism implements NodeProcessor {
 
     context.getVisitedReduceSinks().add(sink);
 
-    if (desc.getNumReducers() <= 0) {
+    if (needSetParallelism(sink, context.getConf())) {
       if (constantReducers > 0) {
         LOG.info("Parallelism for reduce sink " + sink + " set by user to " + constantReducers);
         desc.setNumReducers(constantReducers);
@@ -155,6 +158,42 @@ public class SetSparkReducerParallelism implements NodeProcessor {
       LOG.info("Number of reducers determined to be: " + desc.getNumReducers());
     }
 
+    return false;
+  }
+
+  // tests whether the RS needs automatic setting parallelism
+  private boolean needSetParallelism(ReduceSinkOperator reduceSink, HiveConf hiveConf) {
+    ReduceSinkDesc desc = reduceSink.getConf();
+    if (desc.getNumReducers() <= 0) {
+      return true;
+    }
+    if (desc.getNumReducers() == 1 && desc.hasOrderBy() &&
+        hiveConf.getBoolVar(HiveConf.ConfVars.HIVESAMPLINGFORORDERBY) && !desc.isDeduplicated()) {
+      Stack<Operator<? extends OperatorDesc>> descendants = new Stack<Operator<? extends OperatorDesc>>();
+      List<Operator<? extends OperatorDesc>> children = reduceSink.getChildOperators();
+      if (children != null) {
+        for (Operator<? extends OperatorDesc> child : children) {
+          descendants.push(child);
+        }
+      }
+      while (descendants.size() != 0) {
+        Operator<? extends OperatorDesc> descendant = descendants.pop();
+        //If the decendants contains LimitOperator,return false
+        if (descendant instanceof LimitOperator) {
+          return false;
+        }
+        boolean reachTerminalOperator = (descendant instanceof TerminalOperator);
+        if (!reachTerminalOperator) {
+          List<Operator<? extends OperatorDesc>> childrenOfDescendant = descendant.getChildOperators();
+          if (childrenOfDescendant != null) {
+            for (Operator<? extends OperatorDesc> childOfDescendant : childrenOfDescendant) {
+              descendants.push(childOfDescendant);
+            }
+          }
+        }
+      }
+      return true;
+    }
     return false;
   }
 
