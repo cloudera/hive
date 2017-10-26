@@ -490,7 +490,7 @@ public class ReduceSinkDeDuplication implements Transform {
       if (pRS != null && merge(cRS, pRS, dedupCtx.minReducer())) {
         CorrelationUtilities.replaceReduceSinkWithSelectOperator(
             cRS, dedupCtx.getPctx(), dedupCtx);
-        pRS.getConf().setEnforceSort(true);
+        pRS.getConf().setDeduplicated(true);
         return true;
       }
       return false;
@@ -513,7 +513,7 @@ public class ReduceSinkDeDuplication implements Transform {
       if (pRS != null && merge(cRS, pRS, dedupCtx.minReducer())) {
         CorrelationUtilities.removeReduceSinkForGroupBy(
             cRS, cGBY, dedupCtx.getPctx(), dedupCtx);
-        pRS.getConf().setEnforceSort(true);
+        pRS.getConf().setDeduplicated(true);
         return true;
       }
       return false;
@@ -536,7 +536,7 @@ public class ReduceSinkDeDuplication implements Transform {
             CorrelationUtilities.findPossibleParent(
                 pJoin, ReduceSinkOperator.class, dedupCtx.trustScript());
         if (pRS != null) {
-          pRS.getConf().setEnforceSort(true);
+          pRS.getConf().setDeduplicated(true);
         }
         return true;
       }
@@ -560,7 +560,7 @@ public class ReduceSinkDeDuplication implements Transform {
             CorrelationUtilities.findPossibleParent(
                 pJoin, ReduceSinkOperator.class, dedupCtx.trustScript());
         if (pRS != null) {
-          pRS.getConf().setEnforceSort(true);
+          pRS.getConf().setDeduplicated(true);
         }
         return true;
       }
@@ -580,7 +580,7 @@ public class ReduceSinkDeDuplication implements Transform {
       if (pRS != null && merge(cRS, pRS, dedupCtx.minReducer())) {
         CorrelationUtilities.replaceReduceSinkWithSelectOperator(
             cRS, dedupCtx.getPctx(), dedupCtx);
-        pRS.getConf().setEnforceSort(true);
+        pRS.getConf().setDeduplicated(true);
         return true;
       }
       return false;
@@ -597,7 +597,7 @@ public class ReduceSinkDeDuplication implements Transform {
               start, ReduceSinkOperator.class, dedupCtx.trustScript());
       if (pRS != null && merge(cRS, pRS, dedupCtx.minReducer())) {
         CorrelationUtilities.removeReduceSinkForGroupBy(cRS, cGBY, dedupCtx.getPctx(), dedupCtx);
-        pRS.getConf().setEnforceSort(true);
+        pRS.getConf().setDeduplicated(true);
         return true;
       }
       return false;
